@@ -185,3 +185,20 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
 
   This is break-even, with **no proven edge**.
 - **APRO** updates rarely (it was 20.8 h stale on 28 Oct). Pyth is absent. Testnet prices are fake (about 54–78 USDT/WHSK).
+
+## T2 implementation notes
+
+- A normal call from a deployed `AproReader` to APRO `latestRoundData()` at
+  mainnet block `29413000` reverted (no EOA prank). Fork vaults therefore use
+  `oracle = address(0)`, as required by the T2 review follow-up. APRO remains
+  off-chain keeper/verifier evidence only. MockAggregator tests cover age,
+  incomplete rounds, future timestamps, invalid answers, and price bands.
+- Daily notional uses UTC calendar-day buckets (`block.timestamp / 1 days`),
+  not a sliding window. Mandate updates/revocation do not reset spend or nonces.
+- Exposure means the proportion of total pair value held in tokenA, with both
+  balances valued in tokenB at the same TWAP tick. TokenB is assumed to track USD
+  when comparing the optional tokenA/USD oracle; that peg is UNVERIFIED.
+- ProofTradeRouter takes `(owner, router)` in its constructor, fixing the swap
+  destination. ReceiptChain shares commitment logic through a storage `Chain`:
+  one instance in the vault, one per caller in the router. Events use the
+  pre-increment sequence number, starting at zero.
