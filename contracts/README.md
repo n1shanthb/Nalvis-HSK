@@ -14,7 +14,10 @@ Daily spend uses UTC fixed 24-hour buckets, not a sliding lookback; trades on
 opposite sides of midnight may consume two daily caps in a short interval.
 Mandate changes preserve spend, nonce and trade interval history. Exposure is
 `value(tokenA) / (value(tokenA) + balance(tokenB))`, using post-swap balances and
-the same pre-swap TWAP for both. Holds require a live, unpaused mandate and do
+the same pre-swap TWAP for both. T3 permits a swap above the mandate cap only
+when its post-swap exposure is strictly lower than its pre-swap exposure.
+ProofTradeRouter rejects nonzero sqrtPriceLimitX96 before pulling funds, so
+SwapRouter02 cannot partially consume input at a caller-selected price limit. Holds require a live, unpaused mandate and do
 not advance the trade nonce, interval or notional.
 
 TWAP floors negative fractional mean ticks toward negative infinity. Pool token

@@ -226,7 +226,9 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         int24 tick = _tick();
         _oracle(tick);
         uint256 refOut = _quote(tick, p.amountIn, p.tokenIn);
-        if (refOut == 0 || p.minOut < FullMath.mulDiv(refOut, 10000 - mandate.maxSlippageBps, 10000)) revert Slippage();
+        if (refOut == 0 || p.minOut < FullMath.mulDiv(refOut, 10000 - mandate.maxSlippageBps, 10000)) {
+            revert Slippage();
+        }
         uint256 bucket = block.timestamp / 1 days;
         if (dailyBucket != bucket) {
             dailyBucket = bucket;
@@ -251,6 +253,8 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         address output = p.tokenIn == tokenA ? tokenB : tokenA;
         uint256 beforeOut = IERC20(output).balanceOf(address(this));
         uint256 beforeIn = IERC20(p.tokenIn).balanceOf(address(this));
+        uint256 preA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 preTotal = preA + IERC20(tokenB).balanceOf(address(this));
         SafeToken.approve(p.tokenIn, router, p.amountIn);
         amountOut = IV3SwapRouter(router)
             .exactInputSingle(
@@ -263,7 +267,15 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         ) revert Underfill();
         uint256 valueA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
         uint256 valueB = IERC20(tokenB).balanceOf(address(this));
-        if (valueA > FullMath.mulDiv(valueA + valueB, mandate.maxExposureBps, 10000)) revert Exposure();
+        uint256 total = valueA + valueB;
+        // Compare at full precision by rounding the pre-trade ratio up. For an
+        // integer post valueA, valueA < ceil(preA * total / preTotal) is exactly
+        // the strict fractional comparison, without rounding exposure to bps.
+        uint256 threshold = preTotal == 0 ? 0 : FullMath.mulDiv(preA, total, preTotal);
+        if (preTotal != 0 && mulmod(preA, total, preTotal) != 0) ++threshold;
+        if (valueA > FullMath.mulDiv(total, mandate.maxExposureBps, 10000) && valueA >= threshold) {
+            revert Exposure();
+        }
     }
 
     /// @notice Commit WAIT or REJECT under a live mandate without moving funds.

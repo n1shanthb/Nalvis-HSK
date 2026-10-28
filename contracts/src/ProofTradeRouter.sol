@@ -15,6 +15,7 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     error Deadline();
     error Recipient();
     error Underfill();
+    error PriceLimit();
     event PolicySet(bytes32 policyHash);
 
     /// @notice Set the immutable owner and SwapRouter02 destination.
@@ -51,6 +52,8 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     ) external nonReentrant returns (uint256 amountOut) {
         if (block.timestamp > deadline) revert Deadline();
         if (p.recipient != msg.sender) revert Recipient();
+        // SwapRouter02 requires full consumption when its price limit is zero.
+        if (p.sqrtPriceLimitX96 != 0) revert PriceLimit();
         if (prevHead != chains[msg.sender].head) revert PreviousHead();
         SafeToken.pull(p.tokenIn, msg.sender, p.amountIn);
         SafeToken.approve(p.tokenIn, router, p.amountIn);

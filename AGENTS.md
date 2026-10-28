@@ -202,3 +202,15 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
   destination. ReceiptChain shares commitment logic through a storage `Chain`:
   one instance in the vault, one per caller in the router. Events use the
   pre-increment sequence number, starting at zero.
+
+## T3 implementation notes
+
+- Deployment uses the CLI-selected broadcaster, never an env private key read in
+  Solidity. Set DEPLOY_COMMIT to `git rev-parse HEAD` before running. Manifests
+  record the simulation block; verify both mined receipts before using them.
+- Exposure above the mandate cap is allowed only on strict risk reduction,
+  comparing pre/post tokenB values at the same TWAP without rounding to bps.
+- ProofTradeRouter rejects nonzero sqrtPriceLimitX96 to require full input use.
+- MandateCalldata hashes exact policy/default.json bytes (canonical JSON is the
+  policy file convention); a missing file warns and uses zero. Read-only helpers
+  refuse chains outside 133/31337. See scripts/testnet-bootstrap.md.

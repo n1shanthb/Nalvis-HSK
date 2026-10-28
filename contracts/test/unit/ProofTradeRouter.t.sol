@@ -56,6 +56,18 @@ contract ProofTradeRouterTest is Test {
         assertEq(r.head(alice), keccak256(abi.encode(bytes32(0), hash, uint64(0))));
     }
 
+    function testNonzeroPriceLimitRejectedBeforePull() public {
+        IV3SwapRouter.ExactInputSingleParams memory p = _params(alice, 50e6);
+        p.sqrtPriceLimitX96 = 1;
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.PriceLimit.selector);
+        r.commitAndSwap(0, 0, p, block.timestamp);
+        assertEq(a.balanceOf(alice), 1000e6);
+        assertEq(a.balanceOf(address(r)), 0);
+        assertEq(a.allowance(address(r), address(router)), 0);
+        assertEq(r.seq(alice), 0);
+    }
+
     function testRecipientMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Recipient.selector);
