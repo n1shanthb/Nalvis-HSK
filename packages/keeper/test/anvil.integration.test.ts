@@ -345,6 +345,24 @@ it.skipIf(!!reason)(
             JSON.stringify(verified.checks),
           ).toEqual([]);
           expect(verified.status).toBe('PASS');
+          const { main: verifyCLI } = await import('../../verifier/src/cli.js');
+          const output: string[] = [];
+          expect(
+            await verifyCLI(
+              [
+                r.settlement.transactionHash,
+                '--receipt',
+                join(directory, '31337', name!),
+                '--rpc',
+                chain.rpcUrls.default.http[0],
+                '--chain',
+                '4',
+                '--json',
+              ],
+              (s) => output.push(s),
+            ),
+          ).toBe(0);
+          expect(JSON.parse(output[0]).status).toBe('PASS');
           if (process.env.VERIFIER_FIXTURE_DIR) {
             const dir = process.env.VERIFIER_FIXTURE_DIR;
             await mkdir(join(dir, 'receipts'), { recursive: true });
