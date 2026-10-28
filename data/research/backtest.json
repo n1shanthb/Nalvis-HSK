@@ -1,0 +1,214 @@
+{
+ "note": "Replay only; NOT evidence of profitability (30 days, single pool, one dominant counterparty, stale-hour fills assumed).",
+ "in_sample_hours": 360,
+ "oos_hours": 360,
+ "results": {
+  "A_fixed_band": {
+   "threshold_chosen_in_sample": 0.015,
+   "in_sample": {
+    "final_equity": 994.68,
+    "hold_5050_equity": 993.87,
+    "excess_vs_hold": 0.81,
+    "trades": 3,
+    "rejected_signals": 0,
+    "max_drawdown_pct": 3.86
+   },
+   "out_of_sample": {
+    "final_equity": 949.9,
+    "hold_5050_equity": 963.63,
+    "excess_vs_hold": -13.74,
+    "trades": 4,
+    "rejected_signals": 0,
+    "max_drawdown_pct": 9.34
+   },
+   "full_grid_oos": {
+    "0.005": {
+     "final_equity": 934.91,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -28.73,
+     "trades": 12,
+     "rejected_signals": 0,
+     "max_drawdown_pct": 9.34
+    },
+    "0.01": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 0,
+     "max_drawdown_pct": 9.34
+    },
+    "0.015": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 0,
+     "max_drawdown_pct": 9.34
+    },
+    "0.02": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 0,
+     "max_drawdown_pct": 9.34
+    }
+   },
+   "out_of_sample_dex_mark": {
+    "final_equity": 943.56,
+    "hold_5050_equity": 960.18,
+    "excess_vs_hold": -16.61,
+    "trades": 4,
+    "rejected_signals": 0,
+    "max_drawdown_pct": 7.91
+   },
+   "in_sample_dex_mark": {
+    "final_equity": 983.35,
+    "hold_5050_equity": 986.83,
+    "excess_vs_hold": -3.48,
+    "trades": 3,
+    "rejected_signals": 0,
+    "max_drawdown_pct": 2.95
+   }
+  },
+  "B_risk_aware_band": {
+   "threshold_chosen_in_sample": 0.005,
+   "in_sample": {
+    "final_equity": 997.33,
+    "hold_5050_equity": 993.87,
+    "excess_vs_hold": 3.46,
+    "trades": 14,
+    "rejected_signals": 3,
+    "max_drawdown_pct": 3.29
+   },
+   "out_of_sample": {
+    "final_equity": 946.13,
+    "hold_5050_equity": 963.63,
+    "excess_vs_hold": -17.5,
+    "trades": 8,
+    "rejected_signals": 8,
+    "max_drawdown_pct": 9.34
+   },
+   "full_grid_oos": {
+    "0.005": {
+     "final_equity": 946.13,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -17.5,
+     "trades": 8,
+     "rejected_signals": 8,
+     "max_drawdown_pct": 9.34
+    },
+    "0.01": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 8,
+     "max_drawdown_pct": 9.34
+    },
+    "0.015": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 8,
+     "max_drawdown_pct": 9.34
+    },
+    "0.02": {
+     "final_equity": 949.9,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -13.74,
+     "trades": 4,
+     "rejected_signals": 7,
+     "max_drawdown_pct": 9.34
+    }
+   },
+   "out_of_sample_dex_mark": {
+    "final_equity": 942.8,
+    "hold_5050_equity": 960.18,
+    "excess_vs_hold": -17.38,
+    "trades": 8,
+    "rejected_signals": 8,
+    "max_drawdown_pct": 7.91
+   },
+   "in_sample_dex_mark": {
+    "final_equity": 984.52,
+    "hold_5050_equity": 986.83,
+    "excess_vs_hold": -2.31,
+    "trades": 14,
+    "rejected_signals": 3,
+    "max_drawdown_pct": 2.77
+   }
+  },
+  "D_dislocation": {
+   "threshold_chosen_in_sample": 0.005,
+   "in_sample": {
+    "final_equity": 1011.47,
+    "hold_5050_equity": 993.87,
+    "excess_vs_hold": 17.6,
+    "trades": 35,
+    "rejected_signals": 49,
+    "max_drawdown_pct": 2.1
+   },
+   "out_of_sample": {
+    "final_equity": 967.17,
+    "hold_5050_equity": 963.63,
+    "excess_vs_hold": 3.54,
+    "trades": 38,
+    "rejected_signals": 93,
+    "max_drawdown_pct": 7.92
+   },
+   "full_grid_oos": {
+    "0.005": {
+     "final_equity": 967.17,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": 3.54,
+     "trades": 38,
+     "rejected_signals": 93,
+     "max_drawdown_pct": 7.92
+    },
+    "0.01": {
+     "final_equity": 963.08,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": -0.55,
+     "trades": 13,
+     "rejected_signals": 55,
+     "max_drawdown_pct": 6.64
+    },
+    "0.015": {
+     "final_equity": 974.6,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": 10.97,
+     "trades": 4,
+     "rejected_signals": 40,
+     "max_drawdown_pct": 4.59
+    },
+    "0.02": {
+     "final_equity": 974.6,
+     "hold_5050_equity": 963.63,
+     "excess_vs_hold": 10.97,
+     "trades": 4,
+     "rejected_signals": 28,
+     "max_drawdown_pct": 4.59
+    }
+   },
+   "out_of_sample_dex_mark": {
+    "final_equity": 960.66,
+    "hold_5050_equity": 960.18,
+    "excess_vs_hold": 0.49,
+    "trades": 38,
+    "rejected_signals": 93,
+    "max_drawdown_pct": 5.35
+   },
+   "in_sample_dex_mark": {
+    "final_equity": 999.82,
+    "hold_5050_equity": 986.83,
+    "excess_vs_hold": 12.99,
+    "trades": 35,
+    "rejected_signals": 49,
+    "max_drawdown_pct": 0.74
+   }
+  }
+ }
+}

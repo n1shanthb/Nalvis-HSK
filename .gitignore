@@ -12,3 +12,5 @@ receipts/*
 !receipts/demo/
 work/
 contracts/deployments/31337.json
+
+coverage/

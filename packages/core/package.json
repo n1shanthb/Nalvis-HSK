@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "lint": "eslint src test"
+    "lint": "eslint src test",
+    "backtest": "pnpm build && node dist/backtest/cli.js",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "viem": "^2.38.0",
