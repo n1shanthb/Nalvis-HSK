@@ -128,3 +128,12 @@ The opt-in network test requires reachable RPC/HTTP services. With Node 22 in a
 proxy environment, enable its `--use-env-proxy` support; default tests use no
 network. Engine coverage is enforced at 100% branches; helper behavior is also
 covered by targeted risk/quote and collector tests.
+
+## Keeper settlement extension
+
+T5 appends `settlement: {transactionHash, blockNumber, status, log, gasUsed,
+effectiveGasPrice}` after mining. `receiptHash()` enumerates its input fields
+explicitly, so settlement is excluded and the v1 commitment/golden file remains
+unchanged. Execution quotes and keeper state are committed inside evidence
+sources; engine amounts remain mainnet units while execution amounts use the
+execution token decimals. See `packages/keeper/README.md`.
