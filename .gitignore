@@ -11,3 +11,4 @@ receipts/*
 !receipts/.gitkeep
 !receipts/demo/
 work/
+contracts/deployments/31337.json

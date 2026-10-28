@@ -43,10 +43,9 @@ contract EdgewiseVaultTest is Test {
     }
 
     function _deploy(address feed, uint256 age) internal returns (EdgewiseVault) {
-        return
-            new EdgewiseVault(
-                address(this), address(router), address(pool), address(a), address(b), 3000, 300, feed, 500, age
-            );
+        return new EdgewiseVault(
+            address(this), address(router), address(pool), address(a), address(b), 3000, 300, feed, 500, age
+        );
     }
 
     function _params() internal view returns (EdgewiseVault.TradeParams memory) {
@@ -86,6 +85,33 @@ contract EdgewiseVaultTest is Test {
         assertEq(a.balanceOf(address(v)), 1050e18);
         assertEq(b.balanceOf(address(v)), 950e18);
         assertEq(b.allowance(address(v), address(router)), 0);
+    }
+
+    function testDeriskAboveCap() public {
+        m.maxExposureBps = 4000;
+        v.setMandate(m);
+        EdgewiseVault.TradeParams memory p = _params();
+        p.tokenIn = address(a);
+        vm.prank(agent);
+        v.trade(p); // 50% -> 47.5%, still above 40%.
+        assertEq(a.balanceOf(address(v)), 950e18);
+        assertEq(a.allowance(address(v), address(router)), 0);
+        assertEq(v.seq(), 1);
+    }
+
+    function testIncreasingExposureWithinCap() public {
+        m.maxExposureBps = 5300;
+        v.setMandate(m);
+        _trade(); // 50% -> 52.5% <= 53%.
+        assertEq(v.seq(), 1);
+    }
+
+    function testIncreasingExposureAboveCapReverts() public {
+        m.maxExposureBps = 5100;
+        v.setMandate(m);
+        _reject(_params(), EdgewiseVault.Exposure.selector);
+        assertEq(v.seq(), 0);
+        assertEq(v.nextNonce(), 0);
     }
 
     function testSellAResize() public {
