@@ -6,7 +6,10 @@ export const hskMainnet: Chain = defineChain({
   nativeCurrency: { name: 'HSK', symbol: 'HSK', decimals: 18 },
   rpcUrls: {
     default: {
-      http: [process.env.HSK_MAINNET_RPC || 'https://mainnet.hsk.xyz'],
+      http: [
+        (typeof process !== 'undefined' && process.env.HSK_MAINNET_RPC) ||
+          'https://mainnet.hsk.xyz',
+      ],
     },
   },
   blockExplorers: {
@@ -19,7 +22,10 @@ export const hskTestnet: Chain = defineChain({
   nativeCurrency: { name: 'Test HSK', symbol: 'HSK', decimals: 18 },
   rpcUrls: {
     default: {
-      http: [process.env.HSK_TESTNET_RPC || 'https://testnet.hsk.xyz'],
+      http: [
+        (typeof process !== 'undefined' && process.env.HSK_TESTNET_RPC) ||
+          'https://testnet.hsk.xyz',
+      ],
     },
   },
   blockExplorers: {
