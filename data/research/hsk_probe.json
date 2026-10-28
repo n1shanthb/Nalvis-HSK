@@ -1,0 +1,171 @@
+{
+ "measured_at_IST": "27/10/2026, 9:30:49 pm",
+ "mainnet": {
+  "chainId": "177",
+  "block": 29384857,
+  "block_time_IST": "27/10/2026, 9:30:49 pm",
+  "gasPriceGwei": "500.001",
+  "pyth_code_at_known_addresses": {
+   "0x2880aB155794e7179c9eE2e38200202908C17B43": {
+    "label": "Pyth Core (many chains)",
+    "codeBytes": 0
+   },
+   "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729": {
+    "label": "Pyth Core (many chains)",
+    "codeBytes": 0
+   },
+   "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C": {
+    "label": "Pyth Core (Arb/OP/Polygon)",
+    "codeBytes": 0
+   },
+   "0x4305FB66699C3B2702D4d05CF36551390A4c69C6": {
+    "label": "Pyth Core (Ethereum)",
+    "codeBytes": 0
+   },
+   "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a": {
+    "label": "Pyth Core (Base)",
+    "codeBytes": 0
+   },
+   "0xe9d69CdD6Fe41e7B621B4A688C5D1a68cB5c8ADc": {
+    "label": "Pyth Core (Conflux/HyperEVM)",
+    "codeBytes": 0
+   },
+   "0xACeA761c27A909d4D3895128EBe6370FDE2dF481": {
+    "label": "Pyth Pro (many chains)",
+    "codeBytes": 0
+   }
+  },
+  "whsk_usdt_pool": {
+   "pool": "0x4ff515761864e7838B0AdB8b5b2B8B7A068905dC",
+   "liquidity": "747542660217805375",
+   "tick": -300536,
+   "t0": {
+    "address": "0xB210D2120d57b758EE163cFfb43e73728c471Cf1",
+    "symbol": "WHSK",
+    "balanceInPool": "2508538.101132184374557125"
+   },
+   "t1": {
+    "address": "0xF1B50eD67A9e2CC94Ad3c477779E2d4cBfFf9029",
+    "symbol": "USDT",
+    "balanceInPool": "222811.882017"
+   }
+  },
+  "quotes": [
+   {
+    "usdtIn": 10,
+    "whskOut": 112.23604880441056,
+    "effPrice": 0.08909793338704051,
+    "roundTripUsdtBack": 9.939201,
+    "roundTripCostPct": 0.6079899999999916,
+    "quoterGasEstimate": "73984"
+   },
+   {
+    "usdtIn": 50,
+    "whskOut": 561.0798165102569,
+    "effPrice": 0.08911388100000557,
+    "roundTripUsdtBack": 49.678252,
+    "roundTripCostPct": 0.643495999999999,
+    "quoterGasEstimate": "82647"
+   },
+   {
+    "usdtIn": 100,
+    "whskOut": 1121.9086653124562,
+    "effPrice": 0.08913381551621191,
+    "roundTripUsdtBack": 99.31215,
+    "roundTripCostPct": 0.687850000000001,
+    "quoterGasEstimate": "82645"
+   },
+   {
+    "usdtIn": 500,
+    "whskOut": 5599.524788301023,
+    "effPrice": 0.08929329164586254,
+    "roundTripUsdtBack": 494.793647,
+    "roundTripCostPct": 1.0412705999999994,
+    "quoterGasEstimate": "82627"
+   },
+   {
+    "usdtIn": 1000,
+    "whskOut": 11174.103654429768,
+    "effPrice": 0.08949263680792584,
+    "roundTripUsdtBack": 985.204756,
+    "roundTripCostPct": 1.4795243999999985,
+    "quoterGasEstimate": "82657"
+   }
+  ],
+  "apro_HSK_USD": {
+   "answer": 0.08921597,
+   "updated_IST": "27/10/2026, 4:21:35 pm",
+   "age_h": 5.156523611081971
+  }
+ },
+ "testnet": {
+  "chainId": "133",
+  "block": 34965101,
+  "block_time_IST": "27/10/2026, 9:30:58 pm",
+  "gasPriceGwei": "1.001",
+  "code": {
+   "factory": {
+    "address": "0x2dC2c21D1049F786C535bF9d45F999dB5474f3A0",
+    "codeBytes": 24535
+   },
+   "quoterV2": {
+    "address": "0x73820d9eE5Bf1BfcD429580320FC7A374E8fa1cC",
+    "codeBytes": 8273
+   },
+   "swapRouter02": {
+    "address": "0xa6914E66690c6794244B5f66a09eAEbf66254237",
+    "codeBytes": 24497
+   },
+   "npm": {
+    "address": "0x73dEc6bfa6751509b08480bd97f54b874E3b20e8",
+    "codeBytes": 24384
+   },
+   "multicall": {
+    "address": "0x47F625Ec29637445AA1570d7008Cf78692CdA096",
+    "codeBytes": 1383
+   },
+   "WHSK": {
+    "address": "0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6",
+    "codeBytes": 3143
+   }
+  },
+  "pyth_code_at_known_addresses": {
+   "0x2880aB155794e7179c9eE2e38200202908C17B43": {
+    "label": "Pyth Core (many chains)",
+    "codeBytes": 0
+   },
+   "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729": {
+    "label": "Pyth Core (many chains)",
+    "codeBytes": 0
+   },
+   "0xff1a0f4744e8582DF1aE09D5611b887B6a12925C": {
+    "label": "Pyth Core (Arb/OP/Polygon)",
+    "codeBytes": 0
+   },
+   "0x4305FB66699C3B2702D4d05CF36551390A4c69C6": {
+    "label": "Pyth Core (Ethereum)",
+    "codeBytes": 0
+   },
+   "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a": {
+    "label": "Pyth Core (Base)",
+    "codeBytes": 0
+   },
+   "0xe9d69CdD6Fe41e7B621B4A688C5D1a68cB5c8ADc": {
+    "label": "Pyth Core (Conflux/HyperEVM)",
+    "codeBytes": 0
+   },
+   "0xACeA761c27A909d4D3895128EBe6370FDE2dF481": {
+    "label": "Pyth Pro (many chains)",
+    "codeBytes": 0
+   }
+  },
+  "poolsCreated": [
+   {
+    "error": "Error: server response 400 Bad Request (request={  }, response={  }, error=null, info={ \"requestUrl\": \"https://testnet.h",
+    "from": 34865102,
+    "to": 34965101
+   }
+  ],
+  "poolStates": []
+ }
+}

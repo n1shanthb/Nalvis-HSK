@@ -1,0 +1,34 @@
+{
+ "measured_at_IST": "27/10/2026, 9:33:10 pm",
+ "usdtDecimals": 18,
+ "quotes": [
+  {
+   "fee": 3000,
+   "usdtIn": 10,
+   "whskOut": 0.18387678765633778,
+   "impliedUsdtPerWhsk": 54.38424353317402,
+   "gasEstimate": "81253"
+  },
+  {
+   "fee": 3000,
+   "usdtIn": 100,
+   "whskOut": 1.831860870797928,
+   "impliedUsdtPerWhsk": 54.589298561981764,
+   "gasEstimate": "81321"
+  },
+  {
+   "fee": 500,
+   "usdtIn": 10,
+   "whskOut": 0.12771103159671113,
+   "impliedUsdtPerWhsk": 78.30177138947741,
+   "gasEstimate": "80988"
+  },
+  {
+   "fee": 500,
+   "usdtIn": 100,
+   "whskOut": 1.274137546035756,
+   "impliedUsdtPerWhsk": 78.4844621454972,
+   "gasEstimate": "80990"
+  }
+ ]
+}

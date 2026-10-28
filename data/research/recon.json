@@ -1,0 +1,369 @@
+{
+  "measured_at_IST": "26/10/2026, 7:50:33 pm",
+  "chainId": "177",
+  "block": {
+    "number": 29338649,
+    "ts": 1793024433,
+    "baseFeeGwei": "500.0"
+  },
+  "gasPriceGwei": "500.001",
+  "code": {
+    "factory": 24535,
+    "quoter": 8273,
+    "swapRouter02": 24497,
+    "npm": 24384,
+    "multicall_sdk": 1383,
+    "universalRouter": 21779,
+    "v4PoolManager": 24009,
+    "permit2": 9152,
+    "multicall3": 3808,
+    "botRouter_0x56d1": 12070
+  },
+  "pools": [
+    {
+      "pair": "WHSK/USDT",
+      "fee": 3000,
+      "address": "0x4ff515761864e7838B0AdB8b5b2B8B7A068905dC",
+      "liquidity": "747542660217805375",
+      "tick": -300544,
+      "balances": {
+        "WHSK": "2509461.731132184374557125",
+        "USDT": "222729.62246"
+      }
+    },
+    {
+      "pair": "WHSK/USDCe",
+      "fee": 3000,
+      "address": "0xB580D654cE892181937Aac80EA165950CB7D0E02",
+      "liquidity": "249999999999",
+      "tick": 299933,
+      "balances": {
+        "WHSK": "0.814497753244129888",
+        "USDCe": "0.076788"
+      }
+    },
+    {
+      "pair": "WHSK/USDCe",
+      "fee": 10000,
+      "address": "0x9861246B8BdF619Cc0e8C0422E0a662b51A2c3F4",
+      "liquidity": "0",
+      "tick": 299991,
+      "balances": {
+        "WHSK": "0.000000000000000004",
+        "USDCe": "0.000006"
+      }
+    },
+    {
+      "pair": "USDT/WETH",
+      "fee": 3000,
+      "address": "0xb92b79ed6b370D5cFee2E14B1D0983C258304C16",
+      "liquidity": "1012957283335421",
+      "tick": -198769,
+      "balances": {
+        "USDT": "48935.586044",
+        "WETH": "20.972665270970996892"
+      }
+    },
+    {
+      "pair": "USDT/WBTC",
+      "fee": 3000,
+      "address": "0xd9EA2cE468957Ba49cCC38C4758Ed6ecD561449A",
+      "liquidity": "1823343427",
+      "tick": 66939,
+      "balances": {
+        "USDT": "51806.491586",
+        "WBTC": "0.6417982"
+      }
+    }
+  ],
+  "spot_USDT_per_WHSK": 0.0887612812835374,
+  "ref": {
+    "HSK": 0.0887612812835374,
+    "WETH_small_quote": 2326.4049999999997,
+    "WBTC_small_quote": 80480.3
+  },
+  "impact": [
+    {
+      "leg": "USDT->WHSK",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9696,
+      "totalCostPct": 0.304,
+      "impactExFeePct": 0.004,
+      "quoterGas": 80659
+    },
+    {
+      "leg": "USDT->WHSK",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.8388,
+      "totalCostPct": 0.322,
+      "impactExFeePct": 0.022,
+      "quoterGas": 80645
+    },
+    {
+      "leg": "USDT->WHSK",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.6554,
+      "totalCostPct": 0.345,
+      "impactExFeePct": 0.045,
+      "quoterGas": 80671
+    },
+    {
+      "leg": "USDT->WHSK",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 497.3867,
+      "totalCostPct": 0.523,
+      "impactExFeePct": 0.223,
+      "quoterGas": 80617
+    },
+    {
+      "leg": "USDT->WHSK",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 992.5567,
+      "totalCostPct": 0.744,
+      "impactExFeePct": 0.444,
+      "quoterGas": 80633
+    },
+    {
+      "leg": "WHSK->USDT",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9696,
+      "totalCostPct": 0.304,
+      "impactExFeePct": 0.004,
+      "quoterGas": 79911
+    },
+    {
+      "leg": "WHSK->USDT",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.8388,
+      "totalCostPct": 0.322,
+      "impactExFeePct": 0.022,
+      "quoterGas": 80843
+    },
+    {
+      "leg": "WHSK->USDT",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.6554,
+      "totalCostPct": 0.345,
+      "impactExFeePct": 0.045,
+      "quoterGas": 80853
+    },
+    {
+      "leg": "WHSK->USDT",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 497.3867,
+      "totalCostPct": 0.523,
+      "impactExFeePct": 0.223,
+      "quoterGas": 80881
+    },
+    {
+      "leg": "WHSK->USDT",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 992.5567,
+      "totalCostPct": 0.744,
+      "impactExFeePct": 0.444,
+      "quoterGas": 79911
+    },
+    {
+      "leg": "USDT->WETH",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9376,
+      "totalCostPct": 0.624,
+      "impactExFeePct": 0.324,
+      "quoterGas": 80276
+    },
+    {
+      "leg": "USDT->WETH",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.6475,
+      "totalCostPct": 0.705,
+      "impactExFeePct": 0.405,
+      "quoterGas": 80276
+    },
+    {
+      "leg": "USDT->WETH",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.194,
+      "totalCostPct": 0.806,
+      "impactExFeePct": 0.506,
+      "quoterGas": 80274
+    },
+    {
+      "leg": "USDT->WETH",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 491.9688,
+      "totalCostPct": 1.606,
+      "impactExFeePct": 1.306,
+      "quoterGas": 80330
+    },
+    {
+      "leg": "USDT->WETH",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 974.1138,
+      "totalCostPct": 2.589,
+      "impactExFeePct": 2.289,
+      "quoterGas": 80314
+    },
+    {
+      "leg": "WETH->USDT",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9984,
+      "totalCostPct": 0.016,
+      "impactExFeePct": -0.284,
+      "quoterGas": 80510
+    },
+    {
+      "leg": "WETH->USDT",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.9514,
+      "totalCostPct": 0.097,
+      "impactExFeePct": -0.203,
+      "quoterGas": 80492
+    },
+    {
+      "leg": "WETH->USDT",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.8008,
+      "totalCostPct": 0.199,
+      "impactExFeePct": -0.101,
+      "quoterGas": 80526
+    },
+    {
+      "leg": "WETH->USDT",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 494.9661,
+      "totalCostPct": 1.007,
+      "impactExFeePct": 0.707,
+      "quoterGas": 80550
+    },
+    {
+      "leg": "WETH->USDT",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 980.0189,
+      "totalCostPct": 1.998,
+      "impactExFeePct": 1.698,
+      "quoterGas": 80492
+    },
+    {
+      "leg": "USDT->WBTC",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9377,
+      "totalCostPct": 0.623,
+      "impactExFeePct": 0.323,
+      "quoterGas": 80325
+    },
+    {
+      "leg": "USDT->WBTC",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.6515,
+      "totalCostPct": 0.697,
+      "impactExFeePct": 0.397,
+      "quoterGas": 80307
+    },
+    {
+      "leg": "USDT->WBTC",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.2081,
+      "totalCostPct": 0.792,
+      "impactExFeePct": 0.492,
+      "quoterGas": 80309
+    },
+    {
+      "leg": "USDT->WBTC",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 492.2594,
+      "totalCostPct": 1.548,
+      "impactExFeePct": 1.248,
+      "quoterGas": 80297
+    },
+    {
+      "leg": "USDT->WBTC",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 975.2249,
+      "totalCostPct": 2.478,
+      "impactExFeePct": 2.178,
+      "quoterGas": 80321
+    },
+    {
+      "leg": "WBTC->USDT",
+      "usd": 10,
+      "quoter": "QuoterV2",
+      "outUsd": 9.9973,
+      "totalCostPct": 0.027,
+      "impactExFeePct": -0.273,
+      "quoterGas": 80557
+    },
+    {
+      "leg": "WBTC->USDT",
+      "usd": 50,
+      "quoter": "QuoterV2",
+      "outUsd": 49.9521,
+      "totalCostPct": 0.096,
+      "impactExFeePct": -0.204,
+      "quoterGas": 79561
+    },
+    {
+      "leg": "WBTC->USDT",
+      "usd": 100,
+      "quoter": "QuoterV2",
+      "outUsd": 99.8087,
+      "totalCostPct": 0.191,
+      "impactExFeePct": -0.109,
+      "quoterGas": 80527
+    },
+    {
+      "leg": "WBTC->USDT",
+      "usd": 500,
+      "quoter": "QuoterV2",
+      "outUsd": 495.2278,
+      "totalCostPct": 0.954,
+      "impactExFeePct": 0.654,
+      "quoterGas": 80531
+    },
+    {
+      "leg": "WBTC->USDT",
+      "usd": 1000,
+      "quoter": "QuoterV2",
+      "outUsd": 981.077,
+      "totalCostPct": 1.892,
+      "impactExFeePct": 1.592,
+      "quoterGas": 80559
+    }
+  ],
+  "oracles": {
+    "HSK/USD": {
+      "address": "0x86CE42c1b714149Dc3A7b17169EF67b5F78A224b",
+      "answer": 0.08868231,
+      "updatedAt": 1793011891,
+      "ageHours": 3.48
+    }
+  },
+  "supply": {
+    "USDT": "1073020.221805",
+    "USDCe": "1781.543817"
+  }
+}
