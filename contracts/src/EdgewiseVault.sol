@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
+import {ReceiptChain} from "./ReceiptChain.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
+import {IV3SwapRouter} from "./interfaces/IV3SwapRouter.sol";
+import {IUniswapV3Pool} from "./interfaces/IUniswapV3Pool.sol";
+import {IAggregatorV3} from "./interfaces/IAggregatorV3.sol";
+import {SafeToken} from "./lib/SafeToken.sol";
+import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
+import {TickMath} from "./lib/TickMath.sol";
+import {FullMath} from "./lib/FullMath.sol";
+
+/// @notice Owner-governed, pair-scoped trading with atomic receipt commitments.
+contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
+    address public immutable owner;
+    address public immutable router;
+    address public immutable pool;
+    address public immutable tokenA;
+    address public immutable tokenB;
+    uint24 public immutable fee;
+    uint32 public immutable twapWindowSec;
+    address public immutable oracle;
+    uint16 public immutable oracleBandBps;
+    uint256 public immutable oracleMaxAge;
+    uint256 private immutable unitA;
+    uint256 private immutable unitB;
+    uint16 public constant MAX_SLIPPAGE_CAP_BPS = 100;
+
+    struct Mandate {
+        address agent;
+        uint256 expiry;
+        uint256 maxTradeInA;
+        uint256 maxTradeInB;
+        uint256 maxDailyInB;
+        uint16 maxExposureBps;
+        uint16 maxSlippageBps;
+        uint256 minIntervalSec;
+        bytes32 policyHash;
+    }
+
+    struct TradeParams {
+        address tokenIn;
+        uint256 amountIn;
+        uint256 minOut;
+        uint256 deadline;
+        uint256 nonce;
+        bytes32 receiptHash;
+        bytes32 prevHead;
+        Kind kind;
+    }
+    Chain private chain;
+    Mandate public mandate;
+    bool public paused;
+    uint256 public nextNonce;
+    uint256 public lastTradeAt;
+    uint256 public dailyBucket;
+    uint256 public dailyNotionalB;
+    error Unauthorized();
+    error InvalidConfig();
+    error InvalidMandate();
+    error Inactive();
+    error Deadline();
+    error Nonce();
+    error Interval();
+    error TradeCap();
+    error DailyCap();
+    error Exposure();
+    error Slippage();
+    error Underfill();
+    error InvalidToken();
+    error OracleInvalid();
+    event MandateSet(Mandate mandate);
+    event Revoked();
+    event Paused(bool paused);
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+    modifier onlyAgent() {
+        if (msg.sender != mandate.agent || msg.sender == address(0)) revert Unauthorized();
+        if (paused || block.timestamp >= mandate.expiry) revert Inactive();
+        _;
+    }
+
+    /// @notice All structural configuration is immutable, with an optional oracle.
+    constructor(
+        address owner_,
+        address router_,
+        address pool_,
+        address tokenA_,
+        address tokenB_,
+        uint24 fee_,
+        uint32 window_,
+        address oracle_,
+        uint16 band_,
+        uint256 age_
+    ) {
+        if (
+            owner_ == address(0) || router_.code.length == 0 || pool_.code.length == 0 || tokenA_ == tokenB_
+                || window_ == 0 || band_ > 10000
+        ) revert InvalidConfig();
+        IUniswapV3Pool p = IUniswapV3Pool(pool_);
+        if (
+            p.fee() != fee_
+                || !((p.token0() == tokenA_ && p.token1() == tokenB_)
+                    || (p.token0() == tokenB_ && p.token1() == tokenA_))
+        ) revert InvalidConfig();
+        uint8 da = IERC20(tokenA_).decimals();
+        uint8 db = IERC20(tokenB_).decimals();
+        if (da > 38 || db > 38) revert InvalidConfig();
+        unitA = 10 ** da;
+        unitB = 10 ** db;
+        owner = owner_;
+        router = router_;
+        pool = pool_;
+        tokenA = tokenA_;
+        tokenB = tokenB_;
+        fee = fee_;
+        twapWindowSec = window_;
+        oracle = oracle_;
+        oracleBandBps = band_;
+        oracleMaxAge = age_;
+    }
+
+    /// @notice Next receipt sequence number.
+    function seq() external view returns (uint64) {
+        return chain.seq;
+    }
+
+    /// @notice Most recent receipt chain head.
+    function head() external view returns (bytes32) {
+        return chain.head;
+    }
+
+    /// @notice Replace the mandate, preserving nonce, interval and daily spend history.
+    function setMandate(Mandate calldata m) external onlyOwner {
+        if (
+            m.agent == owner || m.agent == address(0) || m.expiry <= block.timestamp
+                || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000
+        ) revert InvalidMandate();
+        mandate = m;
+        emit MandateSet(m);
+    }
+
+    /// @notice Immediately remove agent authority.
+    function revoke() external onlyOwner {
+        mandate.agent = address(0);
+        emit Revoked();
+    }
+
+    /// @notice Withdraw tokens to an owner-selected recipient.
+    function withdraw(address token, uint256 amount, address to) external onlyOwner nonReentrant {
+        SafeToken.transfer(token, to, amount);
+    }
+
+    /// @notice Stop agent actions.
+    function pause() external onlyOwner {
+        paused = true;
+        emit Paused(true);
+    }
+
+    /// @notice Resume agent actions.
+    function unpause() external onlyOwner {
+        paused = false;
+        emit Paused(false);
+    }
+
+    /// @notice Pull an exact pre-approved deposit of either configured token.
+    function deposit(address token, uint256 amount) external nonReentrant {
+        if (token != tokenA && token != tokenB) revert InvalidToken();
+        SafeToken.pull(token, msg.sender, amount);
+    }
+
+    function _tick() private view returns (int24 tick) {
+        uint32[] memory times = new uint32[](2);
+        times[0] = twapWindowSec;
+        (int56[] memory c,) = IUniswapV3Pool(pool).observe(times);
+        int56 delta;
+        unchecked {
+            delta = c[1] - c[0];
+        }
+        int56 w = int56(uint56(twapWindowSec));
+        int56 mean = delta / w;
+        if (delta < 0 && delta % w != 0) --mean;
+        if (mean < -887272 || mean > 887272) revert InvalidConfig();
+        tick = int24(mean);
+    }
+
+    function _quote(int24 tick, uint256 amount, address input) private view returns (uint256) {
+        uint160 sqrt = TickMath.getSqrtRatioAtTick(tick);
+        bool forward = input < (input == tokenA ? tokenB : tokenA);
+        if (sqrt <= type(uint128).max) {
+            uint256 ratio = uint256(sqrt) * sqrt;
+            return forward ? FullMath.mulDiv(ratio, amount, 1 << 192) : FullMath.mulDiv(1 << 192, amount, ratio);
+        }
+        uint256 ratio128 = FullMath.mulDiv(sqrt, sqrt, 1 << 64);
+        return forward ? FullMath.mulDiv(ratio128, amount, 1 << 128) : FullMath.mulDiv(1 << 128, amount, ratio128);
+    }
+
+    function _oracle(int24 tick) private view {
+        if (oracle == address(0)) return;
+        (uint80 round, int256 answer,, uint256 updated, uint80 answered) = IAggregatorV3(oracle).latestRoundData();
+        if (
+            answer <= 0 || updated == 0 || updated > block.timestamp || block.timestamp - updated > oracleMaxAge
+                || answered < round
+        ) revert OracleInvalid();
+        uint8 decimals = IAggregatorV3(oracle).decimals();
+        if (decimals > 38) revert OracleInvalid();
+        uint256 oracleB = FullMath.mulDiv(uint256(answer), unitB, 10 ** decimals);
+        uint256 twapB = _quote(tick, unitA, tokenA);
+        uint256 diff = twapB > oracleB ? twapB - oracleB : oracleB - twapB;
+        if (oracleB == 0 || diff > FullMath.mulDiv(oracleB, oracleBandBps, 10000)) revert OracleInvalid();
+    }
+
+    /// @notice Execute a mandate-bounded swap and append its receipt atomically.
+    function trade(TradeParams calldata p) external onlyAgent nonReentrant returns (uint256 amountOut) {
+        if (p.kind != Kind.TRADE && p.kind != Kind.RESIZE) revert InvalidKind();
+        if (p.prevHead != chain.head) revert PreviousHead();
+        if (block.timestamp > p.deadline) revert Deadline();
+        if (p.nonce != nextNonce) revert Nonce();
+        if (block.timestamp < lastTradeAt + mandate.minIntervalSec) revert Interval();
+        if (p.tokenIn != tokenA && p.tokenIn != tokenB) revert InvalidToken();
+        if (p.amountIn == 0 || p.amountIn > (p.tokenIn == tokenA ? mandate.maxTradeInA : mandate.maxTradeInB)) {
+            revert TradeCap();
+        }
+        int24 tick = _tick();
+        _oracle(tick);
+        uint256 refOut = _quote(tick, p.amountIn, p.tokenIn);
+        if (refOut == 0 || p.minOut < FullMath.mulDiv(refOut, 10000 - mandate.maxSlippageBps, 10000)) revert Slippage();
+        uint256 bucket = block.timestamp / 1 days;
+        if (dailyBucket != bucket) {
+            dailyBucket = bucket;
+            dailyNotionalB = 0;
+        }
+        dailyNotionalB += p.tokenIn == tokenB ? p.amountIn : refOut;
+        if (dailyNotionalB > mandate.maxDailyInB) revert DailyCap();
+        ++nextNonce;
+        lastTradeAt = block.timestamp;
+        amountOut = _swap(p, tick);
+        _commit(
+            chain,
+            p.receiptHash,
+            p.prevHead,
+            mandate.policyHash,
+            p.kind,
+            Fill(p.tokenIn, p.amountIn, amountOut, p.minOut, refOut)
+        );
+    }
+
+    function _swap(TradeParams calldata p, int24 tick) private returns (uint256 amountOut) {
+        address output = p.tokenIn == tokenA ? tokenB : tokenA;
+        uint256 beforeOut = IERC20(output).balanceOf(address(this));
+        uint256 beforeIn = IERC20(p.tokenIn).balanceOf(address(this));
+        SafeToken.approve(p.tokenIn, router, p.amountIn);
+        amountOut = IV3SwapRouter(router)
+            .exactInputSingle(
+                IV3SwapRouter.ExactInputSingleParams(p.tokenIn, output, fee, address(this), p.amountIn, p.minOut, 0)
+            );
+        SafeToken.approve(p.tokenIn, router, 0);
+        if (
+            amountOut < p.minOut || IERC20(output).balanceOf(address(this)) != beforeOut + amountOut
+                || IERC20(p.tokenIn).balanceOf(address(this)) + p.amountIn != beforeIn
+        ) revert Underfill();
+        uint256 valueA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 valueB = IERC20(tokenB).balanceOf(address(this));
+        if (valueA > FullMath.mulDiv(valueA + valueB, mandate.maxExposureBps, 10000)) revert Exposure();
+    }
+
+    /// @notice Commit WAIT or REJECT under a live mandate without moving funds.
+    function commitHold(bytes32 hash, bytes32 prev, Kind kind) external onlyAgent nonReentrant {
+        _hold(chain, hash, prev, mandate.policyHash, kind);
+    }
+}
