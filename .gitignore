@@ -1,6 +1,13 @@
-out/
-cache/
-broadcast/
-node_modules/
 .env
 .env.*
+!.env.example
+node_modules/
+dist/
+*.tsbuildinfo
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+receipts/*
+!receipts/.gitkeep
+!receipts/demo/
+work/

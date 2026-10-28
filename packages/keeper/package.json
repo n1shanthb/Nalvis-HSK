@@ -1,0 +1,12 @@
+{
+  "name": "@nalvis/keeper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src test"
+  },
+  "dependencies": {}
+}
