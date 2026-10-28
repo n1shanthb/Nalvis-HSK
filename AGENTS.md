@@ -214,3 +214,7 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
 - MandateCalldata hashes exact policy/default.json bytes (canonical JSON is the
   policy file convention); a missing file warns and uses zero. Read-only helpers
   refuse chains outside 133/31337. See scripts/testnet-bootstrap.md.
+
+## Workflow implementation notes
+
+Workflow: commit and push to the task branch after each submodule or logical unit of change; open the PR once when acceptance tests pass

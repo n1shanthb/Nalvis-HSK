@@ -137,3 +137,14 @@ explicitly, so settlement is excluded and the v1 commitment/golden file remains
 unchanged. Execution quotes and keeper state are committed inside evidence
 sources; engine amounts remain mainnet units while execution amounts use the
 execution token decimals. See `packages/keeper/README.md`.
+
+## Verifier replay inputs
+
+T6's keeper commits `evidence.sources.replay` with method
+`deterministic-replay-inputs-v1` and raw `{policy, mandate, state}`. The state is
+captured after preset validation and daily-loss reconciliation, so the verifier
+can replay the exact engine inputs without consulting a mutable policy file.
+This source is inside the existing evidence commitment; it does not change the
+v1 receipt projection or golden-file contract. `sources.keeperState` continues
+to record the execution snapshot. See `packages/verifier/README.md` for failure
+semantics and execution-unit comparisons.

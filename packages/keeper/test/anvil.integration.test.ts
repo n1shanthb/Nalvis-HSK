@@ -1,6 +1,13 @@
 import { it, expect } from 'vitest';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  mkdir,
+  writeFile,
+} from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,6 +28,7 @@ import {
   policyHash,
   units,
   receiptHash,
+  canonical,
 } from '../../core/src/index.js';
 import { vaultAbi, erc20Abi } from '../../core/src/abi/index.js';
 import { connectExecution, PUBLIC_ANVIL_MNEMONIC } from '../src/execution.js';
@@ -175,6 +183,12 @@ it.skipIf(!!reason)(
       const router = (
         await client.waitForTransactionReceipt({ hash: routerTx })
       ).contractAddress!;
+      const recording: {
+        receipts: unknown[];
+        transactions: unknown[];
+        heads: Record<string, string>;
+        configs: Record<string, unknown>;
+      } = { receipts: [], transactions: [], heads: {}, configs: {} };
       // Transfer fork-only test funds from the pool by impersonation; never any remote writes.
       const local = createWalletClient({
         chain,
@@ -318,6 +332,61 @@ it.skipIf(!!reason)(
             await readFile(join(directory, '31337', name!), 'utf8'),
           );
           expect(r.decision.kind).toBe(kind);
+          // Verify against RPC while the real fork is alive, including its prior links.
+          const { verify, rpcReader } =
+            await import('../../verifier/src/verify.js');
+          const reader = rpcReader(chain.rpcUrls.default.http[0]);
+          const verified = await verify(r, reader, {
+            txHash: r.settlement.transactionHash,
+            chain: 4,
+          });
+          expect(
+            verified.checks.filter((c) => !c.pass),
+            JSON.stringify(verified.checks),
+          ).toEqual([]);
+          expect(verified.status).toBe('PASS');
+          const { main: verifyCLI } = await import('../../verifier/src/cli.js');
+          const output: string[] = [];
+          expect(
+            await verifyCLI(
+              [
+                r.settlement.transactionHash,
+                '--receipt',
+                join(directory, '31337', name!),
+                '--rpc',
+                chain.rpcUrls.default.http[0],
+                '--chain',
+                '4',
+                '--json',
+              ],
+              (s) => output.push(s),
+            ),
+          ).toBe(0);
+          expect(JSON.parse(output[0]).status).toBe('PASS');
+          if (process.env.VERIFIER_FIXTURE_DIR) {
+            const dir = process.env.VERIFIER_FIXTURE_DIR;
+            await mkdir(join(dir, 'receipts'), { recursive: true });
+            await writeFile(join(dir, 'receipts', name!), canonical(r) + '\n');
+            const mined = await client.getTransactionReceipt({
+              hash: r.settlement.transactionHash,
+            });
+            recording.receipts.push(mined);
+            recording.transactions.push(
+              await client.getTransaction({ hash: mined.transactionHash }),
+            );
+            recording.heads[String(mined.blockNumber)] = await reader.head(
+              vault,
+              mined.blockNumber,
+            );
+            recording.configs[String(mined.blockNumber)] = await reader.config(
+              vault,
+              mined.blockNumber,
+            );
+            await writeFile(
+              join(dir, 'chain.json'),
+              canonical({ chainId: 31337, ...recording }) + '\n',
+            );
+          }
           expect(receiptHash(r)).toBe(r.receiptHash);
           expect(r.settlement.log.receiptHash).toBe(r.receiptHash);
           expect(

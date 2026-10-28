@@ -155,6 +155,15 @@ export async function tick(
     llmValid: choice.valid,
     dailyLossB: dailyLoss,
   };
+  // Commit the exact replay inputs, including the final validated chooser result.
+  evidence.sources.replay = {
+    address: execution.contract,
+    method: 'deterministic-replay-inputs-v1',
+    chainId: execution.chainId,
+    blockNumber: snapshot.blockNumber ?? evidence.executionBlockNumber,
+    fetchedAt: evidence.now,
+    raw: { policy, mandate: snapshot.mandate, state },
+  };
   const decision = decide(evidence, policy, snapshot.mandate, state);
   let minOut = 0n;
   if (decision.kind === 'TRADE' || decision.kind === 'RESIZE') {

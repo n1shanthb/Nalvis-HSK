@@ -118,3 +118,22 @@ Testnet caveats:
 ## Our deployments
 
 None yet. Add each one here with: chain, address, deploy tx hash, commit SHA, and constructor args.
+
+## Ephemeral local verifier fixture (chain 31337 only)
+
+The T6 recording uses a local fork of mainnet block 29413000. This is not a
+network deployment or an address to use for broadcasting. Source: the T5 Anvil
+integration deploys EdgewiseVault from the compiled artifact and records real
+keeper transactions; verifier capture read nonempty bytecode and token/fee
+configuration at the mined block.
+
+| Contract      | Local fork address                           | Recorded first trade transaction                                     |
+| ------------- | -------------------------------------------- | -------------------------------------------------------------------- |
+| EdgewiseVault | `0x663f3ad617193148711d28f5334ee4ed07016602` | `0x8f76b8333e1797a156c9605d17ee959cf7d95e3da3c945616c07f0985d82b784` |
+
+Recording keeper revision: `08cea51` (replay snapshot extension), based on T5
+`e1033a1`. Constructor inputs: the public Anvil account 0 owner, configured
+SwapRouter02/pool/WHSK/USDT on 177, fee 3000, TWAP window 600, oracle zero,
+oracle band/max-age zero. Deployment transaction hash was not captured and is
+UNVERIFIED; the trade hash above is not a deployment hash. The manifest is only
+test provenance. See `packages/verifier/test/fixtures/README.md`.

@@ -8,5 +8,11 @@
     "test": "vitest run",
     "lint": "eslint src test"
   },
-  "dependencies": {}
+  "dependencies": {
+    "viem": "^2.38.0",
+    "zod": "^3.25.76"
+  },
+  "bin": {
+    "verify": "dist/verifier/src/cli.js"
+  }
 }
