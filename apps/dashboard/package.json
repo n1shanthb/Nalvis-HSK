@@ -7,16 +7,23 @@
     "build": "tsc -p tsconfig.json && vite build",
     "test": "vitest run",
     "lint": "eslint src test",
-    "dev": "vite"
+    "dev": "vite",
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "viem": "^2.38.0"
+    "viem": "^2.38.0",
+    "@ledgerhq/device-management-kit": "^1.9.0",
+    "@ledgerhq/device-signer-kit-ethereum": "^1.18.0",
+    "@ledgerhq/device-transport-kit-web-hid": "^1.2.4",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "vite": "^6.4.1",
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "@testing-library/react": "^16.3.0",
+    "jsdom": "^26.1.0"
   }
 }
