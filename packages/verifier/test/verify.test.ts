@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, test, expect } from 'vitest';
 import { encodeAbiParameters, keccak256, zeroAddress, zeroHash } from 'viem';
 import { hash, receiptHash, type ReceiptBody } from '../../core/src/index.js';
-import { verify } from '../src/verify.js';
+import { verify, chainHead } from '../src/verify.js';
 import { recordedReader } from '../src/recorded.js';
 const dir = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const read = (path: string) =>
@@ -141,6 +141,27 @@ describe('recorded genuine T5 fork execution', () => {
     l.topics[2] = hash('wrong earlier hash');
     const result = await verify(wait, recordedReader(c), { chain: 1 });
     expect(failures(result)).toEqual(['chain_prevHead']);
+  });
+  test('historical head includes multiple subsequent receipts mined in the same block', async () => {
+    // Synthetic RPC response variation exercises multi-transaction block handling.
+    const c = structuredClone(chain);
+    const block = c.receipts[0].blockNumber;
+    let head = chainHead(trade.prevHead, trade.receiptHash, BigInt(trade.seq));
+    for (let i = 1; i <= 2; i++) {
+      c.receipts[i].blockNumber = block;
+      const log = c.receipts[i].logs.find(
+        (l: { address: string }) =>
+          l.address.toLowerCase() === trade.contract.toLowerCase(),
+      );
+      log.blockNumber = block;
+      log.logIndex = c.receipts[0].logs.length + i;
+      log.data = '0x' + head.slice(2) + log.data.slice(66);
+      head = chainHead(head, receipts[i].receiptHash, BigInt(i));
+    }
+    c.heads[block] = head;
+    const result = await verify(trade, recordedReader(c));
+    expect(failures(result)).toEqual([]);
+    expect(result.status).toBe('PASS');
   });
   test('FAIL historical head mismatch', async () => {
     const c = structuredClone(chain);

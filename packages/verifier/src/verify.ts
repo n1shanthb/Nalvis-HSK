@@ -566,6 +566,7 @@ export async function verify(
         own.push({ row, event: decodeReceipt(row) });
       }
       if (end === mined.blockNumber) {
+        let blockSeq = ev.seq;
         for (const { row, event } of own.filter(
           (x) =>
             x.row.blockNumber === mined.blockNumber &&
@@ -574,9 +575,10 @@ export async function verify(
           void row;
           check(
             'same_block_link',
-            event.seq === ev.seq + 1n && event.prevHead === blockHead,
+            event.seq === blockSeq + 1n && event.prevHead === blockHead,
           );
           blockHead = chainHead(event.prevHead, event.receiptHash, event.seq);
+          blockSeq = event.seq;
         }
         check('head_after', head === blockHead);
       }
