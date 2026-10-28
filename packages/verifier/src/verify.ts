@@ -574,7 +574,7 @@ export async function verify(
           void row;
           check(
             'same_block_link',
-            event.seq > ev.seq && event.prevHead === blockHead,
+            event.seq === ev.seq + 1n && event.prevHead === blockHead,
           );
           blockHead = chainHead(event.prevHead, event.receiptHash, event.seq);
         }
