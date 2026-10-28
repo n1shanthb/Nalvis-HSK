@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { type Address, type Hex } from 'viem';
+import { serializeTransaction, hexToBytes, type Address, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { addresses } from '../../../packages/core/src/addresses.js';
 const mocks = vi.hoisted(() => ({
@@ -62,13 +62,23 @@ beforeEach(() => {
 test('DMK WebHID address and transaction path compile and run with mocked SDK', async () => {
   const signer = await connectLedger(133, 2);
   expect(await signer.address()).toBe(addresses[133].whsk.address);
-  await signer.signTransaction('0x1234', 133);
+  const unsigned = serializeTransaction({
+    type: 'legacy',
+    chainId: 133,
+    nonce: 0,
+    gasPrice: 1n,
+    gas: 50000n,
+    to: addresses[133].primaryPool.address,
+    value: 0n,
+    data: '0xb6549f75',
+  });
+  await signer.signTransaction(unsigned, 133);
   expect(mocks.getAddress).toHaveBeenCalledWith("44'/60'/0'/0/2", {
     checkOnDevice: true,
   });
   expect(mocks.signTransaction).toHaveBeenCalledWith(
     "44'/60'/0'/0/2",
-    new Uint8Array([18, 52]),
+    hexToBytes(unsigned),
   );
   await signer.disconnect();
   expect(mocks.close).toHaveBeenCalledOnce();
@@ -175,3 +185,36 @@ test.each(['chain', 'owner', 'signature', 'reject'] as const)(
     expect(signer.disconnect).toHaveBeenCalledOnce();
   },
 );
+
+test('chain switch after signing refuses broadcast', async () => {
+  const signer = new MockSigner(),
+    client = mockClient();
+  client.getChainId
+    .mockResolvedValueOnce(133)
+    .mockResolvedValueOnce(133)
+    .mockResolvedValueOnce(177);
+  await expect(
+    sendOwnerAction({ ...params, signer, client: client as never }),
+  ).rejects.toThrow('Writes forbidden');
+  expect(signer.signTransaction).toHaveBeenCalledOnce();
+  expect(client.sendRawTransaction).not.toHaveBeenCalled();
+  expect(signer.disconnect).toHaveBeenCalledOnce();
+});
+test('Ledger adapter rejects mainnet serialized payload even when caller claims 133', async () => {
+  const signer = await connectLedger(133);
+  const unsigned = serializeTransaction({
+    type: 'legacy',
+    chainId: 177,
+    nonce: 0,
+    gas: 50000n,
+    gasPrice: 1n,
+    to: addresses[133].primaryPool.address,
+    value: 0n,
+    data: '0xb6549f75',
+  });
+  await expect(signer.signTransaction(unsigned, 133)).rejects.toThrow(
+    'Writes forbidden',
+  );
+  expect(mocks.signTransaction).not.toHaveBeenCalled();
+  await signer.disconnect();
+});
