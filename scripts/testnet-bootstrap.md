@@ -58,7 +58,7 @@ QUOTE=$(cast call "$QUOTER" \
   'quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)' \
   "($WHSK,$USDT,$SWAP_IN,3000,0)" --rpc-url "$HSK_TESTNET_RPC" | sed -n '1s/ .*//p')
 export MIN_OUT=$(python3 -c 'import sys; print(int(sys.argv[1])*99//100)' "$QUOTE")
-test "$MIN_OUT" -gt 0
+python3 -c 'import sys; assert int(sys.argv[1]) > 0' "$MIN_OUT"
 send133 "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" "$SWAP_IN" \
   --private-key "$TESTNET_DEPLOYER_KEY"
 DEADLINE=$(( $(date +%s) + 300 ))
