@@ -19,6 +19,7 @@ We are building a **Ledger-governed, receipt-proving trading agent** on HashKey 
 ### The LLM's role (strict)
 
 The LLM is optional and boxed in:
+
 - It may **(a)** choose one strategy preset from a fixed enum defined in the policy file, **(b)** write plain-language explanations of decisions, and **(c)** turn a natural-language request into a parameter diff that is validated against the schema and the mandate.
 - It must **never** set prices, amounts, minOut or recipients. It must never build, sign or send a transaction, and it must never change the engine's verdict.
 - All LLM output is schema-validated (zod), and the transcript hash goes into the receipt.
@@ -49,12 +50,14 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
 ### Contract spec (summary; tests must cover every bullet)
 
 **`ReceiptChain` (abstract)**
+
 - It holds `uint64 seq` and `bytes32 head`.
 - `_commit(receiptHash, prevHead, kind, ...)` requires `prevHead == head`. It then sets `head = keccak256(abi.encode(head, receiptHash, seq))`, increments `seq` and emits the `Receipt` event.
 - `kind` is an enum: `TRADE, RESIZE, WAIT, REJECT`.
 - `event Receipt(uint64 indexed seq, bytes32 indexed receiptHash, bytes32 prevHead, bytes32 policyHash, uint8 kind, address tokenIn, uint256 amountIn, uint256 amountOut, uint256 minOut, uint256 refOut)`. Hold receipts use zeros for the token and amount fields.
 
 **`EdgewiseVault is ReceiptChain`**
+
 - **Constructor** takes `(owner, router, pool, tokenA=WHSK, tokenB=USDT, fee, twapWindowSec, oracle /*may be 0*/, oracleBandBps, oracleMaxAge)`. Everything structural is immutable.
 - **No initializer** and no first-caller setup functions.
 - **Owner-only**:
@@ -75,10 +78,12 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
   - If an oracle is configured, the TWAP price must also be within `oracleBandBps` of the oracle, and the oracle must not be older than `oracleMaxAge`. Fail closed: if `observe` reverts, `trade` reverts.
   - It approves the **exact** `amountIn` to the router, calls `exactInputSingle` with `recipient = address(this)`, then **resets the allowance to 0**.
   - Finally it asserts `amountOut >= minOut` and emits the Receipt.
+
 - **Agent-only `commitHold(receiptHash, prevHead, kind)`**, where kind is WAIT or REJECT. It records the receipt without moving funds.
 - **Deposits** are plain ERC-20 transfers or `deposit(token, amount)` with `transferFrom` for an exact pre-approved amount. The vault never asks for unlimited approval.
 
 **`ProofTradeRouter is ReceiptChain`** is the fallback product if the Ledger/vault path is cut.
+
 - It has an `owner` set in the constructor and an owner-only `setPolicy(bytes32)`.
 - `commitAndSwap(receiptHash, prevHead, ExactInputSingleParams, deadline)` pulls the exact `amountIn` from the caller, approves exactly, swaps to the caller, resets the approval and emits the Receipt.
 - `commitHold(receiptHash, prevHead, kind)`.
@@ -87,11 +92,13 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
 ### Off-chain spec (summary)
 
 **Policy file** (`policy/*.json`): a zod schema with canonical JSON (RFC 8785 / JCS-style sorted keys, no whitespace), where `policyHash = keccak256(utf8(canonical))`. It contains:
+
 - presets (`conservative | balanced | patient`) for target weight, rebalance band, edge buffer, clip sizes and cool-down;
 - data-quality limits for DEX staleness, CEX freshness, APRO band and age, and maximum quote deviation;
 - a daily loss stop.
 
 **Evidence pack**, gathered at one block number. Mainnet 177 reads are read-only.
+
 - Pool `slot0`, liquidity and token balances.
 - QuoterV2 `quoteExactInputSingle` in both directions for a size grid (e.g. 10/25/50/100 USDT).
 - The last swap timestamp from the subgraph.
@@ -103,6 +110,7 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
 The evidence hash is `evidenceHash = keccak256(canonical(evidence))`.
 
 **Decision engine**: a pure function `decide(evidence, policy, mandate, state) -> {kind, size, direction, minOut, ruleTrace[]}`. It has no I/O, no clock reads (time comes from evidence) and no randomness.
+
 - **REJECT**: any data-quality or risk failure, any mandate breach that can't be fixed by resizing, or an invalid LLM proposal.
 - **WAIT**: the data is fine, but the weight is within the band or the edge is ≤ 0 after the measured cost at the chosen size.
 - **RESIZE**: the desired size breaks a cap, or only a smaller grid size has a positive edge. Choose the largest valid size.
@@ -153,6 +161,7 @@ pnpm lint                                          # eslint + tsc --noEmit
 ```
 
 The definition of done for any PR:
+
 - `forge test` and `pnpm test` pass.
 - No new address is used without a `docs/ADDRESSES.md` entry.
 - No secrets appear anywhere.
@@ -177,13 +186,14 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
 - **DEX-vs-CEX basis:** median +0.07%, stdev 1.30%. |basis| > 0.69% in 25% of hours and > 1% in 13%. Reversion is slow.
 - **Backtest** (`data/research/backtest_reference.py` → `backtest.json`): $1k at 50/50, $100 clips, out-of-sample, marked at the DEX price.
 
-  | Strategy | Excess vs hold | Trades | Rejected |
-  |---|---|---|---|
-  | Fixed band | −$16.61 | 4 | 0 |
-  | Risk-aware band | −$17.38 | 8 | 8 |
-  | Dislocation | **+$0.49** | 38 | 93 |
+  | Strategy        | Excess vs hold | Trades | Rejected |
+  | --------------- | -------------- | ------ | -------- |
+  | Fixed band      | −$16.61        | 4      | 0        |
+  | Risk-aware band | −$17.38        | 8      | 8        |
+  | Dislocation     | **+$0.49**     | 38     | 93       |
 
   This is break-even, with **no proven edge**.
+
 - **APRO** updates rarely (it was 20.8 h stale on 28 Oct). Pyth is absent. Testnet prices are fake (about 54–78 USDT/WHSK).
 
 ## T2 implementation notes
@@ -214,3 +224,7 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
 - MandateCalldata hashes exact policy/default.json bytes (canonical JSON is the
   policy file convention); a missing file warns and uses zero. Read-only helpers
   refuse chains outside 133/31337. See scripts/testnet-bootstrap.md.
+
+## Workflow implementation notes
+
+Workflow: commit and push to the task branch after each submodule or logical unit of change; open the PR once when acceptance tests pass
