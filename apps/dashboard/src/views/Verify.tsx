@@ -98,28 +98,35 @@ export function VerifyView({
         Replay recorded Anvil trade
       </button>
       <p>{mode}</p>
-      {error && <p role="alert">FAIL — {error}</p>}
+      {error && <p role="alert" className="verify-alert">FAIL — {error}</p>}
       {result && (
-        <div aria-live="polite">
+        <div aria-live="polite" className="verify-result-card">
+          <div className="verify-header-bar">
+            <span className={`status-banner-badge ${result.status}`}>{result.status}</span>
+            <span className="verify-title-label">{result.label}</span>
+          </div>
           <h3>{result.status}</h3>
-          <p>{result.label}</p>
-          <ul>
+          <p className="verify-desc">{result.label}</p>
+          <ul className="verify-checks-list">
             {result.checks.map((c, i) => (
-              <li key={i}>
-                <b>{c.pass ? 'PASS' : 'FAIL'}</b> · {c.name}
+              <li key={i} className={`verify-check-row ${c.pass ? 'pass' : 'fail'}`}>
+                <b className="check-tag">{c.pass ? 'PASS' : 'FAIL'}</b> · <span className="check-name">{c.name}</span>
                 {c.detail ? ` — ${c.detail}` : ''}
               </li>
             ))}
           </ul>
           {result.metrics && (
-            <dl>
-              {Object.entries(result.metrics).map(([key, value]) => (
-                <div key={key}>
-                  <dt>{key}</dt>
-                  <dd>{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
+            <div className="verify-metrics-box">
+              <span className="verify-metrics-title">VERIFIED EXECUTION METRICS</span>
+              <dl>
+                {Object.entries(result.metrics).map(([key, value]) => (
+                  <div key={key}>
+                    <dt>{key}</dt>
+                    <dd>{String(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           )}
         </div>
       )}

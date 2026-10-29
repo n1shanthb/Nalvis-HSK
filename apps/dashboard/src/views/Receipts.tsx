@@ -62,18 +62,27 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
             className="receipt"
             key={`${log.transactionHash}-${log.logIndex}`}
           >
-            <span className={`badge ${kinds[log.args.kind]}`}>
-              {kinds[log.args.kind]}
-            </span>
+            <div className="receipt-card-header">
+              <span className={`badge ${kinds[log.args.kind]}`}>
+                {kinds[log.args.kind]}
+              </span>
+              <span className="receipt-seq-tag">RECEIPT #{String(log.args.seq)}</span>
+            </div>
             <h3>Receipt #{String(log.args.seq)}</h3>
-            <p>{local?.llm.explanation ?? 'Local explanation unavailable'}</p>
-            {local?.ruleTrace.map((r, i) => (
-              <p key={i}>
-                {r.pass ? 'PASS' : 'FAIL'} · {r.rule}: {r.detail}
-              </p>
-            ))}
+            <p className="receipt-explanation">{local?.llm.explanation ?? 'Local explanation unavailable'}</p>
+            {local?.ruleTrace && local.ruleTrace.length > 0 && (
+              <div className="receipt-rules-list">
+                {local.ruleTrace.map((r, i) => (
+                  <div key={i} className={`rule-check-item ${r.pass ? 'pass' : 'fail'}`}>
+                    <span className="rule-status-badge">{r.pass ? 'PASS' : 'FAIL'}</span>
+                    <span className="rule-name">{r.rule}:</span>
+                    <span className="rule-detail">{r.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <code>{log.args.receiptHash}</code>
-            <p>
+            <p className="receipt-tx-link">
               {href ? (
                 <a href={href} target="_blank" rel="noreferrer">
                   Transaction ↗
@@ -98,22 +107,31 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
           )
           .map((r) => (
             <article className="receipt" key={r.receiptHash}>
-              <span className={`badge ${r.decision.kind}`}>
-                {r.decision.kind}
-              </span>
+              <div className="receipt-card-header">
+                <span className={`badge ${r.decision.kind}`}>
+                  {r.decision.kind}
+                </span>
+                <span className="receipt-seq-tag">LOCAL RECORD #{String(r.seq)}</span>
+              </div>
               <h3>Local file · #{String(r.seq)}</h3>
-              <p>
+              <p className="receipt-sub-note">
                 {chain === 31337
                   ? 'local anvil — prices not real'
                   : 'Testnet — pool prices are not real'}{' '}
                 · on-chain match UNVERIFIED
               </p>
-              <p>{r.llm.explanation}</p>
-              {r.ruleTrace.map((t, i) => (
-                <p key={i}>
-                  {t.pass ? 'PASS' : 'FAIL'} · {t.rule}: {t.detail}
-                </p>
-              ))}
+              <p className="receipt-explanation">{r.llm.explanation}</p>
+              {r.ruleTrace && r.ruleTrace.length > 0 && (
+                <div className="receipt-rules-list">
+                  {r.ruleTrace.map((t, i) => (
+                    <div key={i} className={`rule-check-item ${t.pass ? 'pass' : 'fail'}`}>
+                      <span className="rule-status-badge">{t.pass ? 'PASS' : 'FAIL'}</span>
+                      <span className="rule-name">{t.rule}:</span>
+                      <span className="rule-detail">{t.detail}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <code>{r.receiptHash}</code>
             </article>
           ))}

@@ -29,28 +29,59 @@ export function ContractLink({
 }
 export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
   const m = snapshot.mandate;
+  const exposurePct = (m.maxExposureBps / 100).toFixed(1);
   return (
-    <dl>
-      {Object.entries({
-        Owner: snapshot.owner,
-        Agent: m.agent,
-        Expiry: displayTime(m.expiry),
-        'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
-        'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
-        'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
-        'Exposure cap (bps)': m.maxExposureBps,
-        'Slippage cap (bps)': m.maxSlippageBps,
-        'Minimum interval (s)': String(m.minIntervalSec),
-        'Policy hash': m.policyHash,
-        Paused: String(snapshot.paused),
-        'Read block': String(snapshot.blockNumber),
-      }).map(([k, v]) => (
-        <div key={k}>
-          <dt>{k}</dt>
-          <dd>{v}</dd>
+    <div className="mandate-details-wrapper">
+      <div className="mandate-visual-caps">
+        <div className="cap-card">
+          <div className="cap-header">
+            <span>MAX EXPOSURE CAP</span>
+            <strong>{m.maxExposureBps} BPS ({exposurePct}%)</strong>
+          </div>
+          <div className="cap-bar-track">
+            <div
+              className="cap-bar-fill exposure-fill"
+              style={{ width: `${Math.min(100, Math.max(0, m.maxExposureBps / 100))}%` }}
+            />
+          </div>
+          <small>Strict risk bound: WHSK/total pair value ceiling</small>
         </div>
-      ))}
-    </dl>
+        <div className="cap-card">
+          <div className="cap-header">
+            <span>MAX SLIPPAGE TOLERANCE</span>
+            <strong>{m.maxSlippageBps} BPS ({(m.maxSlippageBps / 100).toFixed(2)}%)</strong>
+          </div>
+          <div className="cap-bar-track">
+            <div
+              className="cap-bar-fill slippage-fill"
+              style={{ width: `${Math.min(100, Math.max(0, m.maxSlippageBps))}%` }}
+            />
+          </div>
+          <small>Hard protocol-level cap: max 100 bps (1.00%)</small>
+        </div>
+      </div>
+      <dl>
+        {Object.entries({
+          Owner: snapshot.owner,
+          Agent: m.agent,
+          Expiry: displayTime(m.expiry),
+          'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
+          'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
+          'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
+          'Exposure cap (bps)': m.maxExposureBps,
+          'Slippage cap (bps)': m.maxSlippageBps,
+          'Minimum interval (s)': String(m.minIntervalSec),
+          'Policy hash': m.policyHash,
+          Paused: String(snapshot.paused),
+          'Read block': String(snapshot.blockNumber),
+        }).map(([k, v]) => (
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 export function MandateView({
