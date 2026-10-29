@@ -499,6 +499,7 @@ export async function connectExecution(
               amountIn: quote.amountIn,
               minOut: r.tx.minOut,
               deadline: BigInt(r.tx.deadline),
+              validUntil: BigInt((r.tx as any).validUntil ?? r.tx.deadline),
               nonce: r.tx.nonce,
               receiptHash: r.receiptHash,
               prevHead: r.prevHead,
@@ -521,6 +522,7 @@ export async function connectExecution(
             amountOutMinimum: r.tx.minOut,
             sqrtPriceLimitX96: 0n,
           },
+          BigInt((r.tx as any).validUntil ?? r.tx.deadline),
           BigInt(r.tx.deadline),
         ],
       });

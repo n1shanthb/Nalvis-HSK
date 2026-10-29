@@ -424,6 +424,9 @@ it.skipIf(!!reason)(
                 deadline: BigInt(
                   Number((await client.getBlock()).timestamp) + 120,
                 ),
+                validUntil: BigInt(
+                  Number((await client.getBlock()).timestamp) + 120,
+                ),
                 nonce: await client.readContract({
                   address: vault,
                   abi: vaultAbi,

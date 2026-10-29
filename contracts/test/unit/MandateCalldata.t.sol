@@ -22,7 +22,9 @@ contract MandateCalldataTest is Test {
         helper = new MandateCalldata();
     }
 
-    function testDefaultCalldataAndRevoke() public view {
+    function testDefaultCalldataAndRevoke() public {
+        vm.setEnv("OWNER_ADDRESS", vm.toString(makeAddr("owner")));
+        vm.setEnv("AGENT_ADDRESS", vm.toString(agent));
         (bytes memory setData, bytes memory revokeData) = helper.run();
         bytes32 policy;
         string memory path = string.concat(vm.projectRoot(), "/../policy/default.json");

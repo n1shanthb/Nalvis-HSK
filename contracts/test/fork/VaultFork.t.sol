@@ -46,7 +46,7 @@ contract VaultForkTest is ForkBase {
         bytes32 hash = keccak256("fork receipt");
         EdgewiseVault.TradeParams memory p =
             EdgewiseVault.TradeParams(
-            Addresses.USDT_177, 50e6, minOut, block.timestamp, 0, hash, 0, ReceiptChain.Kind.TRADE
+            Addresses.USDT_177, 50e6, minOut, block.timestamp, block.timestamp + 60, v.nextNonce(), hash, 0, ReceiptChain.Kind.TRADE
         );
         vm.recordLogs();
         vm.prank(agent);
@@ -98,7 +98,8 @@ contract VaultForkTest is ForkBase {
             50e6,
             _ref(50e6) * 99 / 100,
             block.timestamp,
-            0,
+            block.timestamp + 60,
+            v.nextNonce(),
             keccak256("stale"),
             0,
             ReceiptChain.Kind.TRADE

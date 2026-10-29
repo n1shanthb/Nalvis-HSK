@@ -54,6 +54,7 @@ contract EdgewiseVaultTest is Test {
             50e18,
             49.5e18,
             block.timestamp,
+            block.timestamp + 60, // validUntil added
             v.nextNonce(),
             keccak256("trade"),
             v.head(),
@@ -218,6 +219,28 @@ contract EdgewiseVaultTest is Test {
         _reject(p, EdgewiseVault.Deadline.selector);
     }
 
+    function testValidUntilExpired() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp - 1;
+        _reject(p, EdgewiseVault.DecisionExpired.selector);
+    }
+
+    function testValidUntilBoundary() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp;
+        vm.prank(agent);
+        v.trade(p);
+        assertEq(v.seq(), 1);
+    }
+
+    function testValidUntilValid() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp + 30;
+        vm.prank(agent);
+        v.trade(p);
+        assertEq(v.seq(), 1);
+    }
+
     function testNonceReplay() public {
         _trade();
         EdgewiseVault.TradeParams memory p = _params();
@@ -301,6 +324,8 @@ contract EdgewiseVaultTest is Test {
 
     function testMinOutBelowFloor() public {
         EdgewiseVault.TradeParams memory p = _params();
+        // Ensure validUntil is still in future for this test
+        // (already set in _params)
         p.minOut--;
         _reject(p, EdgewiseVault.Slippage.selector);
     }

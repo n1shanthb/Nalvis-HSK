@@ -499,14 +499,17 @@ export async function verify(
             p.nonce === r.tx.nonce &&
             p.kind === ev.kind,
         );
-      else
+      else {
+        const deadline =
+          (call.args!.length > 4 ? call.args![4] : call.args![3]) as bigint;
         check(
           'calldata_commitment',
           same(call.args![0], r.receiptHash) &&
             same(call.args![1], r.prevHead) &&
-            call.args![3] === BigInt(r.tx.deadline) &&
+            deadline === BigInt(r.tx.deadline) &&
             ev.kind === 0,
         );
+      }
     } else
       check(
         'calldata_hold',

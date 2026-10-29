@@ -20,6 +20,7 @@ export const vaultAbi = parseAbi([
   'function dailyNotionalB() view returns (uint256)',
   'function paused() view returns (bool)',
   'function mandate() view returns (address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint256 minIntervalSec,bytes32 policyHash)',
+  'function trade((address tokenIn,uint256 amountIn,uint256 minOut,uint256 deadline,uint256 validUntil,uint256 nonce,bytes32 receiptHash,bytes32 prevHead,uint8 kind) p) returns (uint256)',
   'function trade((address tokenIn,uint256 amountIn,uint256 minOut,uint256 deadline,uint256 nonce,bytes32 receiptHash,bytes32 prevHead,uint8 kind) p) returns (uint256)',
   'function commitHold(bytes32 receiptHash,bytes32 prevHead,uint8 kind)',
   'function revoke()',
@@ -33,6 +34,7 @@ export const proofRouterAbi = parseAbi([
   'function seq(address caller) view returns (uint64)',
   'function head(address caller) view returns (bytes32)',
   'function commitHold(bytes32 receiptHash,bytes32 prevHead,uint8 kind)',
+  'function commitAndSwap(bytes32 receiptHash,bytes32 prevHead,(address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96) p,uint256 validUntil,uint256 deadline) returns (uint256)',
   'function commitAndSwap(bytes32 receiptHash,bytes32 prevHead,(address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96) p,uint256 deadline) returns (uint256)',
 ]);
 export const erc20Abi = parseAbi([

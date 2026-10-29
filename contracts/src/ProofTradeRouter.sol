@@ -13,6 +13,7 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     error Unauthorized();
     error InvalidOwner();
     error Deadline();
+    error DecisionExpired(); // new error for decision expiry
     error Recipient();
     error Underfill();
     error PriceLimit();
@@ -48,8 +49,10 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
         bytes32 receiptHash,
         bytes32 prevHead,
         IV3SwapRouter.ExactInputSingleParams calldata p,
+        uint256 validUntil,
         uint256 deadline
     ) external nonReentrant returns (uint256 amountOut) {
+        if (block.timestamp > validUntil) revert DecisionExpired();
         if (block.timestamp > deadline) revert Deadline();
         if (p.recipient != msg.sender) revert Recipient();
         // SwapRouter02 requires full consumption when its price limit is zero.

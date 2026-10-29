@@ -71,7 +71,7 @@ contract DeployTestnetForkTest is Test {
         vm.prank(agent);
         uint256 out = v.trade(
             EdgewiseVault.TradeParams(
-                Addresses.USDT_133, 10e18, minOut, block.timestamp, 0, hash, 0, ReceiptChain.Kind.TRADE
+                Addresses.USDT_133, 10e18, minOut, block.timestamp, block.timestamp + 60, v.nextNonce(), hash, 0, ReceiptChain.Kind.TRADE
             )
         );
         assertGe(out, minOut);

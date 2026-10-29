@@ -47,7 +47,7 @@ contract ProofTradeRouterTest is Test {
         vm.expectEmit(true, true, false, true, address(r));
         emit ReceiptChain.Receipt(0, hash, 0, keccak256("policy"), 0, address(a), 50e6, 50e18, 50e18, 0);
         vm.prank(alice);
-        r.commitAndSwap(hash, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(hash, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(a.balanceOf(alice), 950e6);
         assertEq(b.balanceOf(alice), 50e18);
         assertEq(a.balanceOf(address(r)), 0);
@@ -61,7 +61,7 @@ contract ProofTradeRouterTest is Test {
         p.sqrtPriceLimitX96 = 1;
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.PriceLimit.selector);
-        r.commitAndSwap(0, 0, p, block.timestamp);
+        r.commitAndSwap(0, 0, p, block.timestamp + 60, block.timestamp);
         assertEq(a.balanceOf(alice), 1000e6);
         assertEq(a.balanceOf(address(r)), 0);
         assertEq(a.allowance(address(r), address(router)), 0);
@@ -71,13 +71,31 @@ contract ProofTradeRouterTest is Test {
     function testRecipientMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Recipient.selector);
-        r.commitAndSwap(0, 0, _params(bob, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(bob, 50e6), block.timestamp + 60, block.timestamp);
     }
 
     function testDeadlinePassed() public {
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Deadline.selector);
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp - 1);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp - 1);
+    }
+
+    function testValidUntilExpired() public {
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.DecisionExpired.selector);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp - 1, block.timestamp + 60);
+    }
+
+    function testValidUntilBoundary() public {
+        vm.prank(alice);
+        uint256 out = r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp, block.timestamp + 60);
+        assertEq(out, 50e18);
+    }
+
+    function testValidUntilValid() public {
+        vm.prank(alice);
+        uint256 out = r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 30, block.timestamp + 60);
+        assertEq(out, 50e18);
     }
 
     function testSetPolicyNonOwner() public {
@@ -95,7 +113,7 @@ contract ProofTradeRouterTest is Test {
         router.setUnderfill(true);
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Underfill.selector);
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 0);
         assertEq(a.balanceOf(alice), 1000e6);
         assertEq(a.allowance(address(r), address(router)), 0);
@@ -104,7 +122,7 @@ contract ProofTradeRouterTest is Test {
     function testPrevHeadSwapMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ReceiptChain.PreviousHead.selector);
-        r.commitAndSwap(0, bytes32(uint256(1)), _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, bytes32(uint256(1)), _params(alice, 50e6), block.timestamp + 60, block.timestamp);
     }
 
     function testPrevHeadHoldMismatch() public {
@@ -131,7 +149,7 @@ contract ProofTradeRouterTest is Test {
         assertEq(r.seq(bob), 1);
         bytes32 prev = r.head(alice);
         vm.prank(alice);
-        r.commitAndSwap(hash, prev, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(hash, prev, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 2);
         assertEq(r.seq(bob), 1);
         assertEq(r.head(bob), prev);
@@ -152,7 +170,7 @@ contract ProofTradeRouterTest is Test {
         router.setCallback(address(r), abi.encodeCall(r.commitHold, (bytes32(0), bytes32(0), ReceiptChain.Kind.WAIT)));
         vm.prank(alice);
         vm.expectRevert("callback failed");
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 0);
         assertEq(a.balanceOf(alice), 1000e6);
     }
@@ -164,7 +182,7 @@ contract ProofTradeRouterTest is Test {
         for (uint64 i; i < n; ++i) {
             bytes32 hash = keccak256(abi.encode(x, i));
             vm.prank(alice);
-            r.commitAndSwap(hash, prev, _params(alice, amount), block.timestamp);
+            r.commitAndSwap(hash, prev, _params(alice, amount), block.timestamp + 60, block.timestamp);
             prev = keccak256(abi.encode(prev, hash, i));
             assertEq(r.head(alice), prev);
             assertEq(r.seq(alice), i + 1);

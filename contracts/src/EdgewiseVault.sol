@@ -43,6 +43,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 amountIn;
         uint256 minOut;
         uint256 deadline;
+        uint256 validUntil; // new field for decision expiry
         uint256 nonce;
         bytes32 receiptHash;
         bytes32 prevHead;
@@ -60,6 +61,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     error InvalidMandate();
     error Inactive();
     error Deadline();
+    error DecisionExpired(); // new error for decision expiry
     error Nonce();
     error Interval();
     error TradeCap();
@@ -216,6 +218,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     function trade(TradeParams calldata p) external onlyAgent nonReentrant returns (uint256 amountOut) {
         if (p.kind != Kind.TRADE && p.kind != Kind.RESIZE) revert InvalidKind();
         if (p.prevHead != chain.head) revert PreviousHead();
+        if (block.timestamp > p.validUntil) revert DecisionExpired();
         if (block.timestamp > p.deadline) revert Deadline();
         if (p.nonce != nextNonce) revert Nonce();
         if (block.timestamp < lastTradeAt + mandate.minIntervalSec) revert Interval();
