@@ -313,6 +313,67 @@ contract EdgewiseVaultTest is Test {
         _reject(_params(), EdgewiseVault.DailyCap.selector);
     }
 
+    function testMidnightBoundaryBypassPrevented() public {
+        uint256 midnight = ((block.timestamp / 1 days) + 1) * 1 days;
+        vm.warp(midnight - 5 minutes);
+        m.maxDailyInB = 80e18;
+        v.setMandate(m);
+
+        _trade();
+        assertEq(v.dailyNotionalB(), 50e18);
+
+        vm.warp(midnight + 5 minutes);
+        _reject(_params(), EdgewiseVault.DailyCap.selector);
+        assertEq(v.dailyNotionalB(), 50e18);
+    }
+
+    function testRevertedTradeDoesNotConsumeTurnover() public {
+        m.maxDailyInB = 80e18;
+        v.setMandate(m);
+        _trade();
+        assertEq(v.dailyNotionalB(), 50e18);
+
+        EdgewiseVault.TradeParams memory p = _params();
+        p.deadline = block.timestamp - 1;
+        _reject(p, EdgewiseVault.Deadline.selector);
+
+        assertEq(v.dailyNotionalB(), 50e18);
+    }
+
+    function testRollingWindowPartialExpiry() public {
+        m.maxDailyInB = 90e18;
+        v.setMandate(m);
+
+        EdgewiseVault.TradeParams memory p1 = _params();
+        p1.amountIn = 40e18;
+        p1.minOut = 39.6e18;
+        vm.prank(agent);
+        v.trade(p1);
+        assertEq(v.dailyNotionalB(), 40e18);
+
+        vm.warp(block.timestamp + 12 hours);
+        EdgewiseVault.TradeParams memory p2 = _params();
+        p2.amountIn = 40e18;
+        p2.minOut = 39.6e18;
+        p2.nonce = 1;
+        p2.prevHead = v.head();
+        vm.prank(agent);
+        v.trade(p2);
+        assertEq(v.dailyNotionalB(), 80e18);
+
+        vm.warp(block.timestamp + 13 hours);
+        assertEq(v.dailyNotionalB(), 40e18);
+
+        EdgewiseVault.TradeParams memory p3 = _params();
+        p3.amountIn = 40e18;
+        p3.minOut = 39.6e18;
+        p3.nonce = 2;
+        p3.prevHead = v.head();
+        vm.prank(agent);
+        v.trade(p3);
+        assertEq(v.dailyNotionalB(), 80e18);
+    }
+
     function testExposureExceeded() public {
         m.maxExposureBps = 5000;
         v.setMandate(m);

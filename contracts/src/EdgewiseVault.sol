@@ -55,8 +55,11 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     bool public paused;
     uint256 public nextNonce;
     uint256 public lastTradeAt;
-    uint256 public dailyBucket;
-    uint256 public dailyNotionalB;
+    struct TurnoverSlot {
+        uint32 epochBucket;
+        uint224 notionalB;
+    }
+    TurnoverSlot[48] private _turnoverSlots;
     uint256 public highWaterMark;
     error Unauthorized();
     error InvalidConfig();
@@ -215,6 +218,27 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         return mandate;
     }
 
+    /// @notice Returns the rolling 24-hour notional turnover in tokenB terms across 48 30-min buckets.
+    function getRolling24hTurnover() public view returns (uint256 total) {
+        uint32 currentBucket = uint32(block.timestamp / 30 minutes);
+        for (uint256 i = 0; i < 48; ++i) {
+            TurnoverSlot memory s = _turnoverSlots[i];
+            if (currentBucket >= s.epochBucket && currentBucket - s.epochBucket < 48) {
+                total += s.notionalB;
+            }
+        }
+    }
+
+    /// @notice Backwards-compatible alias for getRolling24hTurnover.
+    function dailyNotionalB() external view returns (uint256) {
+        return getRolling24hTurnover();
+    }
+
+    /// @notice UTC calendar day bucket for backwards compatibility.
+    function dailyBucket() external view returns (uint256) {
+        return block.timestamp / 1 days;
+    }
+
     /// @notice Pull an exact pre-approved deposit of either configured token.
     function deposit(address token, uint256 amount) external nonReentrant {
         if (token != tokenA && token != tokenB) revert InvalidToken();
@@ -325,16 +349,12 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         ) {
             revert Drawdown();
         }
-        uint256 bucket = block.timestamp / 1 days;
-        if (dailyBucket != bucket) {
-            dailyBucket = bucket;
-            dailyNotionalB = 0;
-        }
-        dailyNotionalB += p.tokenIn == tokenB ? p.amountIn : refOut;
-        if (dailyNotionalB > mandate.maxDailyInB) revert DailyCap();
+        uint256 tradeNotionalB = p.tokenIn == tokenB ? p.amountIn : refOut;
+        if (getRolling24hTurnover() + tradeNotionalB > mandate.maxDailyInB) revert DailyCap();
         ++nextNonce;
         lastTradeAt = block.timestamp;
         amountOut = _swap(p, tick);
+        _recordTurnover(tradeNotionalB);
         _commit(
             chain,
             p.receiptHash,
@@ -343,6 +363,18 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
             p.kind,
             Fill(p.tokenIn, p.amountIn, amountOut, p.minOut, refOut)
         );
+    }
+
+    function _recordTurnover(uint256 notionalB) private {
+        uint32 currentBucket = uint32(block.timestamp / 30 minutes);
+        uint256 slotIdx = currentBucket % 48;
+        TurnoverSlot storage s = _turnoverSlots[slotIdx];
+        if (s.epochBucket == currentBucket) {
+            s.notionalB += uint224(notionalB);
+        } else {
+            s.epochBucket = currentBucket;
+            s.notionalB = uint224(notionalB);
+        }
     }
 
     function _swap(TradeParams calldata p, int24 tick) private returns (uint256 amountOut) {
