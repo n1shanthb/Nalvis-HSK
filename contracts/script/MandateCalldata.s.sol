@@ -25,8 +25,26 @@ contract MandateCalldata is Script {
         } else {
             console2.log("WARNING: policy/default.json missing; policyHash = bytes32(0)");
         }
+        uint256 drawdownEnv = 2000;
+        if (vm.envExists("MAX_DRAWDOWN_BPS")) {
+            string memory val = vm.envString("MAX_DRAWDOWN_BPS");
+            if (bytes(val).length > 0) {
+                drawdownEnv = vm.envUint("MAX_DRAWDOWN_BPS");
+            }
+        }
+        require(drawdownEnv <= 10000, "Mandate: maxDrawdownBps must be <= 10000");
+        uint16 maxDrawdownBps = uint16(drawdownEnv);
         EdgewiseVault.Mandate memory m = EdgewiseVault.Mandate(
-            agent, block.timestamp + 7 days, 2 * 10 ** da, 100 * 10 ** db, 500 * 10 ** db, 8000, 100, 0, 300, policy
+            agent,
+            block.timestamp + 7 days,
+            2 * 10 ** da,
+            100 * 10 ** db,
+            500 * 10 ** db,
+            8000,
+            100,
+            maxDrawdownBps,
+            300,
+            policy
         );
         setData = abi.encodeCall(EdgewiseVault.setMandate, (m));
         revokeData = abi.encodeCall(EdgewiseVault.revoke, ());
