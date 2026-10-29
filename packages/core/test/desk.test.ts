@@ -18,8 +18,6 @@ describe('Task 8.1: Natural-Language Desk Parser Tests', () => {
   };
 
   const mockPolicy: Policy = {
-    schemaVersion: 1,
-    pair: 'WHSK/USDT',
     presets: {
       conservative: {
         targetWeightA: 0.3,
@@ -45,10 +43,12 @@ describe('Task 8.1: Natural-Language Desk Parser Tests', () => {
     },
     dataQuality: {
       maxDexStaleSec: 3600,
-      maxCexStaleSec: 30,
+      maxCexAgeSec: 30,
+      cexMaxSpreadBps: 50,
+      maxCexVenueDivergenceBps: 100,
       aproBandBps: 200,
       aproMaxAgeSec: 86400,
-      maxCexDexDeviationBps: 500,
+      maxQuoteVsMidBps: 500,
     },
     dailyLossStopB: 50,
   };

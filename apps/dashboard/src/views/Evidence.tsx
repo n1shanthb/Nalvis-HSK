@@ -58,7 +58,7 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
               <span className="bar-label">CEX Mid</span>
               <div className="bar-track">
                 <div className="bar-fill-unavailable">
-                  <span>CEX unavailable</span>
+                  <span>CEX feeds offline</span>
                 </div>
               </div>
             </div>

@@ -39,10 +39,13 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
       try {
         const marketClient = clientFor(177);
         const execClient = clientFor(chain === 177 ? 177 : 133);
+        const sizes = [
+          ...new Set(Object.values(policy.presets).flatMap((p) => p.sizeGridB)),
+        ].sort((a, b) => a - b);
         evidence = await collectEvidence({
           marketClient177: marketClient,
           execClient,
-          policy,
+          sizes,
         });
       } catch {
         // Live evidence network error or offline
@@ -67,9 +70,24 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
     if (!text.trim()) return;
 
     const data = resource.data;
+    const m = data?.snapshot?.mandate;
+    const mandate = m
+      ? {
+          expiry: Number(m.expiry),
+          revoked: m.agent === '0x0000000000000000000000000000000000000000',
+          maxTradeInA: m.maxTradeInA,
+          maxTradeInB: m.maxTradeInB,
+          maxDailyInB: m.maxDailyInB,
+          maxExposureBps: m.maxExposureBps,
+          maxSlippageBps: m.maxSlippageBps,
+          minIntervalSec: Number(m.minIntervalSec),
+          policyHash: m.policyHash,
+        }
+      : undefined;
+
     const res = parser.parse(text, {
       evidence: data?.evidence,
-      mandate: data?.snapshot?.mandate,
+      mandate,
       policy,
       state: data?.snapshot
         ? {
