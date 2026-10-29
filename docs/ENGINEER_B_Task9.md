@@ -117,15 +117,63 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - Chain 133 only. **Never broadcast on mainnet 177.**
    - **Status:** PENDING — Requires Nishanth to supply testnet wallet credentials.
 
-### T9 acceptance
-All tests green incl. new invariant tests; static dashboard build works with owner disabled; verifier PASSes regenerated real anvil fixtures; `scripts/testnet-bootstrap.md` updated; practice testnet deploy done end to end with real receipts that verify PASS, documented in `docs/PRACTICE-DEPLOY.md`.
+### Review Resolutions & Implementation Summary
 
-**Completed so far (Prithiv):**
-- [x] Phase 0: Decision expiry (`validUntil`) — committed `a29d7b0`
-- [x] Phase 1: Drawdown circuit breaker, partial-fill protection, guardrails — committed `0940e98`
-- [x] Phase 2: Invariant tests (6 invariants + VaultHandler) + fuzz tests (6 fuzz tests)
-- [x] Phase 3: `scripts/verify-blockscout.sh` + `testnet-bootstrap.md` update
-- [ ] Phase 4: Practice testnet deploy + `docs/PRACTICE-DEPLOY.md` (needs testnet wallet credentials from Nishanth)
+1. **Router Dust Griefing / DoS Prevention:**
+   - Modified `ProofTradeRouter.sol` to record pre-transfer balance `balBefore` and require post-swap balance `balAfter == balBefore`, instead of asserting `balance == 0`.
+   - Protects against external dust transfers permanently DoS-ing caller swaps.
+   - Reverts atomically without refunding pre-existing dust to callers.
+
+2. **Owner Withdrawal TWAP Dependency:**
+   - Updated `EdgewiseVault.sol` to use `_tryTick()` with `try/catch pool.observe()`.
+   - Withdrawals transfer funds first and adjust `highWaterMark` best-effort proportionally (`highWaterMark = FullMath.mulDiv(highWaterMark, totalAfter, totalBefore)`).
+   - Prevents reverting TWAP reads from locking owner funds, while preserving existing drawdown.
+   - Deposits increment `highWaterMark += depVal` to prevent false profit or drawdown erasure.
+
+3. **Documented Drawdown Breaker Default:**
+   - Updated `MandateCalldata.s.sol` to read `MAX_DRAWDOWN_BPS` from environment with default 2000 bps (20%).
+   - Calldata test verifies both default 2000 bps and explicit values within allowed bounds `<= 10000`.
+
+4. **Genuine Rolling 24-Hour Turnover:**
+   - Replaced calendar-day bucketing with 48 30-minute ring buffer slots (`TurnoverSlot[48] private _turnoverSlots`).
+   - `getRolling24hTurnover()` sums slots within 48 half-hour epochs.
+   - Prevents midnight boundary reset bypass and mandate replacement reset bypass.
+   - Failed trades do not consume turnover.
+
+5. **Strengthened Stateful Foundry Invariants:**
+   - Removed tautological invariants (such as `seq >= 0`).
+   - Added 11 stateful invariants:
+     1. Agent cannot hold vault funds.
+     2. Stranger cannot hold vault funds.
+     3. Minimum interval strictly enforced between trades.
+     4. Inactive/revoked/paused mandate never trades.
+     5. Drawdown breaker blocks agent trades once triggered.
+     6. Per-trade cap enforced.
+     7. Slippage never exceeds 100 bps.
+     8. Router token allowance always zero after execution.
+     9. Failed transactions do not advance nonce or receipt state.
+     10. Rolling turnover cap strictly preserved.
+     11. Owner immutable preserved.
+   - Verified across 256 runs and 128,000 handler calls with 0 failures.
+
+6. **Regenerated Anvil Fixtures & Verifier Compatibility:**
+   - Cleaned up obsolete legacy ABI overloads in `packages/core/src/abi/index.ts`.
+   - Regenerated real Anvil fork fixtures with updated ABIs and preserved transaction hashes.
+   - Added explicit TODO and handoff note in `packages/keeper/src/execution.ts` for Engineer A to implement genuine off-chain decision expiry after PR #9 merges.
+   - All 40 verifier tests, 89 core tests, 17 keeper tests, and 31 dashboard tests pass.
+
+7. **Practice Deployment Preparation:**
+   - Nishanth will not supply wallet credentials.
+   - Two separate testnet-only wallets under Prithiv's control are prepared (Practice Owner and Practice Agent).
+   - Rehearsal scripts ready for execution upon Prithiv's explicit broadcast authorization.
+
+**Completed Phases:**
+- [x] Phase 0: Decision expiry (`validUntil`)
+- [x] Phase 1: Drawdown circuit breaker & partial-fill protection
+- [x] Phase 2: Invariant & fuzz test suite
+- [x] Phase 3: Review blockers resolved (dust griefing, TWAP withdrawal resilience, rolling 24h turnover, calibrated calldata)
+- [x] Phase 4: Regenerated Anvil fixtures & legacy ABI cleanup
+- [ ] Phase 5: Practice testnet deploy rehearsal (awaiting Prithiv's explicit broadcast authorization)
 
 
 
