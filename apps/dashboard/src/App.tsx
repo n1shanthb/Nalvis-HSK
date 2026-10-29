@@ -3,10 +3,11 @@ import { MandateView } from './views/Mandate.js';
 import { EvidenceView } from './views/Evidence.js';
 import { ReceiptsView } from './views/Receipts.js';
 import { VerifyView } from './views/Verify.js';
+import { DeskView } from './views/Desk.js';
 import { type DashboardChain } from './lib/clients.js';
 import './style.css';
 const OwnerPanel = lazy(() => import('./owner/MandateForm.js'));
-const routes = ['mandate', 'evidence', 'receipts', 'verify'] as const;
+const routes = ['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const;
 export type Route = (typeof routes)[number];
 export function App({
   initialChain = 133,
@@ -86,7 +87,7 @@ export function App({
             onClick={() => setRoute(r)}
           >
             <small>0{i + 1}</small>{' '}
-            {['Mandate', 'Live evidence', 'Decisions & receipts', 'Verify'][i]}
+            {['Mandate', 'Live evidence', 'Decisions & receipts', 'Verify', 'Trading Desk'][i]}
           </a>
         ))}
       </nav>
@@ -108,6 +109,7 @@ export function App({
         {route === 'evidence' && <EvidenceView />}
         {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
         {route === 'verify' && <VerifyView chain={chain} />}
+        {route === 'desk' && <DeskView chain={chain} />}
       </main>
       <footer>
         <span>Market evidence · mainnet 177 · read-only</span>

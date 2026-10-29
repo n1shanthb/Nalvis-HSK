@@ -150,7 +150,7 @@ describe('owner mandate review', () => {
   });
 });
 describe('views', () => {
-  test.each(['mandate', 'evidence', 'receipts', 'verify'] as const)(
+  test.each(['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const)(
     'route %s renders without console errors',
     async (route) => {
       fetchFailure();
