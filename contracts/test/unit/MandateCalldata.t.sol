@@ -30,7 +30,7 @@ contract MandateCalldataTest is Test {
         string memory path = string.concat(vm.projectRoot(), "/../policy/default.json");
         if (vm.exists(path)) policy = keccak256(bytes(vm.readFile(path)));
         EdgewiseVault.Mandate memory m =
-            EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 300, policy);
+            EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 0, 300, policy);
         assertEq(setData, abi.encodeCall(EdgewiseVault.setMandate, (m)));
         assertEq(revokeData, abi.encodeCall(EdgewiseVault.revoke, ()));
     }

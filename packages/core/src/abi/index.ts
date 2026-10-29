@@ -18,12 +18,14 @@ export const vaultAbi = parseAbi([
   'function lastTradeAt() view returns (uint256)',
   'function dailyBucket() view returns (uint256)',
   'function dailyNotionalB() view returns (uint256)',
+  'function highWaterMark() view returns (uint256)',
   'function paused() view returns (bool)',
-  'function mandate() view returns (address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint256 minIntervalSec,bytes32 policyHash)',
+  'function mandate() view returns (address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint16 maxDrawdownBps,uint256 minIntervalSec,bytes32 policyHash)',
   'function trade((address tokenIn,uint256 amountIn,uint256 minOut,uint256 deadline,uint256 validUntil,uint256 nonce,bytes32 receiptHash,bytes32 prevHead,uint8 kind) p) returns (uint256)',
   'function trade((address tokenIn,uint256 amountIn,uint256 minOut,uint256 deadline,uint256 nonce,bytes32 receiptHash,bytes32 prevHead,uint8 kind) p) returns (uint256)',
   'function commitHold(bytes32 receiptHash,bytes32 prevHead,uint8 kind)',
   'function revoke()',
+  'function setMandate((address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint16 maxDrawdownBps,uint256 minIntervalSec,bytes32 policyHash) m)',
   'function setMandate((address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint256 minIntervalSec,bytes32 policyHash) m)',
 ]);
 export const proofRouterAbi = parseAbi([

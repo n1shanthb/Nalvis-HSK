@@ -34,6 +34,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 maxDailyInB;
         uint16 maxExposureBps;
         uint16 maxSlippageBps;
+        uint16 maxDrawdownBps; // max drawdown in bps from high-water mark (0 = disabled)
         uint256 minIntervalSec;
         bytes32 policyHash;
     }
@@ -56,6 +57,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     uint256 public lastTradeAt;
     uint256 public dailyBucket;
     uint256 public dailyNotionalB;
+    uint256 public highWaterMark;
     error Unauthorized();
     error InvalidConfig();
     error InvalidMandate();
@@ -71,6 +73,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     error Underfill();
     error InvalidToken();
     error OracleInvalid();
+    error Drawdown(); // drawdown circuit breaker error
     event MandateSet(Mandate mandate);
     event Revoked();
     event Paused(bool paused);
@@ -134,13 +137,18 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         return chain.head;
     }
 
-    /// @notice Replace the mandate, preserving nonce, interval and daily spend history.
+    /// @notice Replace the mandate, preserving nonce, interval and daily spend history, resetting highWaterMark.
     function setMandate(Mandate calldata m) external onlyOwner {
         if (
             m.agent == owner || m.agent == address(0) || m.expiry <= block.timestamp
                 || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000
+                || m.maxDrawdownBps > 10000
         ) revert InvalidMandate();
         mandate = m;
+        int24 tick = _tick();
+        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 valB = IERC20(tokenB).balanceOf(address(this));
+        highWaterMark = valA + valB;
         emit MandateSet(m);
     }
 
@@ -153,6 +161,10 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     /// @notice Withdraw tokens to an owner-selected recipient.
     function withdraw(address token, uint256 amount, address to) external onlyOwner nonReentrant {
         SafeToken.transfer(token, to, amount);
+        int24 tick = _tick();
+        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 valB = IERC20(tokenB).balanceOf(address(this));
+        highWaterMark = valA + valB;
     }
 
     /// @notice Stop agent actions.
@@ -171,6 +183,10 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     function deposit(address token, uint256 amount) external nonReentrant {
         if (token != tokenA && token != tokenB) revert InvalidToken();
         SafeToken.pull(token, msg.sender, amount);
+        int24 tick = _tick();
+        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 valB = IERC20(tokenB).balanceOf(address(this));
+        if (valA + valB > highWaterMark) highWaterMark = valA + valB;
     }
 
     function _tick() private view returns (int24 tick) {
@@ -232,6 +248,16 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         if (refOut == 0 || p.minOut < FullMath.mulDiv(refOut, 10000 - mandate.maxSlippageBps, 10000)) {
             revert Slippage();
         }
+        uint256 preValA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 preTotalVal = preValA + IERC20(tokenB).balanceOf(address(this));
+        if (preTotalVal > highWaterMark) {
+            highWaterMark = preTotalVal;
+        } else if (
+            mandate.maxDrawdownBps > 0
+                && preTotalVal < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
+        ) {
+            revert Drawdown();
+        }
         uint256 bucket = block.timestamp / 1 days;
         if (dailyBucket != bucket) {
             dailyBucket = bucket;
@@ -271,6 +297,14 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 valueA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
         uint256 valueB = IERC20(tokenB).balanceOf(address(this));
         uint256 total = valueA + valueB;
+        if (total > highWaterMark) {
+            highWaterMark = total;
+        } else if (
+            mandate.maxDrawdownBps > 0
+                && total < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
+        ) {
+            revert Drawdown();
+        }
         // Compare at full precision by rounding the pre-trade ratio up. For an
         // integer post valueA, valueA < ceil(preA * total / preTotal) is exactly
         // the strict fractional comparison, without rounding exposure to bps.

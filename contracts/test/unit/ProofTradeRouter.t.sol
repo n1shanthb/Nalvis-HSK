@@ -119,6 +119,17 @@ contract ProofTradeRouterTest is Test {
         assertEq(a.allowance(address(r), address(router)), 0);
     }
 
+    function testPartialFillInputStrandingReverts() public {
+        router.setPartialFill(true);
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Underfill.selector);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+        assertEq(r.seq(alice), 0);
+        assertEq(a.balanceOf(alice), 1000e6);
+        assertEq(a.balanceOf(address(r)), 0);
+        assertEq(a.allowance(address(r), address(router)), 0);
+    }
+
     function testPrevHeadSwapMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ReceiptChain.PreviousHead.selector);

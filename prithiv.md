@@ -65,7 +65,26 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - **minimum interval** between agent trades;
    - **drawdown circuit breaker**: if vault value drops more than `maxDrawdownBps` below its high-water mark, agent trades revert until the owner re-signs a mandate.
    - If one of these needs a risky redesign, ship the safe ones and document the rest as a known limit.
+   - **Status:** COMPLETED.
+   - **Contract & Guardrail updates:**
+     - `Mandate` struct: Added `uint16 maxDrawdownBps`. Validated `<= 10_000` (reverts with `InvalidMandate()`).
+     - `highWaterMark`: Tracked state variable. Initialized / reset on `setMandate(m)`, ratchets up on deposits / positive portfolio gains, adjusted down on owner `withdraw` to prevent false triggers.
+     - Circuit breaker: Evaluated pre-trade and post-trade in `_checkMandate` and `trade`. If total vault value (A valued in B at TWAP + B) < `highWaterMark * (10000 - maxDrawdownBps) / 10000`, reverts with `Drawdown()`.
+     - Turnover cap: Enforced via `dailyTurnoverInB[dayBucket] + valueInB <= mandate.maxDailyInB` on UTC calendar-day bucket (`block.timestamp / 1 days`).
+     - Minimum interval: Enforced via `block.timestamp >= lastTradeAt + mandate.minIntervalSec`.
+     - Script & Calldata: `MandateCalldata.s.sol` and test updated to support `MAX_DRAWDOWN_BPS` env var (default 2000 bps / 20%).
+     - Dashboard: Updated `VaultMandate` types, `Mandate.tsx`, `MandateForm.tsx` to support `maxDrawdownBps`.
 2. **Fix the partial-fill bug:** router partial fills must not strand tokens (refund unspent input to the vault, or revert). Add a test. Re-check that de-risking sells still pass the exposure cap.
+   - **Status:** COMPLETED.
+   - `ProofTradeRouter.commitAndSwap`: Added verification asserting exact token clearance `IERC20(p.tokenIn).balanceOf(address(this)) == 0` and `amountOut >= p.amountOutMinimum`, reverting with `Underfill()` if tokens are stranded.
+   - Added `MockRouter.setPartialFill` test harness and unit test `testPartialFillInputStrandingReverts` in `ProofTradeRouter.t.sol`.
+   - Verified that `_assertExposureAfter` preserves the de-risking exception: exposure > `maxExposureBps` is allowed if post-trade tokenA exposure in tokenB terms strictly decreases.
+   - **Testing Results:**
+     - Foundry unit tests: 109 passed (0 failed).
+     - Core tests: 89 passed (1 skipped).
+     - Keeper tests: 17 passed (1 skipped).
+     - Verifier tests: 40 passed.
+     - Dashboard tests: 31 passed.
 3. **Foundry invariant/fuzz tests:** agent can never withdraw or send funds anywhere except swaps back into the vault; no trading after expiry/revoke/pause or with an expired decision; per-trade cap, turnover cap, min interval and drawdown breaker enforced; random mandates never allow slippage > 100 bps.
 4. Regenerate anvil fixtures from **real** anvil txs if contract changes break them.
 5. `scripts/verify-blockscout.sh`: `forge verify-contract` commands for vault / router / ReceiptChain on testnet 133 and mainnet 177 (to be run after deploy).

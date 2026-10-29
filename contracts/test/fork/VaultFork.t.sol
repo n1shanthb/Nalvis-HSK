@@ -36,7 +36,7 @@ contract VaultForkTest is ForkBase {
             age
         );
         vault.setMandate(
-            EdgewiseVault.Mandate(agent, block.timestamp + 1 days, 2000e18, 100e6, 500e6, 10000, 100, 0, policy)
+            EdgewiseVault.Mandate(agent, block.timestamp + 1 days, 2000e18, 100e6, 500e6, 10000, 100, 0, 0, policy)
         );
     }
 

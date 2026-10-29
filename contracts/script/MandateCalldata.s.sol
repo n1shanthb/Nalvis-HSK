@@ -26,7 +26,7 @@ contract MandateCalldata is Script {
             console2.log("WARNING: policy/default.json missing; policyHash = bytes32(0)");
         }
         EdgewiseVault.Mandate memory m = EdgewiseVault.Mandate(
-            agent, block.timestamp + 7 days, 2 * 10 ** da, 100 * 10 ** db, 500 * 10 ** db, 8000, 100, 300, policy
+            agent, block.timestamp + 7 days, 2 * 10 ** da, 100 * 10 ** db, 500 * 10 ** db, 8000, 100, 0, 300, policy
         );
         setData = abi.encodeCall(EdgewiseVault.setMandate, (m));
         revokeData = abi.encodeCall(EdgewiseVault.revoke, ());

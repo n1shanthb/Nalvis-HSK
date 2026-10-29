@@ -33,7 +33,7 @@ contract EdgewiseVaultTest is Test {
         oracle = new MockAggregator();
         v = _deploy(address(0), 1 hours);
         m = EdgewiseVault.Mandate(
-            agent, block.timestamp + 30 days, 100e18, 100e18, 150e18, 10000, 100, 0, keccak256("policy")
+            agent, block.timestamp + 30 days, 100e18, 100e18, 150e18, 10000, 100, 0, 0, keccak256("policy")
         );
         v.setMandate(m);
         a.mint(address(v), 1000e18);
@@ -648,5 +648,45 @@ contract EdgewiseVaultTest is Test {
             assertEq(v.nextNonce(), i + 1);
             assertEq(b.allowance(address(v), address(router)), 0);
         }
+    }
+
+    function testInvalidMandateMaxDrawdownBps() public {
+        m.maxDrawdownBps = 10001;
+        vm.expectRevert(EdgewiseVault.InvalidMandate.selector);
+        v.setMandate(m);
+    }
+
+    function testDrawdownCircuitBreakerTriggered() public {
+        m.maxDrawdownBps = 1000; // 10% max drawdown
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        // Value drops by 25% (2000e18 -> 1500e18, which is > 10% drawdown)
+        deal(address(b), address(v), 500e18);
+        _reject(_params(), EdgewiseVault.Drawdown.selector);
+    }
+
+    function testDrawdownResetByOwnerSetMandate() public {
+        m.maxDrawdownBps = 1000;
+        v.setMandate(m);
+        deal(address(b), address(v), 500e18);
+        _reject(_params(), EdgewiseVault.Drawdown.selector);
+
+        // Owner re-signs mandate, resetting high-water mark to 1500e18
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 1500e18);
+        _trade();
+        assertEq(v.seq(), 1);
+    }
+
+    function testDrawdownHighWaterMarkRatchetsUp() public {
+        m.maxDrawdownBps = 1000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        // Capital increases to 3000e18
+        deal(address(b), address(v), 2000e18);
+        _trade();
+        assertEq(v.highWaterMark(), 3000e18);
     }
 }

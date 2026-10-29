@@ -92,6 +92,7 @@ export type VaultMandate = {
   maxDailyInB: bigint;
   maxExposureBps: number;
   maxSlippageBps: number;
+  maxDrawdownBps: number;
   minIntervalSec: bigint;
   policyHash: `0x${string}`;
 };
@@ -141,6 +142,7 @@ export async function readVault(
     maxDailyInB,
     maxExposureBps,
     maxSlippageBps,
+    maxDrawdownBps,
     minIntervalSec,
     policyHash,
   ] = raw as readonly [
@@ -149,6 +151,7 @@ export async function readVault(
     bigint,
     bigint,
     bigint,
+    number,
     number,
     number,
     bigint,
@@ -165,6 +168,7 @@ export async function readVault(
       maxDailyInB,
       maxExposureBps,
       maxSlippageBps,
+      maxDrawdownBps,
       minIntervalSec,
       policyHash,
     },

@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 import {ReceiptChain} from "./ReceiptChain.sol";
 import {IV3SwapRouter} from "./interfaces/IV3SwapRouter.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeToken} from "./lib/SafeToken.sol";
 import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
 
@@ -62,7 +63,7 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
         SafeToken.approve(p.tokenIn, router, p.amountIn);
         amountOut = IV3SwapRouter(router).exactInputSingle(p);
         SafeToken.approve(p.tokenIn, router, 0);
-        if (amountOut < p.amountOutMinimum) revert Underfill();
+        if (amountOut < p.amountOutMinimum || IERC20(p.tokenIn).balanceOf(address(this)) != 0) revert Underfill();
         _commit(
             chains[msg.sender],
             receiptHash,
