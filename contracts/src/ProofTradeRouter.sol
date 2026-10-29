@@ -59,11 +59,13 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
         // SwapRouter02 requires full consumption when its price limit is zero.
         if (p.sqrtPriceLimitX96 != 0) revert PriceLimit();
         if (prevHead != chains[msg.sender].head) revert PreviousHead();
+        uint256 balBefore = IERC20(p.tokenIn).balanceOf(address(this));
         SafeToken.pull(p.tokenIn, msg.sender, p.amountIn);
         SafeToken.approve(p.tokenIn, router, p.amountIn);
         amountOut = IV3SwapRouter(router).exactInputSingle(p);
         SafeToken.approve(p.tokenIn, router, 0);
-        if (amountOut < p.amountOutMinimum || IERC20(p.tokenIn).balanceOf(address(this)) != 0) revert Underfill();
+        uint256 balAfter = IERC20(p.tokenIn).balanceOf(address(this));
+        if (amountOut < p.amountOutMinimum || balAfter != balBefore) revert Underfill();
         _commit(
             chains[msg.sender],
             receiptHash,
