@@ -145,10 +145,14 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
                 || m.maxDrawdownBps > 10000
         ) revert InvalidMandate();
         mandate = m;
-        int24 tick = _tick();
-        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
-        uint256 valB = IERC20(tokenB).balanceOf(address(this));
-        highWaterMark = valA + valB;
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+            uint256 valB = IERC20(tokenB).balanceOf(address(this));
+            highWaterMark = valA + valB;
+        } else {
+            highWaterMark = 0;
+        }
         emit MandateSet(m);
     }
 
@@ -158,13 +162,40 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         emit Revoked();
     }
 
-    /// @notice Withdraw tokens to an owner-selected recipient.
+    /// @notice Withdraw tokens to an owner-selected recipient. Never blocked by TWAP failures.
     function withdraw(address token, uint256 amount, address to) external onlyOwner nonReentrant {
+        uint256 bA_before = IERC20(tokenA).balanceOf(address(this));
+        uint256 bB_before = IERC20(tokenB).balanceOf(address(this));
+
         SafeToken.transfer(token, to, amount);
-        int24 tick = _tick();
-        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
-        uint256 valB = IERC20(tokenB).balanceOf(address(this));
-        highWaterMark = valA + valB;
+
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 valA_before = _quote(tick, bA_before, tokenA);
+            uint256 totalBefore = valA_before + bB_before;
+            uint256 bA_after = IERC20(tokenA).balanceOf(address(this));
+            uint256 bB_after = IERC20(tokenB).balanceOf(address(this));
+            uint256 valA_after = _quote(tick, bA_after, tokenA);
+            uint256 totalAfter = valA_after + bB_after;
+
+            if (totalBefore > 0 && highWaterMark > 0) {
+                if (totalBefore >= highWaterMark) {
+                    highWaterMark = totalAfter;
+                } else {
+                    highWaterMark = FullMath.mulDiv(highWaterMark, totalAfter, totalBefore);
+                }
+            } else {
+                highWaterMark = totalAfter;
+            }
+        } else {
+            if (token == tokenB) {
+                if (highWaterMark > amount) {
+                    highWaterMark -= amount;
+                } else {
+                    highWaterMark = 0;
+                }
+            }
+        }
     }
 
     /// @notice Stop agent actions.
@@ -188,10 +219,41 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     function deposit(address token, uint256 amount) external nonReentrant {
         if (token != tokenA && token != tokenB) revert InvalidToken();
         SafeToken.pull(token, msg.sender, amount);
-        int24 tick = _tick();
-        uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
-        uint256 valB = IERC20(tokenB).balanceOf(address(this));
-        if (valA + valB > highWaterMark) highWaterMark = valA + valB;
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 depVal = token == tokenB ? amount : _quote(tick, amount, tokenA);
+            if (highWaterMark == 0) {
+                uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+                uint256 valB = IERC20(tokenB).balanceOf(address(this));
+                highWaterMark = valA + valB;
+            } else {
+                highWaterMark += depVal;
+            }
+        } else {
+            if (token == tokenB) {
+                highWaterMark += amount;
+            }
+        }
+    }
+
+    function _tryTick() private view returns (bool ok, int24 tick) {
+        uint32[] memory times = new uint32[](2);
+        times[0] = twapWindowSec;
+        try IUniswapV3Pool(pool).observe(times) returns (int56[] memory c, uint160[] memory) {
+            if (c.length >= 2) {
+                int56 delta;
+                unchecked {
+                    delta = c[1] - c[0];
+                }
+                int56 w = int56(uint56(twapWindowSec));
+                int56 mean = delta / w;
+                if (delta < 0 && delta % w != 0) --mean;
+                if (mean >= -887272 && mean <= 887272) {
+                    return (true, int24(mean));
+                }
+            }
+        } catch {}
+        return (false, 0);
     }
 
     function _tick() private view returns (int24 tick) {
@@ -255,7 +317,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         }
         uint256 preValA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
         uint256 preTotalVal = preValA + IERC20(tokenB).balanceOf(address(this));
-        if (preTotalVal > highWaterMark) {
+        if (highWaterMark == 0 || preTotalVal > highWaterMark) {
             highWaterMark = preTotalVal;
         } else if (
             mandate.maxDrawdownBps > 0
@@ -302,7 +364,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 valueA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
         uint256 valueB = IERC20(tokenB).balanceOf(address(this));
         uint256 total = valueA + valueB;
-        if (total > highWaterMark) {
+        if (highWaterMark == 0 || total > highWaterMark) {
             highWaterMark = total;
         } else if (
             mandate.maxDrawdownBps > 0

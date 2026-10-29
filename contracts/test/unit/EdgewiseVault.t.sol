@@ -406,6 +406,59 @@ contract EdgewiseVaultTest is Test {
         assertEq(b.balanceOf(stranger), 10e18);
     }
 
+    function testWithdrawWhenObserveReverts() public {
+        pool.setFail(true);
+        v.withdraw(address(b), 10e18, stranger);
+        assertEq(b.balanceOf(stranger), 10e18);
+
+        v.withdraw(address(a), 5e18, stranger);
+        assertEq(a.balanceOf(stranger), 5e18);
+    }
+
+    function testEmergencyWithdrawWhilePaused() public {
+        v.pause();
+        assertTrue(v.paused());
+        v.withdraw(address(b), 20e18, stranger);
+        assertEq(b.balanceOf(stranger), 20e18);
+    }
+
+    function testWithdrawPreservesDrawdown() public {
+        m.maxDrawdownBps = 2000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        deal(address(b), address(v), 700e18);
+        v.withdraw(address(b), 700e18, stranger);
+        uint256 expectedHWM = (uint256(2000e18) * 1000e18) / 1700e18;
+        assertEq(v.highWaterMark(), expectedHWM);
+    }
+
+    function testDepositDoesNotEraseDrawdown() public {
+        m.maxDrawdownBps = 2000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        deal(address(b), address(v), 700e18);
+
+        b.mint(address(this), 300e18);
+        b.approve(address(v), 300e18);
+        v.deposit(address(b), 300e18);
+
+        assertEq(v.highWaterMark(), 2300e18);
+        assertEq(b.balanceOf(address(v)), 1000e18);
+    }
+
+    function testSetMandateWhenObserveReverts() public {
+        pool.setFail(true);
+        m.expiry = block.timestamp + 7 days;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 0);
+
+        pool.setFail(false);
+        _trade();
+        assertGt(v.highWaterMark(), 0);
+    }
+
     function testDeposit() public {
         b.mint(address(this), 10e18);
         b.approve(address(v), 10e18);
