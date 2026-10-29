@@ -50,6 +50,7 @@ export const mandateSchema = z
     maxDailyInB: z.bigint().positive(),
     maxExposureBps: bps,
     maxSlippageBps: z.number().int().min(0).max(100),
+    maxDrawdownBps: bps.optional(),
     minIntervalSec: seconds,
     policyHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   })

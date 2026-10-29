@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { localReceiptFiles } from '../src/lib/receipts.js';
 import { loadDeployment, explorerLink } from '../src/lib/clients.js';
-import trade from '../../../packages/verifier/test/fixtures/receipts/0-0x764e5f6b06e1d95edc1df44663489a0238727a6fc9465f153c788d96bbc6e045.json';
+import trade from '../../../packages/verifier/test/fixtures/receipts/0-0x7b0c0e534f5f1143aa6be5b1fc80e826fc620453d80b9e517cd9dcdddd352a2d.json';
 const response = (value: unknown) =>
   new Response(JSON.stringify(value), {
     headers: { 'content-type': 'application/json' },

@@ -62,7 +62,7 @@ separate; testnet P&L is not real.
 ## Recorded acceptance fixtures
 
 ```sh
-pnpm verify packages/verifier/test/fixtures/receipts/0-0x764e5f6b06e1d95edc1df44663489a0238727a6fc9465f153c788d96bbc6e045.json --recorded packages/verifier/test/fixtures/chain.json
+pnpm verify packages/verifier/test/fixtures/receipts/0-0x7b0c0e534f5f1143aa6be5b1fc80e826fc620453d80b9e517cd9dcdddd352a2d.json --recorded packages/verifier/test/fixtures/chain.json
 pnpm verify --pnl packages/verifier/test/fixtures/receipts --recorded packages/verifier/test/fixtures/chain.json --json
 ```
 

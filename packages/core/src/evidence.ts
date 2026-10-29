@@ -84,6 +84,7 @@ const mandateRawSchema = z.tuple([
   positive,
   z.number().int(),
   z.number().int(),
+  z.number().int(),
   natural,
   z.string(),
 ]);
@@ -407,8 +408,9 @@ export async function collectEvidence({
         maxDailyInB: m[4],
         maxExposureBps: m[5],
         maxSlippageBps: m[6],
-        minIntervalSec: Number(m[7]),
-        policyHash: m[8],
+        maxDrawdownBps: m[7],
+        minIntervalSec: Number(m[8]),
+        policyHash: m[9],
       });
       if (parsed.success)
         e.vault = {

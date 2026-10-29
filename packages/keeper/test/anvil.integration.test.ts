@@ -234,6 +234,7 @@ it.skipIf(!!reason)(
               maxDailyInB: units(10000, 6),
               maxExposureBps: 10000,
               maxSlippageBps: 100,
+              maxDrawdownBps: 2000,
               minIntervalSec: 0n,
               policyHash: policyHash(policy),
             },

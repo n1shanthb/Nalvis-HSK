@@ -63,6 +63,7 @@ const mandateRaw = z.tuple([
   natural,
   z.number().int().min(0).max(10000),
   z.number().int().min(0).max(100),
+  z.number().int().min(0).max(10000),
   natural,
   hex,
 ]);
@@ -268,8 +269,9 @@ export async function connectExecution(
       maxDailyInB: scale(m[4], db, 6),
       maxExposureBps: m[5],
       maxSlippageBps: m[6],
-      minIntervalSec: Number(m[7]),
-      policyHash: m[8],
+      maxDrawdownBps: m[7],
+      minIntervalSec: Number(m[8]),
+      policyHash: m[9],
     };
     const now = Number(block.timestamp);
     return {
@@ -499,6 +501,8 @@ export async function connectExecution(
               amountIn: quote.amountIn,
               minOut: r.tx.minOut,
               deadline: BigInt(r.tx.deadline),
+              // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as any).validUntil ?? r.tx.deadline).
+              // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
               validUntil: BigInt((r.tx as any).validUntil ?? r.tx.deadline),
               nonce: r.tx.nonce,
               receiptHash: r.receiptHash,
@@ -522,6 +526,8 @@ export async function connectExecution(
             amountOutMinimum: r.tx.minOut,
             sqrtPriceLimitX96: 0n,
           },
+          // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as any).validUntil ?? r.tx.deadline).
+          // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
           BigInt((r.tx as any).validUntil ?? r.tx.deadline),
           BigInt(r.tx.deadline),
         ],

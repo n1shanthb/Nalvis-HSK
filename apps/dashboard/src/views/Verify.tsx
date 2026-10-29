@@ -7,7 +7,7 @@ import {
 } from '../../../../packages/verifier/src/verify.js';
 import { recordedReader } from '../../../../packages/verifier/src/recorded.js';
 import recording from '../../../../packages/verifier/test/fixtures/chain.json';
-import trade from '../../../../packages/verifier/test/fixtures/receipts/0-0x764e5f6b06e1d95edc1df44663489a0238727a6fc9465f153c788d96bbc6e045.json';
+import trade from '../../../../packages/verifier/test/fixtures/receipts/0-0x7b0c0e534f5f1143aa6be5b1fc80e826fc620453d80b9e517cd9dcdddd352a2d.json';
 import { localReceipts } from '../lib/receipts.js';
 import { clientFor, type DashboardChain } from '../lib/clients.js';
 export const recordedTrade = trade;
