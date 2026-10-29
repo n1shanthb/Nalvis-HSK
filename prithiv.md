@@ -86,9 +86,28 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
      - Verifier tests: 40 passed.
      - Dashboard tests: 31 passed.
 3. **Foundry invariant/fuzz tests:** agent can never withdraw or send funds anywhere except swaps back into the vault; no trading after expiry/revoke/pause or with an expired decision; per-trade cap, turnover cap, min interval and drawdown breaker enforced; random mandates never allow slippage > 100 bps.
+   - **Status:** COMPLETED.
+   - Invariant test suite: `contracts/test/invariant/VaultInvariant.t.sol` + `VaultHandler.sol`.
+     - **6 invariants:** router allowance always zero, slippage cap ≤ 100 bps, drawdown bps ≤ 10000, owner preserved, daily turnover cap, receipt chain integrity.
+     - VaultHandler drives 9 handler actions: trade (with intentionally expired validUntil), commitHold, agentAttemptWithdraw, strangerActions, deposit, ownerWithdraw, setPaused, warp, attemptSetMandate.
+   - Fuzz test suite: `contracts/test/unit/VaultFuzz.t.sol`.
+     - 5 fuzz tests: MandateSlippageCap, MandateDrawdownCap, DecisionExpiry, PerTradeCap, MinInterval, AgentCannotWithdraw.
+   - Added `getMandate()` external view helper to `EdgewiseVault.sol` so test contracts can read the full struct (Solidity public struct getter returns a tuple, not the struct type).
+   - **Testing Results:**
+     - `forge test --match-path 'test/unit/*'`: 115 tests passed (0 failed) — includes all 6 new fuzz tests.
+     - `forge test --match-path 'test/invariant/*'`: 1 invariant suite passed (0 failed), 42s run with 256 fuzz sequences.
 4. Regenerate anvil fixtures from **real** anvil txs if contract changes break them.
 5. `scripts/verify-blockscout.sh`: `forge verify-contract` commands for vault / router / ReceiptChain on testnet 133 and mainnet 177 (to be run after deploy).
+   - **Status:** COMPLETED.
+   - Script reads `deployments/133.json` (and optionally `177.json`) for deployed addresses.
+   - Encodes exact constructor args via `cast abi-encode` and calls `forge verify-contract --verifier blockscout`.
+   - **UNVERIFIED:** Blockscout verifier URL for chain 133 (`https://testnet-explorer.hsk.xyz/api/`) not confirmed in a live run. API key may or may not be required.
 6. Update `scripts/testnet-bootstrap.md` and the mandate calldata scripts for the new mandate fields, so Nishanth can deploy and sign with his Ledger after both PRs merge.
+   - **Status:** COMPLETED.
+   - Updated `mandate()` cast call ABI to include new `maxDrawdownBps` field (10-element tuple).
+   - Added `highWaterMark()` read after trade in §5.
+   - Added mandate field reference section documenting `maxDrawdownBps`, `maxSlippageBps`, `minIntervalSec`, `maxDailyInB`.
+   - `MandateCalldata.s.sol` already updated in Phase 1 to read `MAX_DRAWDOWN_BPS` env var (default 2000).
 7. **Full practice deploy on testnet (chain 133), no Ledger** — the dress rehearsal for Nishanth's real run. Do it after your Task 9 contracts are final:
    - Use **two fresh throwaway testnet wallets** of your own: one as practice *owner*, one as practice *agent*. Fund them from https://hskchain.net/faucet (0.1 HSK/day each; ask Nishanth if you run short). Never use a wallet holding real funds; never commit keys.
    - Follow `scripts/testnet-bootstrap.md` **exactly as written**, top to bottom, substituting the throwaway owner for the Ledger. Deploy vault / router / ReceiptChain, sign the mandate with the throwaway owner, run the keeper until you get at least one real TRADE, WAIT, RESIZE and REJECT receipt, run `nalvis verify <txHash>` on each (expect PASS), then pause → revoke → confirm an agent trade reverts.
@@ -96,9 +115,17 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - **Fix the runbook** wherever a step was wrong, missing or confusing, and note gas used + HSK spent per step, so Nishanth's Ledger run is a straight copy.
    - Save results to `deployments/133-practice.json` (clearly labelled PRACTICE, throwaway owner, not the demo deployment) and `docs/PRACTICE-DEPLOY.md` (every tx hash with explorer link https://testnet-explorer.hsk.xyz, verify output, problems hit, fixes made). Only real tx hashes, never invented.
    - Chain 133 only. **Never broadcast on mainnet 177.**
+   - **Status:** PENDING — Requires Nishanth to supply testnet wallet credentials.
 
 ### T9 acceptance
 All tests green incl. new invariant tests; static dashboard build works with owner disabled; verifier PASSes regenerated real anvil fixtures; `scripts/testnet-bootstrap.md` updated; practice testnet deploy done end to end with real receipts that verify PASS, documented in `docs/PRACTICE-DEPLOY.md`.
+
+**Completed so far (Prithiv):**
+- [x] Phase 0: Decision expiry (`validUntil`) — committed `a29d7b0`
+- [x] Phase 1: Drawdown circuit breaker, partial-fill protection, guardrails — committed `0940e98`
+- [x] Phase 2: Invariant tests (6 invariants + VaultHandler) + fuzz tests (6 fuzz tests)
+- [x] Phase 3: `scripts/verify-blockscout.sh` + `testnet-bootstrap.md` update
+- [ ] Phase 4: Practice testnet deploy + `docs/PRACTICE-DEPLOY.md` (needs testnet wallet credentials from Nishanth)
 
 
 

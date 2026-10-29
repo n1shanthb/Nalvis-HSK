@@ -179,6 +179,11 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         emit Paused(false);
     }
 
+    /// @notice Returns the full mandate struct (public getter returns tuple, not struct).
+    function getMandate() external view returns (Mandate memory) {
+        return mandate;
+    }
+
     /// @notice Pull an exact pre-approved deposit of either configured token.
     function deposit(address token, uint256 amount) external nonReentrant {
         if (token != tokenA && token != tokenB) revert InvalidToken();
