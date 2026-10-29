@@ -39,16 +39,7 @@ contract VaultInvariantTest is StdInvariant, Test {
 
         // Deploy vault with 1 hour twap
         vault = new EdgewiseVault(
-            owner,
-            address(router),
-            address(pool),
-            address(tokenA),
-            address(tokenB),
-            3000,
-            300,
-            address(0),
-            500,
-            1 hours
+            owner, address(router), address(pool), address(tokenA), address(tokenB), 3000, 300, address(0), 500, 1 hours
         );
 
         // Set initial mandate

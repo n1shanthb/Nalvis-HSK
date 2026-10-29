@@ -55,6 +55,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     bool public paused;
     uint256 public nextNonce;
     uint256 public lastTradeAt;
+
     struct TurnoverSlot {
         uint32 epochBucket;
         uint224 notionalB;
@@ -144,8 +145,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     function setMandate(Mandate calldata m) external onlyOwner {
         if (
             m.agent == owner || m.agent == address(0) || m.expiry <= block.timestamp
-                || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000
-                || m.maxDrawdownBps > 10000
+                || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000 || m.maxDrawdownBps > 10000
         ) revert InvalidMandate();
         mandate = m;
         (bool ok, int24 tick) = _tryTick();
@@ -399,8 +399,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         if (highWaterMark == 0 || total > highWaterMark) {
             highWaterMark = total;
         } else if (
-            mandate.maxDrawdownBps > 0
-                && total < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
+            mandate.maxDrawdownBps > 0 && total < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
         ) {
             revert Drawdown();
         }

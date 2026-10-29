@@ -25,6 +25,7 @@ contract DeployHarness is Deploy {
 contract DeployTestnetForkTest is Test {
     EdgewiseVault deployed;
     address deployedAgent;
+
     /// @notice Exercise the actual CLI deployment entrypoint and real testnet swap.
     function testDeployAndRealTestnetTrade() public {
         string memory rpc = vm.envOr("HSK_TESTNET_RPC", string(""));
@@ -71,7 +72,15 @@ contract DeployTestnetForkTest is Test {
         vm.prank(agent);
         uint256 out = v.trade(
             EdgewiseVault.TradeParams(
-                Addresses.USDT_133, 10e18, minOut, block.timestamp, block.timestamp + 60, v.nextNonce(), hash, 0, ReceiptChain.Kind.TRADE
+                Addresses.USDT_133,
+                10e18,
+                minOut,
+                block.timestamp,
+                block.timestamp + 60,
+                v.nextNonce(),
+                hash,
+                0,
+                ReceiptChain.Kind.TRADE
             )
         );
         assertGe(out, minOut);
@@ -98,7 +107,6 @@ contract DeployTestnetForkTest is Test {
             }
         }
         assertTrue(found, "Receipt missing");
-
     }
 
     function testTradeHelperRealSell() public {

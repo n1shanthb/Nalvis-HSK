@@ -37,18 +37,16 @@ contract MandateCalldataTest is Test {
         bytes32 policy;
         string memory path = string.concat(vm.projectRoot(), "/../policy/default.json");
         if (vm.exists(path)) policy = keccak256(bytes(vm.readFile(path)));
-        EdgewiseVault.Mandate memory mDefault = EdgewiseVault.Mandate(
-            agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 2000, 300, policy
-        );
+        EdgewiseVault.Mandate memory mDefault =
+            EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 2000, 300, policy);
         assertEq(setData, abi.encodeCall(EdgewiseVault.setMandate, (mDefault)));
         assertEq(revokeData, abi.encodeCall(EdgewiseVault.revoke, ()));
 
         // 2. Explicit drawdown (1500 bps)
         vm.setEnv("MAX_DRAWDOWN_BPS", "1500");
         (setData,) = helper.run();
-        EdgewiseVault.Mandate memory mCustom = EdgewiseVault.Mandate(
-            agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 1500, 300, policy
-        );
+        EdgewiseVault.Mandate memory mCustom =
+            EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 1500, 300, policy);
         assertEq(setData, abi.encodeCall(EdgewiseVault.setMandate, (mCustom)));
 
         // 3. Out of bounds (> 10000 bps)

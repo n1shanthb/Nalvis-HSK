@@ -29,16 +29,7 @@ contract VaultFuzzTest is Test {
         pool = new MockPool(address(a), address(b));
 
         vault = new EdgewiseVault(
-            address(this),
-            address(router),
-            address(pool),
-            address(a),
-            address(b),
-            3000,
-            300,
-            address(0),
-            500,
-            1 hours
+            address(this), address(router), address(pool), address(a), address(b), 3000, 300, address(0), 500, 1 hours
         );
 
         EdgewiseVault.Mandate memory m = EdgewiseVault.Mandate({

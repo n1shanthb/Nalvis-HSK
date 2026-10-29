@@ -21,7 +21,7 @@ abstract contract ForkBase is Test {
             vm.skip(true);
         }
         try vm.createSelectFork(rpc, vm.envOr("FORK_BLOCK_177", uint256(29413000))) returns (uint256) {}
-            catch {
+        catch {
             console2.log("SKIP: RPC unreachable or pinned state unavailable");
             vm.skip(true);
         }
@@ -45,8 +45,7 @@ abstract contract ForkBase is Test {
     function _fund(address recipient, uint256 amount) internal {
         try this.fundUSDT(recipient, amount) {
             console2.log("USDT funding: forge-std deal() worked");
-        }
-        catch {
+        } catch {
             vm.prank(Addresses.PRIMARYPOOL_177);
             require(IERC20(Addresses.USDT_177).transfer(recipient, amount));
             console2.log("USDT funding: impersonated pool holder transfer");

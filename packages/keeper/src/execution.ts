@@ -501,9 +501,12 @@ export async function connectExecution(
               amountIn: quote.amountIn,
               minOut: r.tx.minOut,
               deadline: BigInt(r.tx.deadline),
-              // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as any).validUntil ?? r.tx.deadline).
+              // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as { validUntil?: bigint | number }).validUntil ?? r.tx.deadline).
               // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
-              validUntil: BigInt((r.tx as any).validUntil ?? r.tx.deadline),
+              validUntil: BigInt(
+                (r.tx as { validUntil?: bigint | number }).validUntil ??
+                  r.tx.deadline,
+              ),
               nonce: r.tx.nonce,
               receiptHash: r.receiptHash,
               prevHead: r.prevHead,
@@ -526,9 +529,12 @@ export async function connectExecution(
             amountOutMinimum: r.tx.minOut,
             sqrtPriceLimitX96: 0n,
           },
-          // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as any).validUntil ?? r.tx.deadline).
+          // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as { validUntil?: bigint | number }).validUntil ?? r.tx.deadline).
           // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
-          BigInt((r.tx as any).validUntil ?? r.tx.deadline),
+          BigInt(
+            (r.tx as { validUntil?: bigint | number }).validUntil ??
+              r.tx.deadline,
+          ),
           BigInt(r.tx.deadline),
         ],
       });
