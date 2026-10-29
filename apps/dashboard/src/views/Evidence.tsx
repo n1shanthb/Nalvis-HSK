@@ -39,30 +39,47 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
           <div className="bar-group">
             <span className="bar-label">HSKSwap DEX</span>
             <div className="bar-track">
-              <div
-                className="bar-fill dex-bar"
-                style={{ width: `${Math.min(100, Math.max(30, (e.dexMid ?? 55) * 1.5))}%` }}
-              >
-                <span>${e.dexMid?.toFixed(4) ?? '55.5000'}</span>
-              </div>
+              {e.dexMid !== undefined ? (
+                <div
+                  className="bar-fill dex-bar"
+                  style={{ width: `${Math.min(100, Math.max(15, e.dexMid * 1.5))}%` }}
+                >
+                  <span>${e.dexMid.toFixed(4)}</span>
+                </div>
+              ) : (
+                <div className="bar-fill-unavailable">
+                  <span>DEX mid unavailable</span>
+                </div>
+              )}
             </div>
           </div>
-          {e.cex.map((c) => {
-            const cexVal = (c.bid + c.ask) / 2;
-            return (
-              <div className="bar-group" key={c.venue}>
-                <span className="bar-label">{c.venue.toUpperCase()} Mid</span>
-                <div className="bar-track">
-                  <div
-                    className="bar-fill cex-bar"
-                    style={{ width: `${Math.min(100, Math.max(30, cexVal * 1.5))}%` }}
-                  >
-                    <span>${cexVal.toFixed(4)}</span>
-                  </div>
+          {e.cex.length === 0 ? (
+            <div className="bar-group">
+              <span className="bar-label">CEX Mid</span>
+              <div className="bar-track">
+                <div className="bar-fill-unavailable">
+                  <span>CEX unavailable</span>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ) : (
+            e.cex.map((c) => {
+              const cexVal = (c.bid + c.ask) / 2;
+              return (
+                <div className="bar-group" key={c.venue}>
+                  <span className="bar-label">{c.venue.toUpperCase()} Mid</span>
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill cex-bar"
+                      style={{ width: `${Math.min(100, Math.max(15, cexVal * 1.5))}%` }}
+                    >
+                      <span>${cexVal.toFixed(4)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
       <div className="metrics">

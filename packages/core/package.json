@@ -21,5 +21,8 @@
     "./*": "./src/*.ts",
     "./abi/index.js": "./src/abi/index.ts",
     "./*.js": "./src/*.ts"
+  },
+  "bin": {
+    "desk": "./dist/desk/cli.js"
   }
 }

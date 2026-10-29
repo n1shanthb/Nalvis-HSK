@@ -1,3 +1,5 @@
+import { encodeFunctionData, keccak256, type Hex } from 'viem';
+import { vaultAbi } from '../abi/index.js';
 import type { Evidence, Mandate, Policy, Decision } from '../index.js';
 import { nlToParamDiff } from '../llm.js';
 
@@ -12,9 +14,16 @@ export interface DeskState {
 }
 
 export interface DeskParseResult {
-  intent: 'POSITION_PNL' | 'DECISION_EXPLANATION' | 'MARKET_BASIS' | 'PARAM_UPDATE' | 'REFUSAL';
+  intent: 'POSITION_PNL' | 'DECISION_EXPLANATION' | 'MARKET_BASIS' | 'PARAM_UPDATE' | 'OWNER_ACTION' | 'REFUSAL';
   response: string;
   diff?: Record<string, unknown>;
+  calldataHash?: Hex;
+  preparedAction?: {
+    functionName: string;
+    calldata: Hex;
+    calldataHash: Hex;
+    notice: string;
+  };
   refusedReason?: string;
   data?: Record<string, unknown>;
 }
@@ -26,6 +35,7 @@ export class DeskParser {
    * This class parses and answers queries deterministically.
    * It DOES NOT possess, instantiate, or import any signing keys, wallet instances,
    * RPC broadcast clients, or transaction sending routines.
+   * Owner actions (revoke, pause) are PREPARED ONLY (calldata + hash) and must be signed by the Ledger owner.
    */
   constructor() {}
 
@@ -66,7 +76,96 @@ export class DeskParser {
       };
     }
 
-    // 3. Position / Inventory / P&L (English + Hinglish)
+    // 3. Owner Action: Revoke agent (prepare only, never sign)
+    if (/\b(revoke|agent hatao|mandate radd|cancel agent)\b/i.test(q)) {
+      const calldata = encodeFunctionData({ abi: vaultAbi, functionName: 'revoke' });
+      const calldataHash = keccak256(calldata);
+      return {
+        intent: 'OWNER_ACTION',
+        response: `Prepared owner action 'revoke()'. Calldata hash: ${calldataHash}. Review and sign using Ledger in the Owner panel.`,
+        calldataHash,
+        preparedAction: {
+          functionName: 'revoke',
+          calldata,
+          calldataHash,
+          notice: 'Requires Ledger owner signature in Owner panel. Zeroes the agent mandate immediately.',
+        },
+      };
+    }
+
+    // 4. Owner Action: Pause / Unpause vault (prepare only, never sign)
+    if (/\b(pause vault|pause trading|rok do|trading pause|emergency stop)\b/i.test(q)) {
+      const calldata = encodeFunctionData({ abi: vaultAbi, functionName: 'pause' });
+      const calldataHash = keccak256(calldata);
+      return {
+        intent: 'OWNER_ACTION',
+        response: `Prepared owner action 'pause()'. Calldata hash: ${calldataHash}. Review and sign using Ledger in the Owner panel.`,
+        calldataHash,
+        preparedAction: {
+          functionName: 'pause',
+          calldata,
+          calldataHash,
+          notice: 'Requires Ledger owner signature in Owner panel. Halts agent trades until unpaused.',
+        },
+      };
+    }
+
+    // 5. Market Basis / DEX vs CEX spread (English + Hinglish)
+    if (
+      /\b(basis|spread|difference|price gap|gap|bhaav|farq)\b/i.test(q) ||
+      (/\b(cex|dex)\b/i.test(q) && !/\b(balance|position|pnl|p&l)\b/i.test(q))
+    ) {
+      const dex = context.evidence?.dexMid;
+      const cexEntry = context.evidence?.cex?.[0];
+      const cexMid = cexEntry ? (cexEntry.bid + cexEntry.ask) / 2 : undefined;
+
+      if (dex !== undefined && cexMid !== undefined && cexMid > 0) {
+        const basisBps = Math.round(((dex - cexMid) / cexMid) * 10000);
+        const sign = basisBps > 0 ? '+' : '';
+        return {
+          intent: 'MARKET_BASIS',
+          response: `DEX mid: ${dex.toFixed(4)}, CEX mid: ${cexMid.toFixed(4)} | Basis: ${sign}${basisBps} bps`,
+          data: {
+            dexMid: dex,
+            cexMid,
+            basisBps,
+          },
+        };
+      }
+      return {
+        intent: 'MARKET_BASIS',
+        response:
+          'Insufficient live market evidence to compute DEX-vs-CEX basis. Need both DEX mid and CEX book.',
+      };
+    }
+
+    // 6. Decision Explanation / Why did you wait/trade/reject (English + Hinglish)
+    if (
+      /\b(why|decision|reason|rule|trace|kyun|kyu|wait kiya|reject kiya|last trade)\b/i.test(
+        q,
+      )
+    ) {
+      const decision = context.state?.lastDecision;
+      if (!decision) {
+        return {
+          intent: 'DECISION_EXPLANATION',
+          response:
+            'No recent decision available to explain. Once the keeper runs a cycle, rule traces can be inspected here.',
+        };
+      }
+      const traces = decision.ruleTrace
+        .map((t) => `${t.rule}: ${t.pass ? 'PASS' : 'FAIL'} (${t.detail})`)
+        .join('; ');
+      return {
+        intent: 'DECISION_EXPLANATION',
+        response: `Verdict: ${decision.kind}. Reason: ${traces || 'Evaluated within policy constraints.'}`,
+        data: {
+          decision,
+        },
+      };
+    }
+
+    // 7. Position / Inventory / P&L (English + Hinglish)
     if (
       /\b(position|balance|balances|holdings|inventory|kitna hai|kitna balance|profit|loss)\b/i.test(
         q,
@@ -76,14 +175,21 @@ export class DeskParser {
     ) {
       const decA = context.decimalsA ?? context.evidence?.decimalsA ?? 18;
       const decB = context.decimalsB ?? context.evidence?.decimalsB ?? 6;
-      const balA = context.state?.balanceA ?? context.evidence?.vault?.balanceA ?? 0n;
-      const balB = context.state?.balanceB ?? context.evidence?.vault?.balanceB ?? 0n;
+      const balA = context.state?.balanceA ?? context.evidence?.vault?.balanceA;
+      const balB = context.state?.balanceB ?? context.evidence?.vault?.balanceB;
+
+      if (balA === undefined || balB === undefined) {
+        return {
+          intent: 'POSITION_PNL',
+          response: 'Current Position: Vault balance unavailable. Connect RPC or ensure network deployment is accessible.',
+        };
+      }
 
       const numA = Number(balA) / 10 ** decA;
       const numB = Number(balB) / 10 ** decB;
 
       const cexMid =
-        context.evidence?.cex?.[0]
+        context.evidence?.cex && context.evidence.cex.length > 0
           ? (context.evidence.cex[0].bid + context.evidence.cex[0].ask) / 2
           : undefined;
 
@@ -115,63 +221,7 @@ export class DeskParser {
       };
     }
 
-    // 4. Decision Explanation / Why did you wait/trade/reject (English + Hinglish)
-    if (
-      /\b(why|decision|reason|rule|trace|kyun|kyu|wait kiya|reject kiya|last trade)\b/i.test(
-        q,
-      )
-    ) {
-      const decision = context.state?.lastDecision;
-      if (!decision) {
-        return {
-          intent: 'DECISION_EXPLANATION',
-          response:
-            'No recent decision available to explain. Once the keeper runs a cycle, rule traces can be inspected here.',
-        };
-      }
-      const traces = decision.ruleTrace
-        .map((t) => `${t.rule}: ${t.pass ? 'PASS' : 'FAIL'} (${t.detail})`)
-        .join('; ');
-      return {
-        intent: 'DECISION_EXPLANATION',
-        response: `Verdict: ${decision.kind}. Reason: ${traces || 'Evaluated within policy constraints.'}`,
-        data: {
-          decision,
-        },
-      };
-    }
-
-    // 5. Market Basis / DEX vs CEX spread (English + Hinglish)
-    if (
-      /\b(basis|spread|cex|dex|difference|price gap|gap|bhaav|farq)\b/i.test(
-        q,
-      )
-    ) {
-      const dex = context.evidence?.dexMid;
-      const cexEntry = context.evidence?.cex?.[0];
-      const cexMid = cexEntry ? (cexEntry.bid + cexEntry.ask) / 2 : undefined;
-
-      if (dex !== undefined && cexMid !== undefined && cexMid > 0) {
-        const basisBps = Math.round(((dex - cexMid) / cexMid) * 10000);
-        return {
-          intent: 'MARKET_BASIS',
-          response: `DEX mid: ${dex.toFixed(4)}, CEX mid: ${cexMid.toFixed(4)} | Basis: ${basisBps >= 0 ? '+' : ''}${basisBps} bps`,
-          data: {
-            dexMid: dex,
-            cexMid,
-            basisBps,
-          },
-        };
-      }
-      return {
-        intent: 'MARKET_BASIS',
-        response:
-          'Insufficient live market evidence to compute DEX-vs-CEX basis. Need both DEX mid and CEX book.',
-      };
-    }
-
-    // 6. Parameter diff / adjustment (English + Hinglish)
-    // Map Hinglish parameter modifications if present
+    // 8. Parameter diff / adjustment (English + Hinglish)
     let normalizedParamQuery = query;
     if (/zyada conservative/i.test(query) || /risk kam/i.test(query)) {
       normalizedParamQuery = 'be more conservative';
@@ -186,10 +236,13 @@ export class DeskParser {
         decB,
       );
       if (Object.keys(diffResult.diff).length > 0) {
+        const diffStr = JSON.stringify(diffResult.diff);
+        const calldataHash = keccak256(Buffer.from(diffStr));
         return {
           intent: 'PARAM_UPDATE',
-          response: `Proposed parameter update: ${JSON.stringify(diffResult.diff)}. Validated against signed mandate limits.`,
+          response: `Proposed parameter update: ${diffStr}. Calldata hash: ${calldataHash}. Validated against signed mandate limits.`,
           diff: diffResult.diff,
+          calldataHash,
         };
       }
       if (diffResult.refused) {
@@ -201,11 +254,11 @@ export class DeskParser {
       }
     }
 
-    // 7. General fallback / refusal
+    // 9. General fallback / refusal
     return {
       intent: 'REFUSAL',
       response:
-        'Unrecognised query. Desk supports: checking positions/P&L, explaining verdicts, viewing DEX/CEX basis, and proposing conservative parameter updates within mandate limits.',
+        'Unrecognised query. Desk supports: checking positions/P&L, explaining verdicts, viewing DEX/CEX basis, preparing pause/revoke actions, and proposing conservative parameter updates within mandate limits.',
       refusedReason: 'Unrecognised request',
     };
   }

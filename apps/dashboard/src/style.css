@@ -1160,6 +1160,18 @@ footer {
   border-right: 2px solid #000000;
 }
 
+.bar-fill-unavailable {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-inset);
+}
+
 .dex-bar {
   background: var(--neo-green);
 }

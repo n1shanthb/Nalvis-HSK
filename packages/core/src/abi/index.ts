@@ -23,6 +23,8 @@ export const vaultAbi = parseAbi([
   'function trade((address tokenIn,uint256 amountIn,uint256 minOut,uint256 deadline,uint256 nonce,bytes32 receiptHash,bytes32 prevHead,uint8 kind) p) returns (uint256)',
   'function commitHold(bytes32 receiptHash,bytes32 prevHead,uint8 kind)',
   'function revoke()',
+  'function pause()',
+  'function unpause()',
   'function setMandate((address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint256 minIntervalSec,bytes32 policyHash) m)',
 ]);
 export const proofRouterAbi = parseAbi([
