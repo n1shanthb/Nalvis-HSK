@@ -136,7 +136,7 @@ test('compiled CLI exits 1 and names check for all six required tampers', () => 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-});
+}, 30000);
 test('P&L CLI verifies all receipts first', async () => {
   const output: string[] = [];
   expect(

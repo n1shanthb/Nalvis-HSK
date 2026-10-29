@@ -15,11 +15,19 @@ import { useResource } from '../lib/useResource.js';
 
 const policy = policySchema.parse(policyJSON);
 
+interface HistoryItem {
+  query: string;
+  result: DeskParseResult;
+  timestamp: string;
+  llmUsed?: boolean;
+  model?: string;
+  promptHash?: string;
+}
+
 export function DeskView({ chain }: { chain: DashboardChain }) {
   const [query, setQuery] = useState('');
-  const [history, setHistory] = useState<
-    { query: string; result: DeskParseResult; timestamp: string }[]
-  >([]);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Load real vault state, live evidence, and last recorded decision
   const resource = useResource(
@@ -66,9 +74,10 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
 
   const parser = new DeskParser();
 
-  const handleQuery = (text: string) => {
-    if (!text.trim()) return;
+  const handleQuery = async (text: string) => {
+    if (!text.trim() || isEvaluating) return;
 
+    setIsEvaluating(true);
     const data = resource.data;
     const m = data?.snapshot?.mandate;
     const mandate = m
@@ -85,33 +94,82 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
         }
       : undefined;
 
-    const res = parser.parse(text, {
+    const deskContext = {
       evidence: data?.evidence,
       mandate,
       policy,
       state: data?.snapshot
         ? {
-            balanceA: data.snapshot.mandate.maxTradeInA, // fallback
+            balanceA: data.snapshot.mandate.maxTradeInA,
             balanceB: data.snapshot.mandate.maxTradeInB,
             lastDecision: data.lastDecision,
           }
         : undefined,
       decimalsA: data?.snapshot?.decimalsA ?? 18,
       decimalsB: data?.snapshot?.decimalsB ?? 6,
-    });
+    };
+
+    let finalResult: DeskParseResult;
+    let llmUsed = false;
+    let modelName: string | undefined;
+    let promptHash: string | undefined;
+
+    try {
+      // Attempt call to serverless proxy /api/desk
+      const res = await fetch('/api/desk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: text,
+          ...deskContext,
+        }),
+      });
+
+      if (res.ok) {
+        const body = (await res.json()) as {
+          llmUsed: boolean;
+          model?: string;
+          promptHash?: string;
+          result: DeskParseResult;
+        };
+        finalResult = body.result;
+        llmUsed = body.llmUsed;
+        modelName = body.model;
+        promptHash = body.promptHash;
+      } else {
+        // Fallback to local deterministic parser
+        finalResult = parser.parse(text, deskContext);
+      }
+    } catch {
+      // Network or API offline: rule-based fallback
+      finalResult = parser.parse(text, deskContext);
+    } finally {
+      setIsEvaluating(false);
+    }
 
     const now = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
     });
-    setHistory((prev) => [...prev, { query: text, result: res, timestamp: now }]);
+
+    setHistory((prev) => [
+      ...prev,
+      {
+        query: text,
+        result: finalResult,
+        timestamp: now,
+        llmUsed,
+        model: modelName,
+        promptHash,
+      },
+    ]);
     setQuery('');
   };
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    handleQuery(query);
+    void handleQuery(query);
   };
 
   const sampleChips = [
@@ -134,7 +192,7 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
         </div>
         <div className="desk-status-badge">
           <span className="dot pulse" />
-          <span>DETERMINISTIC ENGINE · LLM ISOLATED</span>
+          <span>HYBRID DESK · GROQ LLM + DETERMINISTIC ENGINE</span>
         </div>
       </div>
 
@@ -170,7 +228,8 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
               key={idx}
               type="button"
               className="chip-btn"
-              onClick={() => handleQuery(chip.q)}
+              disabled={isEvaluating}
+              onClick={() => void handleQuery(chip.q)}
             >
               {chip.label}
             </button>
@@ -183,14 +242,14 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
           <span className="terminal-dot red" />
           <span className="terminal-dot yellow" />
           <span className="terminal-dot green" />
-          <span className="terminal-title">NALVIS INTENT TERMINAL // STRICT DETERMINISTIC REPL</span>
+          <span className="terminal-title">NALVIS INTENT TERMINAL // GROQ LLM + DETERMINISTIC VERIFIER</span>
         </div>
 
         <div className="desk-chat-stream">
           {history.length === 0 && (
             <div className="terminal-empty-state">
               <p>Type a natural language query or select a quick query chip above.</p>
-              <small>Real telemetry: queries are evaluated live against current vault state, mandate bounds, and evidence.</small>
+              <small>Dual pipeline: Groq LLM parses intents & grounded facts; deterministic engine validates strictly against mandate.</small>
             </div>
           )}
           {history.map((item, idx) => (
@@ -206,11 +265,28 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
               >
                 <div className="bubble-header">
                   <span className="sender-tag">NALVIS DESK:</span>
-                  <span className={`intent-badge ${item.result.intent}`}>
-                    {item.result.intent}
-                  </span>
+                  <div className="badge-group">
+                    {item.llmUsed ? (
+                      <span className="mode-badge llm-mode">
+                        GROQ LLM ({item.model})
+                      </span>
+                    ) : (
+                      <span className="mode-badge rule-mode">
+                        RULE-BASED MODE
+                      </span>
+                    )}
+                    <span className={`intent-badge ${item.result.intent}`}>
+                      {item.result.intent}
+                    </span>
+                  </div>
                 </div>
                 <p>{item.result.response}</p>
+                {item.promptHash && (
+                  <div className="bubble-calldata-box">
+                    <span>PROMPT HASH:</span>
+                    <code>{item.promptHash}</code>
+                  </div>
+                )}
                 {item.result.calldataHash && (
                   <div className="bubble-calldata-box">
                     <span>CALLDATA HASH:</span>
@@ -239,12 +315,17 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
           <input
             type="text"
             className="terminal-input"
-            placeholder="Ask about positions, P&L, basis, why WAIT/REJECT, or propose param adjustments..."
+            placeholder={
+              isEvaluating
+                ? 'Evaluating with Groq & deterministic engine...'
+                : 'Ask about positions, P&L, basis, why WAIT/REJECT, or propose param adjustments...'
+            }
             value={query}
+            disabled={isEvaluating}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button type="submit" className="terminal-send-btn">
-            Evaluate
+          <button type="submit" className="terminal-send-btn" disabled={isEvaluating || !query.trim()}>
+            {isEvaluating ? 'Evaluating...' : 'Evaluate'}
           </button>
         </form>
       </div>

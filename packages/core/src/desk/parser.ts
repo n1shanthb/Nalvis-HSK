@@ -54,7 +54,7 @@ export class DeskParser {
 
     // 1. Refusal check: Signing / Execution / Transfer requests
     if (
-      /\b(sign|send|transfer|execute|swap now|broadcast|transact|bhejo|sign karo|execute karo)\b/i.test(
+      /\b(sign|send|transfer|execute|swap|broadcast|transact|bhejo|sign karo|execute karo)\b/i.test(
         q,
       )
     ) {
