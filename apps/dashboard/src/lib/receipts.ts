@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { parseAbiItem } from 'viem';
-import { receiptEvent } from '../../../../packages/core/src/abi/index.js';
+import { receiptEvent } from '@nalvis/core/abi/index.js';
 import {
   receiptSchema,
   type StoredReceipt,

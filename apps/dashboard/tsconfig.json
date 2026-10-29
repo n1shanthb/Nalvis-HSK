@@ -6,7 +6,17 @@
     "declaration": false,
     "jsx": "react-jsx",
     "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@nalvis/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "@nalvis/core": [
+        "../../packages/core/src/index.ts"
+      ]
+    }
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

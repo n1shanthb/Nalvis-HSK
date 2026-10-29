@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DeskParser, type DeskParseResult } from '../../../../packages/core/src/index.js';
+import { DeskParser, type DeskParseResult } from '@nalvis/core/index.js';
 import { type DashboardChain } from '../lib/clients.js';
 
 export function DeskView({ chain }: { chain: DashboardChain }) {

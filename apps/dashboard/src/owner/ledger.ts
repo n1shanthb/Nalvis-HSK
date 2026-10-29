@@ -18,9 +18,9 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { assertWritableChain } from '../../../../packages/core/src/addresses.js';
+import { assertWritableChain } from '@nalvis/core/addresses.js';
 import { clientFor } from '../lib/clients.js';
-import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
+import { vaultAbi } from '@nalvis/core/abi/index.js';
 
 export const BLIND_SIGNING_WARNING =
   'Blind signing: HashKey Chain has no Ledger clear-signing metadata; verify the calldata hash shown here matches your device.';

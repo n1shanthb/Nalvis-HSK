@@ -7,12 +7,12 @@ import {
   type Chain,
 } from 'viem';
 import { z } from 'zod';
-import { addresses } from '../../../../packages/core/src/addresses.js';
+import { addresses } from '@nalvis/core/addresses.js';
 import {
   hskMainnet,
   hskTestnet,
-} from '../../../../packages/core/src/chains.js';
-import { vaultAbi, erc20Abi } from '../../../../packages/core/src/abi/index.js';
+} from '@nalvis/core/chains.js';
+import { vaultAbi, erc20Abi } from '@nalvis/core/abi/index.js';
 import addressBook from '../../../../docs/ADDRESSES.md?raw';
 
 export type DashboardChain = 133 | 177 | 31337;

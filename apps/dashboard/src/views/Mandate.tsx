@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { formatUnits } from 'viem';
-import { addresses } from '../../../../packages/core/src/addresses.js';
+import { addresses } from '@nalvis/core/addresses.js';
 import {
   loadDeployment,
   readVault,

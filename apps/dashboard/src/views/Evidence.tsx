@@ -1,10 +1,10 @@
-import type { Evidence } from '../../../../packages/core/src/types.js';
+import type { Evidence } from '@nalvis/core/types.js';
 import { useCallback } from 'react';
 import {
   collectEvidence,
   endpoints,
-} from '../../../../packages/core/src/evidence.js';
-import { policySchema } from '../../../../packages/core/src/policy.js';
+} from '@nalvis/core/evidence.js';
+import { policySchema } from '@nalvis/core/policy.js';
 import policyJSON from '../../../../policy/default.json';
 import { clientFor, displayTime } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';

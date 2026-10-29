@@ -8,9 +8,9 @@ import {
   zeroAddress,
   type Hex,
 } from 'viem';
-import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
-import { nlToParamDiff } from '../../../../packages/core/src/llm.js';
-import { policySchema } from '../../../../packages/core/src/policy.js';
+import { vaultAbi } from '@nalvis/core/abi/index.js';
+import { nlToParamDiff } from '@nalvis/core/llm.js';
+import { policySchema } from '@nalvis/core/policy.js';
 import policyJSON from '../../../../policy/default.json';
 import {
   type DashboardChain,
