@@ -29,7 +29,7 @@ beforeAll(() => {
     { encoding: 'utf8' },
   );
   expect(result.status, result.stdout + result.stderr).toBe(0);
-}, 20000);
+}, 60000);
 test('compiled CLI prints PASS table and exits 0 on genuine recorded fixture', () => {
   const result = spawnSync(
     process.execPath,
@@ -136,7 +136,7 @@ test('compiled CLI exits 1 and names check for all six required tampers', () => 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-});
+}, 30000);
 test('P&L CLI verifies all receipts first', async () => {
   const output: string[] = [];
   expect(

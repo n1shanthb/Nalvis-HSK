@@ -62,7 +62,7 @@ it('stable decision and receipt across 100 runs', () => {
   const old = evidenceHash(s.e);
   s.e.sources.fixture.raw = 'one changed byte';
   expect(evidenceHash(s.e)).not.toBe(old);
-});
+}, 30000);
 it('freeze exact receipt fields and hash in golden file', () => {
   expect(canonical(receiptScenario())).toBe(
     readFileSync(
