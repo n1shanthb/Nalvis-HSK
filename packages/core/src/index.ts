@@ -9,3 +9,4 @@ export * from './receipt.js';
 export * from './llm.js';
 export * from './serialization.js';
 export * from './desk/index.js';
+export * from './risk/index.js';
