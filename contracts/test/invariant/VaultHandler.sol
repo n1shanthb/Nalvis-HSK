@@ -17,16 +17,18 @@ contract VaultHandler is Test {
 
     address public immutable owner;
     address public immutable agent;
+    address public immutable stranger;
 
     // Ghost tracking variables for invariant checking
     uint256 public ghost_successfulTrades;
     uint256 public ghost_failedTrades;
-    uint256 public ghost_lastTradeTimestamp;
-    mapping(uint256 => uint256) public ghost_dailyTurnoverInB;
-    uint256 public ghost_ownerWithdrawalsA;
-    uint256 public ghost_ownerWithdrawalsB;
-    uint256 public ghost_depositsA;
-    uint256 public ghost_depositsB;
+    uint256 public ghost_successfulReceipts;
+    uint256 public ghost_lastSuccessfulTradeTimestamp;
+    bool public ghost_minIntervalViolated;
+    bool public ghost_tradeSucceededWhileInactive;
+    bool public ghost_tradeSucceededInDrawdown;
+    bool public ghost_tradeExceededPerTradeCap;
+    bool public ghost_tradeViolatedSlippage;
 
     constructor(
         EdgewiseVault _vault,
@@ -44,38 +46,45 @@ contract VaultHandler is Test {
         pool = _pool;
         owner = _owner;
         agent = _agent;
+        stranger = makeAddr("invariant_stranger");
     }
 
-    /// @notice Handler action: Attempt to trade from the agent with bounded randomized inputs
+    /// @notice Handler action: Attempt to trade from the agent with randomized parameters
     function trade(
         bool tokenAIn,
         uint256 amountInRaw,
         uint256 timeJump,
-        uint256 validUntilDelta
+        uint256 validUntilDelta,
+        uint256 deadlineDelta,
+        uint256 minOutDelta
     ) public {
-        timeJump = bound(timeJump, 0, 3 days);
+        timeJump = bound(timeJump, 0, 2 days);
         if (timeJump > 0) {
             vm.warp(block.timestamp + timeJump);
         }
 
         address tokenIn = tokenAIn ? address(tokenA) : address(tokenB);
-        uint256 amountIn = bound(amountInRaw, 1e18, 200e18);
+        uint256 amountIn = bound(amountInRaw, 1e18, 150e18);
 
-        // Read mandate once into memory via struct-returning getter
-        EdgewiseVault.Mandate memory _m = vault.getMandate();
-        uint256 slipBps = uint256(_m.maxSlippageBps);
-        uint256 minOut = (amountIn * (10_000 - slipBps)) / 10_000;
-
-        uint256 validUntil;
-        if (validUntilDelta % 10 == 0) {
-            // Intentionally expired validUntil (in the past)
-            validUntil = block.timestamp > 1 ? block.timestamp - 1 : 0;
-        } else {
-            validUntil = block.timestamp + bound(validUntilDelta, 1, 3600);
+        uint256 minOut;
+        {
+            uint256 slip = uint256(vault.getMandate().maxSlippageBps);
+            if (minOutDelta % 10 == 0) {
+                minOut = (amountIn * 95) / 100;
+            } else {
+                minOut = (amountIn * (10_000 - slip)) / 10_000;
+            }
         }
 
-        uint256 deadline = block.timestamp + 300;
-        bytes32 rHash = keccak256(abi.encodePacked("invariant_trade", ghost_successfulTrades + ghost_failedTrades));
+        uint256 validUntil = (validUntilDelta % 8 == 0)
+            ? (block.timestamp > 1 ? block.timestamp - 1 : 0)
+            : block.timestamp + bound(validUntilDelta, 1, 3600);
+
+        uint256 deadline = (deadlineDelta % 9 == 0)
+            ? (block.timestamp > 1 ? block.timestamp - 1 : 0)
+            : block.timestamp + bound(deadlineDelta, 60, 3600);
+
+        bytes32 rHash = keccak256(abi.encodePacked("invariant_trade", ghost_successfulReceipts + ghost_failedTrades));
 
         EdgewiseVault.TradeParams memory p = EdgewiseVault.TradeParams(
             tokenIn,
@@ -89,115 +98,150 @@ contract VaultHandler is Test {
             ReceiptChain.Kind.TRADE
         );
 
-        // Record pre-state
+        // Pre-state capture
         uint256 preSeq = vault.seq();
+        uint256 preNonce = vault.nextNonce();
+        bytes32 preHead = vault.head();
+
+        bool inDrawdown = false;
+        {
+            uint256 hwm = vault.highWaterMark();
+            EdgewiseVault.Mandate memory _m = vault.getMandate();
+            if (_m.maxDrawdownBps > 0 && hwm > 0) {
+                uint256 curTotal = tokenA.balanceOf(address(vault)) + tokenB.balanceOf(address(vault));
+                if (curTotal < (hwm * (10_000 - _m.maxDrawdownBps)) / 10_000) {
+                    inDrawdown = true;
+                }
+            }
+        }
 
         vm.prank(agent);
         try vault.trade(p) returns (uint256 out) {
             ghost_successfulTrades++;
-            ghost_lastTradeTimestamp = block.timestamp;
-            ghost_dailyTurnoverInB[block.timestamp / 1 days] += amountIn; // 1:1 price mock
+            ghost_successfulReceipts++;
 
-            // Invariant sub-check: router allowance must immediately be 0
-            assertEq(MockERC20(tokenIn).allowance(address(vault), address(router)), 0, "Router allowance not zero");
+            EdgewiseVault.Mandate memory m = vault.getMandate();
+            if (vault.paused() || block.timestamp >= m.expiry || m.agent == address(0)) {
+                ghost_tradeSucceededWhileInactive = true;
+            }
+            if (ghost_successfulTrades > 1 && block.timestamp < ghost_lastSuccessfulTradeTimestamp + m.minIntervalSec) {
+                ghost_minIntervalViolated = true;
+            }
+            if (inDrawdown) {
+                ghost_tradeSucceededInDrawdown = true;
+            }
+            if (amountIn > (tokenIn == address(tokenA) ? m.maxTradeInA : m.maxTradeInB)) {
+                ghost_tradeExceededPerTradeCap = true;
+            }
+            if (minOut < (amountIn * (10_000 - m.maxSlippageBps)) / 10_000) {
+                ghost_tradeViolatedSlippage = true;
+            }
+
+            ghost_lastSuccessfulTradeTimestamp = block.timestamp;
+
+            // Invariant checks on success:
+            assertEq(MockERC20(tokenIn).allowance(address(vault), address(router)), 0, "Allowance not zero on success");
             assertEq(vault.seq(), preSeq + 1, "Seq did not increment");
+            assertEq(vault.nextNonce(), preNonce + 1, "Nonce did not increment");
+            assertTrue(vault.head() != preHead, "Head did not update");
             assertGe(out, minOut, "Output below minOut");
         } catch {
             ghost_failedTrades++;
-            // Assert that on revert, allowance is never left dangling
-            assertEq(MockERC20(tokenIn).allowance(address(vault), address(router)), 0, "Dangling allowance on trade revert");
+            // Invariant checks on failure: failed txs MUST NOT advance nonce or receipt state
+            assertEq(vault.seq(), preSeq, "Failed trade advanced seq");
+            assertEq(vault.nextNonce(), preNonce, "Failed trade advanced nonce");
+            assertEq(vault.head(), preHead, "Failed trade advanced head");
+            assertEq(tokenA.allowance(address(vault), address(router)), 0, "Dangling tokenA allowance on failure");
+            assertEq(tokenB.allowance(address(vault), address(router)), 0, "Dangling tokenB allowance on failure");
         }
     }
 
-    /// @notice Handler action: Attempt to commit a hold receipt (WAIT or REJECT)
+    /// @notice Handler action: Attempt to commit hold receipt
     function commitHold(uint8 kindRaw) public {
         ReceiptChain.Kind kind = (kindRaw % 2 == 0) ? ReceiptChain.Kind.WAIT : ReceiptChain.Kind.REJECT;
-        bytes32 rHash = keccak256(abi.encodePacked("invariant_hold", ghost_successfulTrades + ghost_failedTrades));
-
+        bytes32 rHash = keccak256(abi.encodePacked("invariant_hold", ghost_successfulReceipts));
         uint256 preSeq = vault.seq();
+        uint256 preNonce = vault.nextNonce();
+        bytes32 preHead = vault.head();
+
         vm.prank(agent);
         try vault.commitHold(rHash, vault.head(), kind) {
-            assertEq(vault.seq(), preSeq + 1, "Hold receipt seq not incremented");
+            ghost_successfulReceipts++;
+            assertEq(vault.seq(), preSeq + 1, "Hold receipt did not increment seq");
+            assertEq(vault.nextNonce(), preNonce, "Hold receipt changed nonce");
+            assertTrue(vault.head() != preHead, "Hold receipt did not update head");
         } catch {
-            // Expected if paused or revoked or expired
+            assertEq(vault.seq(), preSeq, "Failed hold changed seq");
+            assertEq(vault.head(), preHead, "Failed hold changed head");
         }
     }
 
-    /// @notice Handler action: Agent tries to withdraw funds (must always fail)
-    function agentAttemptWithdraw(bool withdrawA, uint256 amount) public {
-        amount = bound(amount, 1, 1000e18);
+    /// @notice Handler action: Agent tries to withdraw (must always revert)
+    function agentAttemptWithdraw(bool withdrawA, uint256 amountRaw) public {
+        uint256 amount = bound(amountRaw, 1, 500e18);
         address token = withdrawA ? address(tokenA) : address(tokenB);
 
         vm.prank(agent);
         try vault.withdraw(token, amount, agent) {
-            assertTrue(false, "Agent should never be able to withdraw");
-        } catch {
-            // Expected: Unauthorized()
-        }
-    }
-
-    /// @notice Handler action: Stranger tries to trade or withdraw (must always fail)
-    function strangerActions(address _stranger, bool withdrawA, uint256 amount) public {
-        vm.assume(_stranger != owner && _stranger != agent && _stranger != address(0));
-        amount = bound(amount, 1, 100e18);
-        address token = withdrawA ? address(tokenA) : address(tokenB);
-
-        // Stranger withdraw attempt
-        vm.prank(_stranger);
-        try vault.withdraw(token, amount, _stranger) {
-            assertTrue(false, "Stranger should never be able to withdraw");
+            assertTrue(false, "Agent must never be able to withdraw");
         } catch {}
 
-        // Stranger trade attempt
+        assertEq(tokenA.balanceOf(agent), 0, "Agent held tokenA");
+        assertEq(tokenB.balanceOf(agent), 0, "Agent held tokenB");
+    }
+
+    /// @notice Handler action: Stranger tries to withdraw or trade (must always revert)
+    function strangerActions(bool withdrawA, uint256 amountRaw) public {
+        uint256 amount = bound(amountRaw, 1, 100e18);
+        address token = withdrawA ? address(tokenA) : address(tokenB);
+
+        vm.prank(stranger);
+        try vault.withdraw(token, amount, stranger) {
+            assertTrue(false, "Stranger cannot withdraw");
+        } catch {}
+
         EdgewiseVault.TradeParams memory p = EdgewiseVault.TradeParams(
             token,
             amount,
-            amount * 99 / 100,
+            (amount * 99) / 100,
             block.timestamp + 300,
             block.timestamp + 300,
             vault.nextNonce(),
-            keccak256("stranger"),
+            keccak256("stranger_trade"),
             vault.head(),
             ReceiptChain.Kind.TRADE
         );
-        vm.prank(_stranger);
+
+        vm.prank(stranger);
         try vault.trade(p) {
-            assertTrue(false, "Stranger should never be able to trade");
+            assertTrue(false, "Stranger cannot trade");
         } catch {}
+
+        assertEq(tokenA.balanceOf(stranger), 0, "Stranger held tokenA");
+        assertEq(tokenB.balanceOf(stranger), 0, "Stranger held tokenB");
     }
 
     /// @notice Handler action: Deposit funds into vault
-    function deposit(bool depositA, uint256 amount) public {
-        amount = bound(amount, 1e18, 500e18);
-        if (depositA) {
-            tokenA.mint(address(vault), amount);
-            ghost_depositsA += amount;
-        } else {
-            tokenB.mint(address(vault), amount);
-            ghost_depositsB += amount;
-        }
+    function deposit(bool depositA, uint256 amountRaw) public {
+        uint256 amount = bound(amountRaw, 1e18, 500e18);
+        MockERC20 tok = depositA ? tokenA : tokenB;
+        tok.mint(address(this), amount);
+        tok.approve(address(vault), amount);
+        vault.deposit(address(tok), amount);
     }
 
     /// @notice Handler action: Owner withdraw
-    function ownerWithdraw(bool withdrawA, uint256 amount) public {
+    function ownerWithdraw(bool withdrawA, uint256 amountRaw) public {
         MockERC20 tok = withdrawA ? tokenA : tokenB;
         uint256 bal = tok.balanceOf(address(vault));
         if (bal == 0) return;
-        amount = bound(amount, 1, bal);
+        uint256 amount = bound(amountRaw, 1, bal);
 
         vm.prank(owner);
-        try vault.withdraw(address(tok), amount, owner) {
-            if (withdrawA) {
-                ghost_ownerWithdrawalsA += amount;
-            } else {
-                ghost_ownerWithdrawalsB += amount;
-            }
-        } catch {
-            // e.g. if paused or error
-        }
+        try vault.withdraw(address(tok), amount, owner) {} catch {}
     }
 
-    /// @notice Handler action: Owner pause / unpause
+    /// @notice Handler action: Pause or unpause
     function setPaused(bool shouldPause) public {
         vm.prank(owner);
         if (shouldPause && !vault.paused()) {
@@ -207,13 +251,13 @@ contract VaultHandler is Test {
         }
     }
 
-    /// @notice Handler action: Advance time
-    function warp(uint256 delta) public {
-        delta = bound(delta, 1, 7 days);
+    /// @notice Handler action: Time advance
+    function warp(uint256 deltaRaw) public {
+        uint256 delta = bound(deltaRaw, 1, 3 days);
         vm.warp(block.timestamp + delta);
     }
 
-    /// @notice Handler action: Attempt to set mandate (tests maxSlippageBps and maxDrawdownBps caps)
+    /// @notice Handler action: Owner updates mandate with randomized valid/invalid values
     function attemptSetMandate(uint16 maxSlippageBps, uint16 maxDrawdownBps) public {
         EdgewiseVault.Mandate memory currentM = vault.getMandate();
         EdgewiseVault.Mandate memory newM = EdgewiseVault.Mandate(
@@ -232,7 +276,7 @@ contract VaultHandler is Test {
         vm.prank(owner);
         if (maxSlippageBps > 100 || maxDrawdownBps > 10_000) {
             try vault.setMandate(newM) {
-                assertTrue(false, "setMandate should revert if maxSlippageBps > 100 or maxDrawdownBps > 10000");
+                assertTrue(false, "setMandate must revert on invalid caps");
             } catch {}
         } else {
             try vault.setMandate(newM) {} catch {}

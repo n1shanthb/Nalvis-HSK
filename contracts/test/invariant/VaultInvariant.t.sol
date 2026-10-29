@@ -60,8 +60,8 @@ contract VaultInvariantTest is StdInvariant, Test {
             maxDailyInB: 200e18,
             maxExposureBps: 10000,
             maxSlippageBps: 100,
-            minIntervalSec: 60,
             maxDrawdownBps: 2000, // 20%
+            minIntervalSec: 60,
             policyHash: keccak256("invariant_policy")
         });
         vault.setMandate(m);
@@ -77,45 +77,66 @@ contract VaultInvariantTest is StdInvariant, Test {
         targetContract(address(handler));
     }
 
-    /// @notice Invariant 1: Vault containment - Router allowance is always zero after any action
+    /// @notice Invariant 1: Agent can never withdraw or hold vault tokens directly
+    function invariant_agentCannotHoldVaultFunds() public view {
+        assertEq(tokenA.balanceOf(agent), 0, "Agent held tokenA");
+        assertEq(tokenB.balanceOf(agent), 0, "Agent held tokenB");
+    }
+
+    /// @notice Invariant 2: Stranger cannot withdraw or siphon swap proceeds
+    function invariant_strangerCannotHoldVaultFunds() public view {
+        assertEq(tokenA.balanceOf(handler.stranger()), 0, "Stranger held tokenA");
+        assertEq(tokenB.balanceOf(handler.stranger()), 0, "Stranger held tokenB");
+    }
+
+    /// @notice Invariant 3: Router allowance is always zero after any action
     function invariant_routerAllowanceAlwaysZero() public view {
-        assertEq(tokenA.allowance(address(vault), address(router)), 0, "tokenA allowance to router must be 0");
-        assertEq(tokenB.allowance(address(vault), address(router)), 0, "tokenB allowance to router must be 0");
+        assertEq(tokenA.allowance(address(vault), address(router)), 0, "tokenA allowance must be 0");
+        assertEq(tokenB.allowance(address(vault), address(router)), 0, "tokenB allowance must be 0");
     }
 
-    /// @notice Invariant 2: Slippage cap can NEVER exceed 100 bps
-    function invariant_maxSlippageBpsNeverExceedsCap() public view {
-        EdgewiseVault.Mandate memory _m = vault.getMandate();
-        assertLe(_m.maxSlippageBps, 100, "maxSlippageBps exceeded MAX_SLIPPAGE_CAP_BPS");
+    /// @notice Invariant 4: Minimum interval is enforced between successful trades
+    function invariant_minIntervalEnforced() public view {
+        assertFalse(handler.ghost_minIntervalViolated(), "Min interval violated between successful trades");
     }
 
-    /// @notice Invariant 3: Max drawdown bps can NEVER exceed 10_000 bps (100%)
-    function invariant_maxDrawdownBpsNeverExceeds100Percent() public view {
-        EdgewiseVault.Mandate memory _m = vault.getMandate();
-        assertLe(_m.maxDrawdownBps, 10000, "maxDrawdownBps cannot exceed 10000");
+    /// @notice Invariant 5: Inactive (expired, revoked, paused) mandates never authorize trades
+    function invariant_inactiveMandateNeverTrades() public view {
+        assertFalse(handler.ghost_tradeSucceededWhileInactive(), "Trade executed under inactive mandate");
     }
 
-    /// @notice Invariant 4: Vault owner is immutable / preserved
-    function invariant_ownerPreserved() public view {
-        assertEq(vault.owner(), owner, "Vault owner mutated");
+    /// @notice Invariant 6: Per-trade caps are never bypassed
+    function invariant_perTradeCapNeverBypassed() public view {
+        assertFalse(handler.ghost_tradeExceededPerTradeCap(), "Per trade cap exceeded");
     }
 
-    /// @notice Invariant 5: Daily turnover cap is never exceeded on any calendar day
-    function invariant_dailyTurnoverCapPreserved() public view {
-        uint256 currentDay = block.timestamp / 1 days;
-        EdgewiseVault.Mandate memory _m = vault.getMandate();
-        assertLe(
-            handler.ghost_dailyTurnoverInB(currentDay),
-            _m.maxDailyInB,
-            "Daily turnover cap violated"
-        );
+    /// @notice Invariant 7: Rolling 24-hour turnover cap is never exceeded
+    function invariant_rollingTurnoverCapPreserved() public view {
+        assertLe(vault.getRolling24hTurnover(), vault.getMandate().maxDailyInB, "Rolling turnover cap exceeded");
     }
 
-    /// @notice Invariant 6: Sequential nonce and head consistency
-    function invariant_receiptChainIntegrity() public view {
-        assertGe(vault.seq(), 0, "Seq cannot be negative");
+    /// @notice Invariant 8: Slippage never exceeds 100 bps
+    function invariant_slippageNeverExceedsCap() public view {
+        assertLe(vault.getMandate().maxSlippageBps, 100, "Mandate slippage exceeded 100 bps");
+        assertFalse(handler.ghost_tradeViolatedSlippage(), "Trade violated slippage limit");
+    }
+
+    /// @notice Invariant 9: Drawdown breaker blocks agent trades once triggered
+    function invariant_drawdownBreakerEnforced() public view {
+        assertFalse(handler.ghost_tradeSucceededInDrawdown(), "Trade executed during drawdown breach");
+    }
+
+    /// @notice Invariant 10: Nonce and receipt chain consistency (failed txs never advance state)
+    function invariant_receiptChainAndNonceConsistency() public view {
+        assertEq(vault.seq(), handler.ghost_successfulReceipts(), "Receipt seq out of sync");
+        assertEq(vault.nextNonce(), handler.ghost_successfulTrades(), "Nonce out of sync");
         if (vault.seq() > 0) {
             assertTrue(vault.head() != bytes32(0), "Head cannot be zero when seq > 0");
         }
+    }
+
+    /// @notice Invariant 11: Vault owner is immutable / preserved
+    function invariant_ownerPreserved() public view {
+        assertEq(vault.owner(), owner, "Vault owner mutated");
     }
 }
