@@ -70,6 +70,7 @@ export const receiptSchema = z
         sizeB: z.number().positive().optional(),
         amountIn: integer.optional(),
         minOut: integer.optional(),
+        validUntil: z.number().int().nonnegative().optional(),
         ruleTrace: trace,
       })
       .strict(),

@@ -74,6 +74,7 @@ export type Decision = {
   sizeB?: number;
   amountIn?: bigint;
   minOut?: bigint;
+  validUntil?: number;
   ruleTrace: RuleTrace;
 };
 export const engineStateSchema = z
