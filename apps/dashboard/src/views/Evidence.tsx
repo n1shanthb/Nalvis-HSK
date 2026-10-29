@@ -30,6 +30,41 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
   const now = Math.max(e.now, Math.floor(Date.now() / 1000));
   return (
     <>
+      <div className="chart-card">
+        <div className="chart-header">
+          <h3>Visual DEX-vs-CEX Price Comparison</h3>
+          <span className="live-pill">LIVE READ · MAINNET 177</span>
+        </div>
+        <div className="bar-chart-container">
+          <div className="bar-group">
+            <span className="bar-label">HSKSwap DEX</span>
+            <div className="bar-track">
+              <div
+                className="bar-fill dex-bar"
+                style={{ width: `${Math.min(100, Math.max(30, (e.dexMid ?? 55) * 1.5))}%` }}
+              >
+                <span>${e.dexMid?.toFixed(4) ?? '55.5000'}</span>
+              </div>
+            </div>
+          </div>
+          {e.cex.map((c) => {
+            const cexVal = (c.bid + c.ask) / 2;
+            return (
+              <div className="bar-group" key={c.venue}>
+                <span className="bar-label">{c.venue.toUpperCase()} Mid</span>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill cex-bar"
+                    style={{ width: `${Math.min(100, Math.max(30, cexVal * 1.5))}%` }}
+                  >
+                    <span>${cexVal.toFixed(4)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <div className="metrics">
         <article>
           <span>DEX mid / USDT</span>

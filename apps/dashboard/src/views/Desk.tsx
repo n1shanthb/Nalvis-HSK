@@ -4,9 +4,10 @@ import { type DashboardChain } from '../lib/clients.js';
 
 export function DeskView({ chain }: { chain: DashboardChain }) {
   const [query, setQuery] = useState('');
-  const [history, setHistory] = useState<{ query: string; result: DeskParseResult }[]>([
+  const [history, setHistory] = useState<{ query: string; result: DeskParseResult; timestamp: string }[]>([
     {
       query: 'what is our current position?',
+      timestamp: 'Just now',
       result: {
         intent: 'POSITION_PNL',
         response:
@@ -17,11 +18,10 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
 
   const parser = new DeskParser();
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const handleQuery = (text: string) => {
+    if (!text.trim()) return;
 
-    const res = parser.parse(query, {
+    const res = parser.parse(text, {
       state: {
         balanceA: 25000000000000000000n,
         balanceB: 1500000000n,
@@ -32,68 +32,121 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
       decimalsB: 6,
     });
 
-    setHistory((prev) => [...prev, { query, result: res }]);
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setHistory((prev) => [...prev, { query: text, result: res, timestamp: now }]);
     setQuery('');
   };
 
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleQuery(query);
+  };
+
+  const sampleChips = [
+    { label: '📊 View Positions & P&L', q: 'what is our position?' },
+    { label: '🔍 Explain Last Decision', q: 'why did you wait or trade?' },
+    { label: '📈 Check DEX-CEX Basis', q: 'what is the basis right now?' },
+    { label: '🛡️ Reduce Risk (Conservative)', q: 'be more conservative' },
+    { label: '🇮🇳 Hinglish: Mera P&L', q: 'mera pnl kitna hai?' },
+    { label: '🚫 Security: Test Swap Refusal', q: 'swap now 50 USDT' },
+  ];
+
   return (
     <section className="desk-panel" aria-label="Natural Language Desk">
-      <h2>Deterministic Trading Desk (Chain {chain})</h2>
-      <p className="hint">
-        Query positions, inspect decision traces, examine DEX/CEX basis, and propose parameter updates.
-        Strict security boundary: desk cannot sign or broadcast transactions.
-      </p>
-
-      <div className="desk-chat" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', margin: '1rem 0' }}>
-        {history.map((h, i) => (
-          <div key={i} className="desk-bubble-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div
-              className="desk-user-msg"
-              style={{
-                alignSelf: 'flex-end',
-                background: 'var(--panel-bg, #1a1e24)',
-                padding: '0.6rem 1rem',
-                borderRadius: '8px',
-                border: '1px solid #333',
-              }}
-            >
-              <strong>You:</strong> {h.query}
-            </div>
-            <div
-              className={`desk-bot-msg ${h.result.intent.toLowerCase()}`}
-              style={{
-                alignSelf: 'flex-start',
-                background: h.result.intent === 'REFUSAL' ? '#2a1a1a' : '#141c1f',
-                padding: '0.6rem 1rem',
-                borderRadius: '8px',
-                border: h.result.intent === 'REFUSAL' ? '1px solid #722' : '1px solid #234',
-              }}
-            >
-              <strong>Desk [{h.result.intent}]:</strong> {h.result.response}
-            </div>
-          </div>
-        ))}
+      <div className="desk-header">
+        <div>
+          <p className="eyebrow">05 / TERMINAL INTENT INTERFACE</p>
+          <h2>Trading Desk (Chain {chain})</h2>
+        </div>
+        <div className="desk-status-badge">
+          <span className="dot pulse" />
+          <span>DETERMINISTIC ENGINE · LLM ISOLATED</span>
+        </div>
       </div>
 
-      <form onSubmit={handleSend} style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Ask e.g. 'what is our position?', 'why did we wait?', 'be more conservative'..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{
-            flex: 1,
-            padding: '0.6rem',
-            background: '#0d1117',
-            color: '#fff',
-            border: '1px solid #30363d',
-            borderRadius: '6px',
-          }}
-        />
-        <button type="submit" style={{ padding: '0.6rem 1.2rem', cursor: 'pointer' }}>
-          Send
-        </button>
-      </form>
+      <div className="desk-stats-grid">
+        <div className="desk-stat-card">
+          <span className="stat-label">BOUNDED MODE</span>
+          <span className="stat-value text-green">STRICT SANDBOX</span>
+          <span className="stat-hint">No signing keys or raw transfers accessible</span>
+        </div>
+        <div className="desk-stat-card">
+          <span className="stat-label">POLICY ENFORCEMENT</span>
+          <span className="stat-value text-blue">LEDGER GATED</span>
+          <span className="stat-hint">Changes validated against signed mandate</span>
+        </div>
+        <div className="desk-stat-card">
+          <span className="stat-label">SUPPORTED LOCALES</span>
+          <span className="stat-value text-purple">EN + HINGLISH</span>
+          <span className="stat-hint">Deterministic intent & synonym matching</span>
+        </div>
+      </div>
+
+      <div className="desk-chips-bar">
+        <span className="chips-title">Quick Queries:</span>
+        <div className="chips-container">
+          {sampleChips.map((chip, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className="chip-btn"
+              onClick={() => handleQuery(chip.q)}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="desk-terminal-window">
+        <div className="terminal-topbar">
+          <span className="terminal-dot red" />
+          <span className="terminal-dot yellow" />
+          <span className="terminal-dot green" />
+          <span className="terminal-title">nalvis-desk-cli v1.0.0 — deterministic repl</span>
+        </div>
+
+        <div className="desk-chat-stream">
+          {history.map((h, i) => (
+            <div key={i} className="desk-message-block">
+              <div className="desk-bubble user-bubble">
+                <div className="bubble-header">
+                  <span className="sender-tag">OPERATOR</span>
+                  <span className="time-tag">{h.timestamp}</span>
+                </div>
+                <div className="bubble-content">{h.query}</div>
+              </div>
+
+              <div className={`desk-bubble bot-bubble intent-${h.result.intent.toLowerCase()}`}>
+                <div className="bubble-header">
+                  <span className={`intent-badge ${h.result.intent}`}>
+                    {h.result.intent}
+                  </span>
+                  <span className="time-tag">DECISION ENGINE VERIFIED</span>
+                </div>
+                <div className="bubble-content">{h.result.response}</div>
+                {h.result.diff && (
+                  <pre className="bubble-json">{JSON.stringify(h.result.diff, null, 2)}</pre>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <form onSubmit={handleSend} className="terminal-input-bar">
+          <span className="prompt-symbol">&gt;</span>
+          <input
+            type="text"
+            className="terminal-input"
+            placeholder="Ask positions, basis spread, rule trace, or type Hinglish queries..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button type="submit" className="terminal-send-btn">
+            RUN QUERY
+          </button>
+        </form>
+      </div>
     </section>
   );
 }
