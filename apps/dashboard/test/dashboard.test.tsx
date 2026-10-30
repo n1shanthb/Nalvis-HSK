@@ -34,6 +34,7 @@ export const snapshot: VaultSnapshot = {
     maxDailyInB: 100n * 10n ** 18n,
     maxExposureBps: 8000,
     maxSlippageBps: 50,
+    maxDrawdownBps: 0,
     minIntervalSec: 30n,
     policyHash: zeroHash,
   },

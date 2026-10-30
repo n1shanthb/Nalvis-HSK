@@ -25,6 +25,7 @@ contract DeployHarness is Deploy {
 contract DeployTestnetForkTest is Test {
     EdgewiseVault deployed;
     address deployedAgent;
+
     /// @notice Exercise the actual CLI deployment entrypoint and real testnet swap.
     function testDeployAndRealTestnetTrade() public {
         string memory rpc = vm.envOr("HSK_TESTNET_RPC", string(""));
@@ -54,7 +55,7 @@ contract DeployTestnetForkTest is Test {
         assertEq(v.oracle(), address(0));
         assertEq(v.twapWindowSec(), 600);
         vm.prank(owner);
-        v.setMandate(EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 300, 0));
+        v.setMandate(EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 0, 300, 0));
         deal(Addresses.USDT_133, address(v), 500e18);
         uint32[] memory times = new uint32[](2);
         times[0] = 600;
@@ -71,7 +72,15 @@ contract DeployTestnetForkTest is Test {
         vm.prank(agent);
         uint256 out = v.trade(
             EdgewiseVault.TradeParams(
-                Addresses.USDT_133, 10e18, minOut, block.timestamp, 0, hash, 0, ReceiptChain.Kind.TRADE
+                Addresses.USDT_133,
+                10e18,
+                minOut,
+                block.timestamp,
+                block.timestamp + 60,
+                v.nextNonce(),
+                hash,
+                0,
+                ReceiptChain.Kind.TRADE
             )
         );
         assertGe(out, minOut);
@@ -98,7 +107,6 @@ contract DeployTestnetForkTest is Test {
             }
         }
         assertTrue(found, "Receipt missing");
-
     }
 
     function testTradeHelperRealSell() public {

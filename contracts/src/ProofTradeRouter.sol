@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 import {ReceiptChain} from "./ReceiptChain.sol";
 import {IV3SwapRouter} from "./interfaces/IV3SwapRouter.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeToken} from "./lib/SafeToken.sol";
 import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
 
@@ -13,6 +14,7 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     error Unauthorized();
     error InvalidOwner();
     error Deadline();
+    error DecisionExpired(); // new error for decision expiry
     error Recipient();
     error Underfill();
     error PriceLimit();
@@ -48,18 +50,22 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
         bytes32 receiptHash,
         bytes32 prevHead,
         IV3SwapRouter.ExactInputSingleParams calldata p,
+        uint256 validUntil,
         uint256 deadline
     ) external nonReentrant returns (uint256 amountOut) {
+        if (block.timestamp > validUntil) revert DecisionExpired();
         if (block.timestamp > deadline) revert Deadline();
         if (p.recipient != msg.sender) revert Recipient();
         // SwapRouter02 requires full consumption when its price limit is zero.
         if (p.sqrtPriceLimitX96 != 0) revert PriceLimit();
         if (prevHead != chains[msg.sender].head) revert PreviousHead();
+        uint256 balBefore = IERC20(p.tokenIn).balanceOf(address(this));
         SafeToken.pull(p.tokenIn, msg.sender, p.amountIn);
         SafeToken.approve(p.tokenIn, router, p.amountIn);
         amountOut = IV3SwapRouter(router).exactInputSingle(p);
         SafeToken.approve(p.tokenIn, router, 0);
-        if (amountOut < p.amountOutMinimum) revert Underfill();
+        uint256 balAfter = IERC20(p.tokenIn).balanceOf(address(this));
+        if (amountOut < p.amountOutMinimum || balAfter != balBefore) revert Underfill();
         _commit(
             chains[msg.sender],
             receiptHash,

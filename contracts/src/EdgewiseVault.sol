@@ -34,6 +34,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 maxDailyInB;
         uint16 maxExposureBps;
         uint16 maxSlippageBps;
+        uint16 maxDrawdownBps; // max drawdown in bps from high-water mark (0 = disabled)
         uint256 minIntervalSec;
         bytes32 policyHash;
     }
@@ -43,6 +44,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 amountIn;
         uint256 minOut;
         uint256 deadline;
+        uint256 validUntil; // new field for decision expiry
         uint256 nonce;
         bytes32 receiptHash;
         bytes32 prevHead;
@@ -53,13 +55,19 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     bool public paused;
     uint256 public nextNonce;
     uint256 public lastTradeAt;
-    uint256 public dailyBucket;
-    uint256 public dailyNotionalB;
+
+    struct TurnoverSlot {
+        uint32 epochBucket;
+        uint224 notionalB;
+    }
+    TurnoverSlot[48] private _turnoverSlots;
+    uint256 public highWaterMark;
     error Unauthorized();
     error InvalidConfig();
     error InvalidMandate();
     error Inactive();
     error Deadline();
+    error DecisionExpired(); // new error for decision expiry
     error Nonce();
     error Interval();
     error TradeCap();
@@ -69,6 +77,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     error Underfill();
     error InvalidToken();
     error OracleInvalid();
+    error Drawdown(); // drawdown circuit breaker error
     event MandateSet(Mandate mandate);
     event Revoked();
     event Paused(bool paused);
@@ -132,13 +141,21 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         return chain.head;
     }
 
-    /// @notice Replace the mandate, preserving nonce, interval and daily spend history.
+    /// @notice Replace the mandate, preserving nonce, interval and daily spend history, resetting highWaterMark.
     function setMandate(Mandate calldata m) external onlyOwner {
         if (
             m.agent == owner || m.agent == address(0) || m.expiry <= block.timestamp
-                || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000
+                || m.maxSlippageBps > MAX_SLIPPAGE_CAP_BPS || m.maxExposureBps > 10000 || m.maxDrawdownBps > 10000
         ) revert InvalidMandate();
         mandate = m;
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+            uint256 valB = IERC20(tokenB).balanceOf(address(this));
+            highWaterMark = valA + valB;
+        } else {
+            highWaterMark = 0;
+        }
         emit MandateSet(m);
     }
 
@@ -148,9 +165,40 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         emit Revoked();
     }
 
-    /// @notice Withdraw tokens to an owner-selected recipient.
+    /// @notice Withdraw tokens to an owner-selected recipient. Never blocked by TWAP failures.
     function withdraw(address token, uint256 amount, address to) external onlyOwner nonReentrant {
+        uint256 bA_before = IERC20(tokenA).balanceOf(address(this));
+        uint256 bB_before = IERC20(tokenB).balanceOf(address(this));
+
         SafeToken.transfer(token, to, amount);
+
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 valA_before = _quote(tick, bA_before, tokenA);
+            uint256 totalBefore = valA_before + bB_before;
+            uint256 bA_after = IERC20(tokenA).balanceOf(address(this));
+            uint256 bB_after = IERC20(tokenB).balanceOf(address(this));
+            uint256 valA_after = _quote(tick, bA_after, tokenA);
+            uint256 totalAfter = valA_after + bB_after;
+
+            if (totalBefore > 0 && highWaterMark > 0) {
+                if (totalBefore >= highWaterMark) {
+                    highWaterMark = totalAfter;
+                } else {
+                    highWaterMark = FullMath.mulDiv(highWaterMark, totalAfter, totalBefore);
+                }
+            } else {
+                highWaterMark = totalAfter;
+            }
+        } else {
+            if (token == tokenB) {
+                if (highWaterMark > amount) {
+                    highWaterMark -= amount;
+                } else {
+                    highWaterMark = 0;
+                }
+            }
+        }
     }
 
     /// @notice Stop agent actions.
@@ -165,10 +213,71 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         emit Paused(false);
     }
 
+    /// @notice Returns the full mandate struct (public getter returns tuple, not struct).
+    function getMandate() external view returns (Mandate memory) {
+        return mandate;
+    }
+
+    /// @notice Returns the rolling 24-hour notional turnover in tokenB terms across 48 30-min buckets.
+    function getRolling24hTurnover() public view returns (uint256 total) {
+        uint32 currentBucket = uint32(block.timestamp / 30 minutes);
+        for (uint256 i = 0; i < 48; ++i) {
+            TurnoverSlot memory s = _turnoverSlots[i];
+            if (currentBucket >= s.epochBucket && currentBucket - s.epochBucket < 48) {
+                total += s.notionalB;
+            }
+        }
+    }
+
+    /// @notice Backwards-compatible alias for getRolling24hTurnover.
+    function dailyNotionalB() external view returns (uint256) {
+        return getRolling24hTurnover();
+    }
+
+    /// @notice UTC calendar day bucket for backwards compatibility.
+    function dailyBucket() external view returns (uint256) {
+        return block.timestamp / 1 days;
+    }
+
     /// @notice Pull an exact pre-approved deposit of either configured token.
     function deposit(address token, uint256 amount) external nonReentrant {
         if (token != tokenA && token != tokenB) revert InvalidToken();
         SafeToken.pull(token, msg.sender, amount);
+        (bool ok, int24 tick) = _tryTick();
+        if (ok) {
+            uint256 depVal = token == tokenB ? amount : _quote(tick, amount, tokenA);
+            if (highWaterMark == 0) {
+                uint256 valA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+                uint256 valB = IERC20(tokenB).balanceOf(address(this));
+                highWaterMark = valA + valB;
+            } else {
+                highWaterMark += depVal;
+            }
+        } else {
+            if (token == tokenB) {
+                highWaterMark += amount;
+            }
+        }
+    }
+
+    function _tryTick() private view returns (bool ok, int24 tick) {
+        uint32[] memory times = new uint32[](2);
+        times[0] = twapWindowSec;
+        try IUniswapV3Pool(pool).observe(times) returns (int56[] memory c, uint160[] memory) {
+            if (c.length >= 2) {
+                int56 delta;
+                unchecked {
+                    delta = c[1] - c[0];
+                }
+                int56 w = int56(uint56(twapWindowSec));
+                int56 mean = delta / w;
+                if (delta < 0 && delta % w != 0) --mean;
+                if (mean >= -887272 && mean <= 887272) {
+                    return (true, int24(mean));
+                }
+            }
+        } catch {}
+        return (false, 0);
     }
 
     function _tick() private view returns (int24 tick) {
@@ -216,6 +325,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     function trade(TradeParams calldata p) external onlyAgent nonReentrant returns (uint256 amountOut) {
         if (p.kind != Kind.TRADE && p.kind != Kind.RESIZE) revert InvalidKind();
         if (p.prevHead != chain.head) revert PreviousHead();
+        if (block.timestamp > p.validUntil) revert DecisionExpired();
         if (block.timestamp > p.deadline) revert Deadline();
         if (p.nonce != nextNonce) revert Nonce();
         if (block.timestamp < lastTradeAt + mandate.minIntervalSec) revert Interval();
@@ -229,16 +339,22 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         if (refOut == 0 || p.minOut < FullMath.mulDiv(refOut, 10000 - mandate.maxSlippageBps, 10000)) {
             revert Slippage();
         }
-        uint256 bucket = block.timestamp / 1 days;
-        if (dailyBucket != bucket) {
-            dailyBucket = bucket;
-            dailyNotionalB = 0;
+        uint256 preValA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
+        uint256 preTotalVal = preValA + IERC20(tokenB).balanceOf(address(this));
+        if (highWaterMark == 0 || preTotalVal > highWaterMark) {
+            highWaterMark = preTotalVal;
+        } else if (
+            mandate.maxDrawdownBps > 0
+                && preTotalVal < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
+        ) {
+            revert Drawdown();
         }
-        dailyNotionalB += p.tokenIn == tokenB ? p.amountIn : refOut;
-        if (dailyNotionalB > mandate.maxDailyInB) revert DailyCap();
+        uint256 tradeNotionalB = p.tokenIn == tokenB ? p.amountIn : refOut;
+        if (getRolling24hTurnover() + tradeNotionalB > mandate.maxDailyInB) revert DailyCap();
         ++nextNonce;
         lastTradeAt = block.timestamp;
         amountOut = _swap(p, tick);
+        _recordTurnover(tradeNotionalB);
         _commit(
             chain,
             p.receiptHash,
@@ -247,6 +363,18 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
             p.kind,
             Fill(p.tokenIn, p.amountIn, amountOut, p.minOut, refOut)
         );
+    }
+
+    function _recordTurnover(uint256 notionalB) private {
+        uint32 currentBucket = uint32(block.timestamp / 30 minutes);
+        uint256 slotIdx = currentBucket % 48;
+        TurnoverSlot storage s = _turnoverSlots[slotIdx];
+        if (s.epochBucket == currentBucket) {
+            s.notionalB += uint224(notionalB);
+        } else {
+            s.epochBucket = currentBucket;
+            s.notionalB = uint224(notionalB);
+        }
     }
 
     function _swap(TradeParams calldata p, int24 tick) private returns (uint256 amountOut) {
@@ -268,6 +396,13 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 valueA = _quote(tick, IERC20(tokenA).balanceOf(address(this)), tokenA);
         uint256 valueB = IERC20(tokenB).balanceOf(address(this));
         uint256 total = valueA + valueB;
+        if (highWaterMark == 0 || total > highWaterMark) {
+            highWaterMark = total;
+        } else if (
+            mandate.maxDrawdownBps > 0 && total < FullMath.mulDiv(highWaterMark, 10000 - mandate.maxDrawdownBps, 10000)
+        ) {
+            revert Drawdown();
+        }
         // Compare at full precision by rounding the pre-trade ratio up. For an
         // integer post valueA, valueA < ceil(preA * total / preTotal) is exactly
         // the strict fractional comparison, without rounding exposure to bps.

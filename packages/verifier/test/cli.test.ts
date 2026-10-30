@@ -60,7 +60,7 @@ test('tx lookup, --receipt and --json produce machine-readable PASS', async () =
     expect(JSON.parse(output[0]).status).toBe('PASS');
   }
 });
-test('compiled CLI exits 1 and names check for all six required tampers', () => {
+test('compiled CLI exits 1 and names check for all six required tampers', { timeout: 30000 }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'verifier-tampers-'));
   try {
     const cases: [

@@ -60,6 +60,7 @@ export function scenario(decimalsB = 6) {
     maxDailyInB: units(1000, decimalsB),
     maxExposureBps: 10000,
     maxSlippageBps: 100,
+    maxDrawdownBps: 2000,
     minIntervalSec: 0,
     policyHash: policyHash(policy),
   };

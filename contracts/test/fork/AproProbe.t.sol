@@ -18,7 +18,7 @@ contract AproProbeTest is Test {
             vm.skip(true);
         }
         try vm.createSelectFork(rpc, vm.envOr("FORK_BLOCK_177", uint256(29413000))) returns (uint256) {}
-            catch {
+        catch {
             console2.log("SKIP: RPC unavailable for APRO probe");
             vm.skip(true);
         }

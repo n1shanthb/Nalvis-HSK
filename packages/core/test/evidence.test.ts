@@ -38,6 +38,7 @@ function mocks() {
             m.maxDailyInB,
             m.maxExposureBps,
             m.maxSlippageBps,
+            m.maxDrawdownBps ?? 2000,
             BigInt(m.minIntervalSec),
             m.policyHash,
           ];

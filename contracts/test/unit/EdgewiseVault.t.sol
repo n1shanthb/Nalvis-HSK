@@ -33,7 +33,7 @@ contract EdgewiseVaultTest is Test {
         oracle = new MockAggregator();
         v = _deploy(address(0), 1 hours);
         m = EdgewiseVault.Mandate(
-            agent, block.timestamp + 30 days, 100e18, 100e18, 150e18, 10000, 100, 0, keccak256("policy")
+            agent, block.timestamp + 30 days, 100e18, 100e18, 150e18, 10000, 100, 0, 0, keccak256("policy")
         );
         v.setMandate(m);
         a.mint(address(v), 1000e18);
@@ -54,6 +54,7 @@ contract EdgewiseVaultTest is Test {
             50e18,
             49.5e18,
             block.timestamp,
+            block.timestamp + 60, // validUntil added
             v.nextNonce(),
             keccak256("trade"),
             v.head(),
@@ -218,6 +219,28 @@ contract EdgewiseVaultTest is Test {
         _reject(p, EdgewiseVault.Deadline.selector);
     }
 
+    function testValidUntilExpired() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp - 1;
+        _reject(p, EdgewiseVault.DecisionExpired.selector);
+    }
+
+    function testValidUntilBoundary() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp;
+        vm.prank(agent);
+        v.trade(p);
+        assertEq(v.seq(), 1);
+    }
+
+    function testValidUntilValid() public {
+        EdgewiseVault.TradeParams memory p = _params();
+        p.validUntil = block.timestamp + 30;
+        vm.prank(agent);
+        v.trade(p);
+        assertEq(v.seq(), 1);
+    }
+
     function testNonceReplay() public {
         _trade();
         EdgewiseVault.TradeParams memory p = _params();
@@ -290,6 +313,67 @@ contract EdgewiseVaultTest is Test {
         _reject(_params(), EdgewiseVault.DailyCap.selector);
     }
 
+    function testMidnightBoundaryBypassPrevented() public {
+        uint256 midnight = ((block.timestamp / 1 days) + 1) * 1 days;
+        vm.warp(midnight - 5 minutes);
+        m.maxDailyInB = 80e18;
+        v.setMandate(m);
+
+        _trade();
+        assertEq(v.dailyNotionalB(), 50e18);
+
+        vm.warp(midnight + 5 minutes);
+        _reject(_params(), EdgewiseVault.DailyCap.selector);
+        assertEq(v.dailyNotionalB(), 50e18);
+    }
+
+    function testRevertedTradeDoesNotConsumeTurnover() public {
+        m.maxDailyInB = 80e18;
+        v.setMandate(m);
+        _trade();
+        assertEq(v.dailyNotionalB(), 50e18);
+
+        EdgewiseVault.TradeParams memory p = _params();
+        p.deadline = block.timestamp - 1;
+        _reject(p, EdgewiseVault.Deadline.selector);
+
+        assertEq(v.dailyNotionalB(), 50e18);
+    }
+
+    function testRollingWindowPartialExpiry() public {
+        m.maxDailyInB = 90e18;
+        v.setMandate(m);
+
+        EdgewiseVault.TradeParams memory p1 = _params();
+        p1.amountIn = 40e18;
+        p1.minOut = 39.6e18;
+        vm.prank(agent);
+        v.trade(p1);
+        assertEq(v.dailyNotionalB(), 40e18);
+
+        vm.warp(block.timestamp + 12 hours);
+        EdgewiseVault.TradeParams memory p2 = _params();
+        p2.amountIn = 40e18;
+        p2.minOut = 39.6e18;
+        p2.nonce = 1;
+        p2.prevHead = v.head();
+        vm.prank(agent);
+        v.trade(p2);
+        assertEq(v.dailyNotionalB(), 80e18);
+
+        vm.warp(block.timestamp + 13 hours);
+        assertEq(v.dailyNotionalB(), 40e18);
+
+        EdgewiseVault.TradeParams memory p3 = _params();
+        p3.amountIn = 40e18;
+        p3.minOut = 39.6e18;
+        p3.nonce = 2;
+        p3.prevHead = v.head();
+        vm.prank(agent);
+        v.trade(p3);
+        assertEq(v.dailyNotionalB(), 80e18);
+    }
+
     function testExposureExceeded() public {
         m.maxExposureBps = 5000;
         v.setMandate(m);
@@ -301,6 +385,8 @@ contract EdgewiseVaultTest is Test {
 
     function testMinOutBelowFloor() public {
         EdgewiseVault.TradeParams memory p = _params();
+        // Ensure validUntil is still in future for this test
+        // (already set in _params)
         p.minOut--;
         _reject(p, EdgewiseVault.Slippage.selector);
     }
@@ -379,6 +465,59 @@ contract EdgewiseVaultTest is Test {
     function testWithdraw() public {
         v.withdraw(address(b), 10e18, stranger);
         assertEq(b.balanceOf(stranger), 10e18);
+    }
+
+    function testWithdrawWhenObserveReverts() public {
+        pool.setFail(true);
+        v.withdraw(address(b), 10e18, stranger);
+        assertEq(b.balanceOf(stranger), 10e18);
+
+        v.withdraw(address(a), 5e18, stranger);
+        assertEq(a.balanceOf(stranger), 5e18);
+    }
+
+    function testEmergencyWithdrawWhilePaused() public {
+        v.pause();
+        assertTrue(v.paused());
+        v.withdraw(address(b), 20e18, stranger);
+        assertEq(b.balanceOf(stranger), 20e18);
+    }
+
+    function testWithdrawPreservesDrawdown() public {
+        m.maxDrawdownBps = 2000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        deal(address(b), address(v), 700e18);
+        v.withdraw(address(b), 700e18, stranger);
+        uint256 expectedHWM = (uint256(2000e18) * 1000e18) / 1700e18;
+        assertEq(v.highWaterMark(), expectedHWM);
+    }
+
+    function testDepositDoesNotEraseDrawdown() public {
+        m.maxDrawdownBps = 2000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        deal(address(b), address(v), 700e18);
+
+        b.mint(address(this), 300e18);
+        b.approve(address(v), 300e18);
+        v.deposit(address(b), 300e18);
+
+        assertEq(v.highWaterMark(), 2300e18);
+        assertEq(b.balanceOf(address(v)), 1000e18);
+    }
+
+    function testSetMandateWhenObserveReverts() public {
+        pool.setFail(true);
+        m.expiry = block.timestamp + 7 days;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 0);
+
+        pool.setFail(false);
+        _trade();
+        assertGt(v.highWaterMark(), 0);
     }
 
     function testDeposit() public {
@@ -623,5 +762,45 @@ contract EdgewiseVaultTest is Test {
             assertEq(v.nextNonce(), i + 1);
             assertEq(b.allowance(address(v), address(router)), 0);
         }
+    }
+
+    function testInvalidMandateMaxDrawdownBps() public {
+        m.maxDrawdownBps = 10001;
+        vm.expectRevert(EdgewiseVault.InvalidMandate.selector);
+        v.setMandate(m);
+    }
+
+    function testDrawdownCircuitBreakerTriggered() public {
+        m.maxDrawdownBps = 1000; // 10% max drawdown
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        // Value drops by 25% (2000e18 -> 1500e18, which is > 10% drawdown)
+        deal(address(b), address(v), 500e18);
+        _reject(_params(), EdgewiseVault.Drawdown.selector);
+    }
+
+    function testDrawdownResetByOwnerSetMandate() public {
+        m.maxDrawdownBps = 1000;
+        v.setMandate(m);
+        deal(address(b), address(v), 500e18);
+        _reject(_params(), EdgewiseVault.Drawdown.selector);
+
+        // Owner re-signs mandate, resetting high-water mark to 1500e18
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 1500e18);
+        _trade();
+        assertEq(v.seq(), 1);
+    }
+
+    function testDrawdownHighWaterMarkRatchetsUp() public {
+        m.maxDrawdownBps = 1000;
+        v.setMandate(m);
+        assertEq(v.highWaterMark(), 2000e18);
+
+        // Capital increases to 3000e18
+        deal(address(b), address(v), 2000e18);
+        _trade();
+        assertEq(v.highWaterMark(), 3000e18);
     }
 }

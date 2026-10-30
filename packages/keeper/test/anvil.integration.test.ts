@@ -234,6 +234,7 @@ it.skipIf(!!reason)(
               maxDailyInB: units(10000, 6),
               maxExposureBps: 10000,
               maxSlippageBps: 100,
+              maxDrawdownBps: 2000,
               minIntervalSec: 0n,
               policyHash: policyHash(policy),
             },
@@ -422,6 +423,9 @@ it.skipIf(!!reason)(
                 amountIn: 1n,
                 minOut: 1n,
                 deadline: BigInt(
+                  Number((await client.getBlock()).timestamp) + 120,
+                ),
+                validUntil: BigInt(
                   Number((await client.getBlock()).timestamp) + 120,
                 ),
                 nonce: await client.readContract({

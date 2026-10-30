@@ -77,6 +77,7 @@ export function validateMandate(
     maxDailyInB: exactUnits(fields.maxDailyInB, snapshot.decimalsB),
     maxExposureBps: Number(exposure),
     maxSlippageBps: clampSlippage(Number(fields.maxSlippageBps)),
+    maxDrawdownBps: Number(uint(fields.maxDrawdownBps ?? '0')),
     minIntervalSec: uint(fields.minIntervalSec),
     policyHash: fields.policyHash as Hex,
   };
@@ -89,6 +90,7 @@ const labels: Record<keyof VaultMandate, string> = {
   maxDailyInB: 'USDT per UTC day',
   maxExposureBps: 'Exposure cap (bps)',
   maxSlippageBps: 'Slippage cap (bps)',
+  maxDrawdownBps: 'Drawdown cap (bps)',
   minIntervalSec: 'Minimum interval (seconds)',
   policyHash: 'Policy hash',
 };

@@ -40,6 +40,7 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
         'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
         'Exposure cap (bps)': m.maxExposureBps,
         'Slippage cap (bps)': m.maxSlippageBps,
+        'Drawdown cap (bps)': m.maxDrawdownBps,
         'Minimum interval (s)': String(m.minIntervalSec),
         'Policy hash': m.policyHash,
         Paused: String(snapshot.paused),

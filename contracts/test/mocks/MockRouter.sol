@@ -8,6 +8,7 @@ contract MockRouter {
     uint256 public numerator = 1;
     uint256 public denominator = 1;
     bool public underfill;
+    bool public partialFill;
     address public callback;
     bytes public callbackData;
 
@@ -20,6 +21,10 @@ contract MockRouter {
         underfill = f;
     }
 
+    function setPartialFill(bool f) external {
+        partialFill = f;
+    }
+
     function setCallback(address target, bytes calldata data) external {
         callback = target;
         callbackData = data;
@@ -27,12 +32,13 @@ contract MockRouter {
 
     function exactInputSingle(IV3SwapRouter.ExactInputSingleParams calldata p) external payable returns (uint256 out) {
         require(IERC20(p.tokenIn).allowance(msg.sender, address(this)) == p.amountIn, "exact approval");
-        require(IERC20(p.tokenIn).transferFrom(msg.sender, address(this), p.amountIn));
+        uint256 pullAmount = partialFill ? p.amountIn - 1 : p.amountIn;
+        require(IERC20(p.tokenIn).transferFrom(msg.sender, address(this), pullAmount));
         if (callback != address(0)) {
             (bool ok,) = callback.call(callbackData);
             require(ok, "callback failed");
         }
-        out = underfill ? p.amountOutMinimum - 1 : FullMath.mulDiv(p.amountIn, numerator, denominator);
+        out = underfill ? p.amountOutMinimum - 1 : FullMath.mulDiv(pullAmount, numerator, denominator);
         require(IERC20(p.tokenOut).transfer(p.recipient, out));
     }
 }

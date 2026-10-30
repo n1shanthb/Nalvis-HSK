@@ -124,17 +124,26 @@ export REVOKE_DATA=$(jq -er '.returns.revokeData.value' work/mandate.json)
 send133 "$VAULT_ADDRESS" --data "$SET_DATA" --ledger --sender "$OWNER_ADDRESS" \
   --mnemonic-derivation-path "m/44'/60'/0'/0/0"
 cast call "$VAULT_ADDRESS" \
-  'mandate()(address,uint256,uint256,uint256,uint256,uint16,uint16,uint256,bytes32)' \
+  'mandate()(address,uint256,uint256,uint256,uint256,uint16,uint16,uint16,uint256,bytes32)' \
   --rpc-url "$HSK_TESTNET_RPC"
 ```
 
 Default: 2 WHSK/trade, 100 test-USDT/trade, 500 test-USDT per UTC calendar day,
 80% exposure cap (strict exposure reduction allowed), 100 bps slippage,
+2000 bps (20%) max drawdown from high-water mark before circuit breaker triggers,
 300-second cooldown, expiry at the RPC block timestamp + 7 days. Missing
 `policy/default.json` prints a WARNING and uses zero policyHash. If present, it
 must contain canonical sorted-key JSON with no whitespace; the helper hashes its
 exact file bytes. Review the same bytes/hash before signing. No APRO exists on
 133: oracle, band and age are all zero.
+
+Mandate field reference (T9 guardrails):
+- `maxDrawdownBps`: set via `MAX_DRAWDOWN_BPS` env var (default 2000 = 20%).
+  Agent trades halt if total vault value drops > `maxDrawdownBps` bps below its
+  high-water mark; owner must re-sign a mandate to reset.
+- `maxSlippageBps`: hard-capped at 100 bps by contract constant; cannot be raised.
+- `minIntervalSec`: minimum seconds between agent trades (default 300).
+- `maxDailyInB`: rolling UTC calendar-day notional cap in tokenB units.
 
 ## 5. One agent trade, then verify
 
@@ -149,6 +158,7 @@ TX_HASH=$(jq -er '.transactionHash' work/trade-tx.json)
 cast receipt "$TX_HASH" --rpc-url "$HSK_TESTNET_RPC" --json > work/trade-receipt.json
 cast call "$VAULT_ADDRESS" 'seq()(uint64)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$VAULT_ADDRESS" 'head()(bytes32)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$VAULT_ADDRESS" 'highWaterMark()(uint256)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$WHSK" 'allowance(address,address)(uint256)' "$VAULT_ADDRESS" "$SWAP_ROUTER" \
   --rpc-url "$HSK_TESTNET_RPC"
 RECEIPT_DATA=$(jq -er --arg vault "${VAULT_ADDRESS,,}" '

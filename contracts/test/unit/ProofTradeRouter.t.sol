@@ -47,7 +47,7 @@ contract ProofTradeRouterTest is Test {
         vm.expectEmit(true, true, false, true, address(r));
         emit ReceiptChain.Receipt(0, hash, 0, keccak256("policy"), 0, address(a), 50e6, 50e18, 50e18, 0);
         vm.prank(alice);
-        r.commitAndSwap(hash, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(hash, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(a.balanceOf(alice), 950e6);
         assertEq(b.balanceOf(alice), 50e18);
         assertEq(a.balanceOf(address(r)), 0);
@@ -61,7 +61,7 @@ contract ProofTradeRouterTest is Test {
         p.sqrtPriceLimitX96 = 1;
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.PriceLimit.selector);
-        r.commitAndSwap(0, 0, p, block.timestamp);
+        r.commitAndSwap(0, 0, p, block.timestamp + 60, block.timestamp);
         assertEq(a.balanceOf(alice), 1000e6);
         assertEq(a.balanceOf(address(r)), 0);
         assertEq(a.allowance(address(r), address(router)), 0);
@@ -71,13 +71,31 @@ contract ProofTradeRouterTest is Test {
     function testRecipientMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Recipient.selector);
-        r.commitAndSwap(0, 0, _params(bob, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(bob, 50e6), block.timestamp + 60, block.timestamp);
     }
 
     function testDeadlinePassed() public {
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Deadline.selector);
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp - 1);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp - 1);
+    }
+
+    function testValidUntilExpired() public {
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.DecisionExpired.selector);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp - 1, block.timestamp + 60);
+    }
+
+    function testValidUntilBoundary() public {
+        vm.prank(alice);
+        uint256 out = r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp, block.timestamp + 60);
+        assertEq(out, 50e18);
+    }
+
+    function testValidUntilValid() public {
+        vm.prank(alice);
+        uint256 out = r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 30, block.timestamp + 60);
+        assertEq(out, 50e18);
     }
 
     function testSetPolicyNonOwner() public {
@@ -95,16 +113,27 @@ contract ProofTradeRouterTest is Test {
         router.setUnderfill(true);
         vm.prank(alice);
         vm.expectRevert(ProofTradeRouter.Underfill.selector);
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 0);
         assertEq(a.balanceOf(alice), 1000e6);
+        assertEq(a.allowance(address(r), address(router)), 0);
+    }
+
+    function testPartialFillInputStrandingReverts() public {
+        router.setPartialFill(true);
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Underfill.selector);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+        assertEq(r.seq(alice), 0);
+        assertEq(a.balanceOf(alice), 1000e6);
+        assertEq(a.balanceOf(address(r)), 0);
         assertEq(a.allowance(address(r), address(router)), 0);
     }
 
     function testPrevHeadSwapMismatch() public {
         vm.prank(alice);
         vm.expectRevert(ReceiptChain.PreviousHead.selector);
-        r.commitAndSwap(0, bytes32(uint256(1)), _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, bytes32(uint256(1)), _params(alice, 50e6), block.timestamp + 60, block.timestamp);
     }
 
     function testPrevHeadHoldMismatch() public {
@@ -131,7 +160,7 @@ contract ProofTradeRouterTest is Test {
         assertEq(r.seq(bob), 1);
         bytes32 prev = r.head(alice);
         vm.prank(alice);
-        r.commitAndSwap(hash, prev, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(hash, prev, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 2);
         assertEq(r.seq(bob), 1);
         assertEq(r.head(bob), prev);
@@ -152,7 +181,7 @@ contract ProofTradeRouterTest is Test {
         router.setCallback(address(r), abi.encodeCall(r.commitHold, (bytes32(0), bytes32(0), ReceiptChain.Kind.WAIT)));
         vm.prank(alice);
         vm.expectRevert("callback failed");
-        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
         assertEq(r.seq(alice), 0);
         assertEq(a.balanceOf(alice), 1000e6);
     }
@@ -164,12 +193,81 @@ contract ProofTradeRouterTest is Test {
         for (uint64 i; i < n; ++i) {
             bytes32 hash = keccak256(abi.encode(x, i));
             vm.prank(alice);
-            r.commitAndSwap(hash, prev, _params(alice, amount), block.timestamp);
+            r.commitAndSwap(hash, prev, _params(alice, amount), block.timestamp + 60, block.timestamp);
             prev = keccak256(abi.encode(prev, hash, i));
             assertEq(r.head(alice), prev);
             assertEq(r.seq(alice), i + 1);
             assertEq(a.allowance(address(r), address(router)), 0);
             assertEq(r.seq(bob), 0);
         }
+    }
+
+    function testPreFundedDustDoesNotBlockSwap() public {
+        // Send 1 wei dust to router before swap
+        a.mint(address(r), 1);
+        b.mint(address(r), 10);
+        assertEq(a.balanceOf(address(r)), 1);
+        assertEq(b.balanceOf(address(r)), 10);
+
+        vm.prank(alice);
+        uint256 out = r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+        assertGt(out, 0);
+
+        // Pre-existing dust must still be present and not drained
+        assertEq(a.balanceOf(address(r)), 1);
+        assertEq(b.balanceOf(address(r)), 10);
+        assertEq(a.allowance(address(r), address(router)), 0);
+        assertEq(r.seq(alice), 1);
+    }
+
+    function testPreFundedDustCannotBeExtracted() public {
+        // Stranger sends 500e6 dust to router
+        a.mint(address(r), 500e6);
+        uint256 aliceStart = a.balanceOf(alice);
+
+        vm.prank(alice);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+
+        // Alice only swapped 50e6 and could not extract the 500e6 dust
+        assertEq(a.balanceOf(alice), aliceStart - 50e6);
+        assertEq(a.balanceOf(address(r)), 500e6);
+        assertEq(a.allowance(address(r), address(router)), 0);
+    }
+
+    function testPartialFillLeavesPreFundedDustIntactAndReverts() public {
+        a.mint(address(r), 7);
+        router.setPartialFill(true);
+
+        uint256 aliceStart = a.balanceOf(alice);
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Underfill.selector);
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+
+        // Alice balance untouched
+        assertEq(a.balanceOf(alice), aliceStart);
+        // Pre-existing dust remains untouched
+        assertEq(a.balanceOf(address(r)), 7);
+        assertEq(a.allowance(address(r), address(router)), 0);
+        assertEq(r.seq(alice), 0);
+    }
+
+    function testSwapFailureRevertsAtomically() public {
+        a.mint(address(r), 3);
+        // Simulate router failure via callback revert
+        router.setCallback(address(this), abi.encodeWithSignature("revertingCallback()"));
+
+        uint256 aliceStart = a.balanceOf(alice);
+        vm.prank(alice);
+        vm.expectRevert("callback failed");
+        r.commitAndSwap(0, 0, _params(alice, 50e6), block.timestamp + 60, block.timestamp);
+
+        // State fully rolled back
+        assertEq(a.balanceOf(alice), aliceStart);
+        assertEq(a.balanceOf(address(r)), 3);
+        assertEq(r.seq(alice), 0);
+    }
+
+    function revertingCallback() external pure {
+        revert("simulated failure");
     }
 }

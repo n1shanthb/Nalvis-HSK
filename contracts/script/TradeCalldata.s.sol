@@ -43,6 +43,7 @@ contract TradeCalldata is Script {
                     0.01 ether,
                     minOut,
                     block.timestamp + 300,
+                    block.timestamp + 60,
                     vault.nextNonce(),
                     keccak256("T3 human bootstrap: testnet prices are fake"),
                     vault.head(),
