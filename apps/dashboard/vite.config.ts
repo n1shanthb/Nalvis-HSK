@@ -52,6 +52,20 @@ function receiptAssets(): Plugin {
 }
 export default defineConfig({
   plugins: [receiptAssets()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          ledger: [
+            '@ledgerhq/device-management-kit',
+            '@ledgerhq/device-signer-kit-ethereum',
+            '@ledgerhq/device-transport-kit-web-hid',
+          ],
+          viem: ['viem'],
+        },
+      },
+    },
+  },
   server: {
     proxy:
       process.env.ENABLE_CEX_PROXY === 'true'

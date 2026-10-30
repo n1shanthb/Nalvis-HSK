@@ -237,12 +237,41 @@ export class DeskParser {
       );
       if (Object.keys(diffResult.diff).length > 0) {
         const diffStr = JSON.stringify(diffResult.diff);
-        const calldataHash = keccak256(Buffer.from(diffStr));
+        const m = context.mandate;
+        const newMaxTradeInA = diffResult.diff.maxTradeInA !== undefined ? BigInt(diffResult.diff.maxTradeInA as string) : m.maxTradeInA;
+        const newMaxTradeInB = diffResult.diff.maxTradeInB !== undefined ? BigInt(diffResult.diff.maxTradeInB as string) : m.maxTradeInB;
+        const newPolicyHash = (diffResult.diff.policyHash as Hex | undefined) ?? (m.policyHash as Hex);
+
+        const proposedMandate = {
+          agent: '0x0000000000000000000000000000000000000000' as Hex,
+          expiry: BigInt(m.expiry),
+          maxTradeInA: newMaxTradeInA,
+          maxTradeInB: newMaxTradeInB,
+          maxDailyInB: m.maxDailyInB,
+          maxExposureBps: m.maxExposureBps,
+          maxSlippageBps: m.maxSlippageBps,
+          minIntervalSec: BigInt(m.minIntervalSec),
+          policyHash: newPolicyHash,
+        };
+
+        const calldata = encodeFunctionData({
+          abi: vaultAbi,
+          functionName: 'setMandate',
+          args: [proposedMandate],
+        });
+        const calldataHash = keccak256(calldata);
+
         return {
           intent: 'PARAM_UPDATE',
           response: `Proposed parameter update: ${diffStr}. Calldata hash: ${calldataHash}. Validated against signed mandate limits.`,
           diff: diffResult.diff,
           calldataHash,
+          preparedAction: {
+            functionName: 'setMandate',
+            calldata,
+            calldataHash,
+            notice: 'Requires Ledger owner signature in Owner panel to update signed mandate parameters.',
+          },
         };
       }
       if (diffResult.refused) {

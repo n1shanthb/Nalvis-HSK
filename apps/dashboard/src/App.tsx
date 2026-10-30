@@ -1,14 +1,27 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { MandateView } from './views/Mandate.js';
-import { EvidenceView } from './views/Evidence.js';
-import { ReceiptsView } from './views/Receipts.js';
-import { VerifyView } from './views/Verify.js';
-import { DeskView } from './views/Desk.js';
 import { type DashboardChain } from './lib/clients.js';
 import './style.css';
+
+const MandateView = lazy(() =>
+  import('./views/Mandate.js').then((m) => ({ default: m.MandateView })),
+);
+const EvidenceView = lazy(() =>
+  import('./views/Evidence.js').then((m) => ({ default: m.EvidenceView })),
+);
+const ReceiptsView = lazy(() =>
+  import('./views/Receipts.js').then((m) => ({ default: m.ReceiptsView })),
+);
+const VerifyView = lazy(() =>
+  import('./views/Verify.js').then((m) => ({ default: m.VerifyView })),
+);
+const DeskView = lazy(() =>
+  import('./views/Desk.js').then((m) => ({ default: m.DeskView })),
+);
 const OwnerPanel = lazy(() => import('./owner/MandateForm.js'));
+
 const routes = ['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const;
 export type Route = (typeof routes)[number];
+
 export function App({
   initialChain = 133,
   initialRoute,
@@ -92,24 +105,26 @@ export function App({
         ))}
       </nav>
       <main key={`${chain}-${route}`}>
-        {route === 'mandate' && (
-          <MandateView
-            chain={chain}
-            onOwner={
-              enableOwner
-                ? (d, s) => (
-                    <Suspense fallback={<p>Loading owner panel…</p>}>
-                      <OwnerPanel chain={chain} vault={d.vault} snapshot={s} />
-                    </Suspense>
-                  )
-                : undefined
-            }
-          />
-        )}{' '}
-        {route === 'evidence' && <EvidenceView />}
-        {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
-        {route === 'verify' && <VerifyView chain={chain} />}
-        {route === 'desk' && <DeskView chain={chain} />}
+        <Suspense fallback={<p>Loading view…</p>}>
+          {route === 'mandate' && (
+            <MandateView
+              chain={chain}
+              onOwner={
+                enableOwner
+                  ? (d, s) => (
+                      <Suspense fallback={<p>Loading owner panel…</p>}>
+                        <OwnerPanel chain={chain} vault={d.vault} snapshot={s} />
+                      </Suspense>
+                    )
+                  : undefined
+              }
+            />
+          )}{' '}
+          {route === 'evidence' && <EvidenceView />}
+          {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
+          {route === 'verify' && <VerifyView chain={chain} />}
+          {route === 'desk' && <DeskView chain={chain} />}
+        </Suspense>
       </main>
       <footer>
         <span>Market evidence · mainnet 177 · read-only</span>

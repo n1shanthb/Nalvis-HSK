@@ -99,6 +99,8 @@ export type VaultSnapshot = {
   mandate: VaultMandate;
   owner: Address;
   paused: boolean;
+  balanceA: bigint;
+  balanceB: bigint;
   decimalsA: number;
   decimalsB: number;
   blockNumber: bigint;
@@ -123,16 +125,34 @@ export async function readVault(
     read('mandate'),
   ]);
   const cfg = addresses[chain === 133 ? 133 : 177];
-  const [decimalsA, decimalsB] = await Promise.all(
-    [cfg.whsk.address, cfg.usdt.address].map((token) =>
-      client.readContract({
-        address: token,
-        abi: erc20Abi,
-        functionName: 'decimals',
-        blockNumber,
-      }),
-    ),
-  );
+  const [decimalsA, decimalsB, balanceA, balanceB] = await Promise.all([
+    client.readContract({
+      address: cfg.whsk.address,
+      abi: erc20Abi,
+      functionName: 'decimals',
+      blockNumber,
+    }),
+    client.readContract({
+      address: cfg.usdt.address,
+      abi: erc20Abi,
+      functionName: 'decimals',
+      blockNumber,
+    }),
+    client.readContract({
+      address: cfg.whsk.address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [vault],
+      blockNumber,
+    }),
+    client.readContract({
+      address: cfg.usdt.address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [vault],
+      blockNumber,
+    }),
+  ]);
   const [
     agent,
     expiry,
@@ -168,6 +188,8 @@ export async function readVault(
       minIntervalSec,
       policyHash,
     },
+    balanceA: balanceA as bigint,
+    balanceB: balanceB as bigint,
     decimalsA,
     decimalsB,
     blockNumber,

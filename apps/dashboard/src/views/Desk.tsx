@@ -94,19 +94,29 @@ export function DeskView({ chain }: { chain: DashboardChain }) {
         }
       : undefined;
 
+    const realBalanceA = data?.snapshot?.balanceA ?? data?.evidence?.vault?.balanceA;
+    const realBalanceB = data?.snapshot?.balanceB ?? data?.evidence?.vault?.balanceB;
+
     const deskContext = {
       evidence: data?.evidence,
       mandate,
       policy,
-      state: data?.snapshot
-        ? {
-            balanceA: data.snapshot.mandate.maxTradeInA,
-            balanceB: data.snapshot.mandate.maxTradeInB,
-            lastDecision: data.lastDecision,
-          }
-        : undefined,
-      decimalsA: data?.snapshot?.decimalsA ?? 18,
-      decimalsB: data?.snapshot?.decimalsB ?? 6,
+      state:
+        realBalanceA !== undefined && realBalanceB !== undefined
+          ? {
+              balanceA: realBalanceA,
+              balanceB: realBalanceB,
+              lastDecision: data?.lastDecision,
+            }
+          : data?.lastDecision
+            ? {
+                balanceA: undefined as unknown as bigint,
+                balanceB: undefined as unknown as bigint,
+                lastDecision: data.lastDecision,
+              }
+            : undefined,
+      decimalsA: data?.snapshot?.decimalsA ?? data?.evidence?.vault?.decimalsA ?? 18,
+      decimalsB: data?.snapshot?.decimalsB ?? data?.evidence?.vault?.decimalsB ?? 6,
     };
 
     let finalResult: DeskParseResult;

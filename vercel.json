@@ -1,9 +1,13 @@
 {
-  "buildCommand": "pnpm --filter @nalvis/dashboard build",
+  "buildCommand": "pnpm --filter @nalvis/core build && pnpm --filter @nalvis/dashboard build",
   "outputDirectory": "apps/dashboard/dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
@@ -27,4 +31,3 @@
     }
   ]
 }
-

@@ -31,6 +31,23 @@ export const DEFAULT_GROQ_MODEL =
 export const DEFAULT_GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
 /**
+ * Validates that every number present in the LLM explanation exists in the grounded context string.
+ * Returns true if properly grounded, false if ungrounded numbers or hallucinations are detected.
+ */
+export function verifyGroundedExplanation(explanation: string, contextString: string): boolean {
+  if (!explanation) return true;
+  // Match all numbers (integers and decimals)
+  const numbersInExplanation = explanation.match(/\b\d+(?:\.\d+)?\b/g) ?? [];
+  for (const num of numbersInExplanation) {
+    // If context does not contain this exact number string, reject
+    if (!contextString.includes(num)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Builds a strict, grounded context summary for the LLM.
  * Rule: Only include numbers and facts that exist in the real inputs.
  * If any metric is absent, it is explicitly noted as 'unavailable'.

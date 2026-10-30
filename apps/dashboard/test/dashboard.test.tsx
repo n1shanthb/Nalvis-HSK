@@ -25,6 +25,8 @@ export const snapshot: VaultSnapshot = {
   paused: false,
   decimalsA: 18,
   decimalsB: 18,
+  balanceA: 50n * 10n ** 18n,
+  balanceB: 2500n * 10n ** 18n,
   blockNumber: 1n,
   mandate: {
     agent,
