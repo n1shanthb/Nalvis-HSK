@@ -43,7 +43,9 @@ test('unlisted deployment contracts are UNVERIFIED and refused', async () => {
       commit: 'a'.repeat(40),
     }),
   );
-  await expect(loadDeployment(133)).rejects.toThrow('UNVERIFIED');
+  await expect(loadDeployment(133)).rejects.toThrow(
+    'Deployment not verified against docs/ADDRESSES.md',
+  );
 });
 test('testnet links use documented explorer; Anvil never links to a remote explorer', () => {
   expect(explorerLink(133, 'tx', 'hash')).toBe(

@@ -58,7 +58,7 @@ export function createMarketHandler(
     const venue = new URL(request.url).searchParams.get('venue');
     if (venue && venue !== 'mexc' && venue !== 'gate')
       return Response.json({ error: 'Unknown venue' }, { status: 400 });
-    const venues: Venue[] = venue ? [venue] : ['mexc', 'gate'];
+    const venues: Venue[] = venue ? [venue as Venue] : ['mexc', 'gate'];
     const results = await Promise.allSettled(venues.map(ticker));
     const body: {
       mexc: unknown;
@@ -75,7 +75,7 @@ export function createMarketHandler(
       if (result.error) body.errors[v] = result.error;
     });
     const failed = venue
-      ? !!body.errors[venue]
+      ? !!body.errors[venue as Venue]
       : venues.every((v) => !!body.errors[v]);
     return Response.json(body, {
       status: failed ? 502 : 200,
