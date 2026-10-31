@@ -1,3 +1,4 @@
+import { Landing } from './views/Landing.js';
 import type { OwnerProposal } from '../../../packages/core/src/desk/proposal.js';
 import { lazy, Suspense, useEffect, useState } from 'react';
 const MandateView = lazy(() =>
@@ -22,6 +23,15 @@ const DeskView = lazy(() =>
   import('./views/Desk.js').then((m) => ({ default: m.DeskView })),
 );
 const routes = ['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const;
+type AppRoute = Route | 'home';
+const routeLabels = [
+  'Overview',
+  'Live evidence',
+  'Decisions & receipts',
+  'Verify',
+  'Desk',
+];
+const routeIcons = ['◫', '⌁', '◇', '✓', '✧'];
 export type Route = (typeof routes)[number];
 export function App({
   initialChain = 133,
@@ -39,22 +49,54 @@ export function App({
   const [proposal, setProposal] = useState<OwnerProposal>();
   const [chain, setChain] = useState<DashboardChain>(initialChain);
   const readRoute = () =>
-    routes.find((r) => `#/${r}` === window.location.hash) ?? 'mandate';
-  const [route, setRoute] = useState<Route>(initialRoute ?? readRoute);
+    routes.find((r) => `#/${r}` === window.location.hash) ?? 'home';
+  const [route, setRoute] = useState<AppRoute>(initialRoute ?? readRoute);
   useEffect(() => {
     const change = () => setRoute(readRoute());
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
+  if (route === 'home') return <Landing />;
   return (
-    <div className="shell">
-      <header>
-        <a className="brand" href="#/mandate">
-          <span className="brand-icon">N</span>
-          <span>
-            NALVIS <small>EDGEWISE × PROOFTRADE</small>
-          </span>
+    <div className="shell console-shell">
+      <aside className="console-sidebar">
+        <a className="wordmark" href="#/home">
+          <span className="brand-mark">N</span>NALVIS
         </a>
+        <span className="sidebar-label">WORKSPACE</span>
+        <nav aria-label="Dashboard views">
+          {routes.map((r, i) => (
+            <a
+              key={r}
+              href={`#/${r}`}
+              aria-current={route === r ? 'page' : undefined}
+              onClick={() => setRoute(r)}
+            >
+              <span className="nav-symbol">{routeIcons[i]}</span>
+              {routeLabels[i]}
+              {r === 'desk' && <span className="nav-new">AI</span>}
+            </a>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sidebar-note">
+            <span className="status-light" />
+            <b>{demo ? 'Recorded session' : 'Read-only market evidence'}</b>
+            <p>
+              {demo
+                ? 'Local Anvil. Prices are not real.'
+                : 'Mainnet evidence. Bounded testnet execution.'}
+            </p>
+          </div>
+          <a href="#/home">← Back to Nalvis</a>
+        </div>
+      </aside>
+      <header className="console-topbar">
+        <div className="console-breadcrumb">
+          <span>Workspace</span>
+          <i>/</i>
+          <b>{routeLabels[routes.indexOf(route)]}</b>
+        </div>
         <div className="network">
           <label className="demo-toggle">
             <input
@@ -82,15 +124,6 @@ export function App({
           </label>
         </div>
       </header>
-      <div className="intro">
-        <p className="eyebrow">BOUNDED EXECUTION. VERIFIABLE DECISIONS.</p>
-        <h1>
-          Trust the limits.
-          <br />
-          <span>Inspect the evidence.</span>
-        </h1>
-        <p>A Ledger-governed mandate and a receipt for every decision.</p>
-      </div>
       {demo && (
         <div className="banner" role="note">
           DEMO · local anvil — prices not real · offline recorded receipts
@@ -111,27 +144,6 @@ export function App({
           Mainnet 177 — read-only
         </div>
       )}
-      <nav aria-label="Dashboard views">
-        {routes.map((r, i) => (
-          <a
-            key={r}
-            href={`#/${r}`}
-            aria-current={route === r ? 'page' : undefined}
-            onClick={() => setRoute(r)}
-          >
-            <small>0{i + 1}</small>{' '}
-            {
-              [
-                'Mandate',
-                'Live evidence',
-                'Decisions & receipts',
-                'Verify',
-                'Desk',
-              ][i]
-            }
-          </a>
-        ))}
-      </nav>
       <main key={`${chain}-${route}-${demo}`}>
         <Suspense
           fallback={

@@ -1,5 +1,6 @@
 import type { OwnerProposal } from '../../../../packages/core/src/desk/proposal.js';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { z } from 'zod';
 import {
   desk,
   supportedCommands,
@@ -10,6 +11,24 @@ import { liveDeskContext } from '../lib/desk-context.js';
 import type { DashboardChain } from '../lib/clients.js';
 import { demoContext } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
+const providerSchema = z.object({
+  providers: z.array(
+    z.object({
+      id: z.enum(['groq', 'openrouter']),
+      available: z.boolean(),
+      model: z.string().nullable(),
+    }),
+  ),
+});
+const translationSchema = z
+  .object({
+    provider: z.enum(['groq', 'openrouter']),
+    model: z.string(),
+    command: z.string().max(120),
+    promptHash: z.string().regex(/^[a-f0-9]{64}$/),
+    outputHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
 export function DeskView({
   demo = false,
   chain = 133,
@@ -27,26 +46,119 @@ export function DeskView({
     ),
   );
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<
-    { input: string; reply: DeskReply }[]
+  const [provider, setProvider] = useState('rules');
+  const [providers, setProviders] = useState<
+    z.infer<typeof providerSchema>['providers']
   >([]);
-  function submit(text: string) {
-    if (!text.trim()) return;
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/desk', { signal: controller.signal })
+      .then((r) => r.json())
+      .then((data) => setProviders(providerSchema.parse(data).providers))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+  const [messages, setMessages] = useState<
+    {
+      input: string;
+      reply: DeskReply;
+      interpretation?: string;
+      source?: string;
+      warning?: string;
+      transcript?: { promptHash: string; outputHash: string };
+    }[]
+  >([]);
+  async function submit(text: string) {
+    if (!text.trim() || pending) return;
+    setPending(true);
+    setInput('');
+    let command = text,
+      source = 'Built-in commands',
+      warning: string | undefined,
+      transcript: { promptHash: string; outputHash: string } | undefined;
+    try {
+      if (provider !== 'rules') {
+        const response = await fetch('/api/desk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, text }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!response.ok) throw new Error('AI unavailable');
+        const result = translationSchema.parse(await response.json());
+        command = result.command;
+        source = `${result.provider === 'groq' ? 'Groq' : 'OpenRouter'} · ${result.model}`;
+        transcript = {
+          promptHash: result.promptHash,
+          outputHash: result.outputHash,
+        };
+      }
+    } catch {
+      warning =
+        'AI unavailable or unable to interpret this request. Answered using the original text and built-in commands.';
+    }
     setMessages((m) => [
       ...m,
-      { input: text, reply: desk(text, resource.data) },
+      {
+        input: text,
+        reply: desk(command, resource.data),
+        source,
+        interpretation: command !== text ? command : undefined,
+        warning,
+        transcript,
+      },
     ]);
-    setInput('');
+    setPending(false);
   }
   return (
     <section>
       <p className="eyebrow">05 / NATURAL LANGUAGE DESK</p>
       <h2>Your evidence, explained.</h2>
       <p>
-        Deterministic answers. Owner actions produce a diff and calldata hash
-        for Ledger review.
+        Grounded answers from verified evidence. Owner actions produce a diff
+        and calldata hash for Ledger review.
       </p>
-      <p className="muted">{supportedCommands}</p>
+      <div className="desk-toolbar">
+        <label>
+          Language engine{' '}
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            disabled={pending}
+          >
+            <option value="rules">Built-in commands</option>
+            {(['groq', 'openrouter'] as const).map((id) => (
+              <option
+                key={id}
+                value={id}
+                disabled={!providers.find((p) => p.id === id)?.available}
+              >
+                {id === 'groq' ? 'Groq' : 'OpenRouter'}
+                {providers.find((p) => p.id === id)?.available
+                  ? ''
+                  : ' · not configured'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p>
+          {provider === 'rules'
+            ? providers.some((p) => p.available)
+              ? 'Choose an AI provider, or use built-in commands without a key.'
+              : 'Groq / OpenRouter not configured. Built-in commands are available.'
+            : `${providers.find((p) => p.id === provider)?.model ?? ''} · interprets language only. Verified rules decide.`}
+        </p>
+      </div>
+      <details className="desk-supported">
+        <summary>What can I ask?</summary>
+        <p className="muted">{supportedCommands}</p>
+        <p>
+          AI requests send your text to the selected provider. Never include
+          keys or sensitive information. Proposals always require separate owner
+          review; this conversation does not execute trades.
+        </p>
+      </details>
       {!demo && (
         <p>
           Uses verified locally served receipts on the selected network. Enable
@@ -56,9 +168,14 @@ export function DeskView({
       {resource.error && (
         <p role="alert">Recorded evidence unavailable: {resource.error}</p>
       )}
-      <div>
+      <div className="desk-commands">
         {['show P&L', 'kyu wait kiya', 'show spread', 'pause'].map((t) => (
-          <button key={t} className="secondary" onClick={() => submit(t)}>
+          <button
+            key={t}
+            className="secondary"
+            disabled={pending}
+            onClick={() => void submit(t)}
+          >
             {t}
           </button>
         ))}
@@ -73,7 +190,37 @@ export function DeskView({
         {messages.map((m, i) => (
           <article key={i}>
             <p className="user-message">{m.input}</p>
+            {m.source && (
+              <p className="ai-meta">
+                {m.source}
+                {m.interpretation && (
+                  <>
+                    {' '}
+                    · Interpreted as <code>{m.interpretation}</code>
+                  </>
+                )}
+              </p>
+            )}
+            {m.warning && (
+              <p className="ai-fallback" role="status">
+                {m.warning}
+              </p>
+            )}
             <p>{m.reply.message}</p>
+            {m.transcript && (
+              <details className="ai-meta">
+                <summary>Interpretation transcript hashes</summary>
+                <p>
+                  SHA-256 · audit metadata for this conversation, not an
+                  on-chain receipt.
+                </p>
+                <code>
+                  Prompt: {m.transcript.promptHash}
+                  <br />
+                  Output: {m.transcript.outputHash}
+                </code>
+              </details>
+            )}
             {m.reply.diff && (
               <pre>
                 {JSON.stringify(
@@ -98,11 +245,16 @@ export function DeskView({
             ))}
           </article>
         ))}
+        {pending && (
+          <p className="desk-pending" role="status">
+            Interpreting your request…
+          </p>
+        )}
       </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          submit(input);
+          void submit(input);
         }}
       >
         <label>
@@ -114,7 +266,9 @@ export function DeskView({
             placeholder="Why did you WAIT last?"
           />
         </label>
-        <button disabled={!input.trim() || resource.loading}>Ask desk</button>
+        <button disabled={!input.trim() || resource.loading || pending}>
+          Ask desk
+        </button>
       </form>
     </section>
   );
