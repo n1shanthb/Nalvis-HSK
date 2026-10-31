@@ -64,7 +64,11 @@ export async function readJSON(path: string): Promise<unknown> {
     !response.ok ||
     !(response.headers.get('content-type') ?? '').includes('json')
   )
-    throw Error(`Unavailable: ${path}`);
+    throw Error(
+      path.startsWith('/deployments/')
+        ? 'The verified deployment is not available yet. Follow the testnet bootstrap.'
+        : 'The requested data could not be loaded. Please retry shortly.',
+    );
   return response.json();
 }
 export async function loadDeployment(

@@ -1,3 +1,7 @@
+import { Header } from './components/Header.js';
+import { AgentView } from './views/Agent.js';
+import { MandateWizard } from './owner/MandateWizard.js';
+import { OwnerActions } from './owner/OwnerActions.js';
 import { Landing } from './views/Landing.js';
 import type { OwnerProposal } from '../../../packages/core/src/desk/proposal.js';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -22,16 +26,15 @@ const DemoConsole = lazy(() =>
 const DeskView = lazy(() =>
   import('./views/Desk.js').then((m) => ({ default: m.DeskView })),
 );
-const routes = ['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const;
+const routes = [
+  'mandate',
+  'evidence',
+  'receipts',
+  'verify',
+  'desk',
+  'agent',
+] as const;
 type AppRoute = Route | 'home';
-const routeLabels = [
-  'Overview',
-  'Live evidence',
-  'Decisions & receipts',
-  'Verify',
-  'Desk',
-];
-const routeIcons = ['◫', '⌁', '◇', '✓', '✧'];
 export type Route = (typeof routes)[number];
 export function App({
   initialChain = 133,
@@ -42,14 +45,20 @@ export function App({
   initialRoute?: Route;
   enableOwner?: boolean;
 }) {
-  const [demo, setDemo] = useState(
-    import.meta.env.VITE_DEMO_MODE === 'true' ||
-      new URLSearchParams(window.location.search).get('demo') === '1',
+  const [demo] = useState(
+    new URLSearchParams(window.location.search).get('demo') === '1',
   );
   const [proposal, setProposal] = useState<OwnerProposal>();
-  const [chain, setChain] = useState<DashboardChain>(initialChain);
-  const readRoute = () =>
-    routes.find((r) => `#/${r}` === window.location.hash) ?? 'home';
+  const [chain] = useState<DashboardChain>(initialChain);
+  const readRoute = () => {
+    const path = window.location.hash.split('?')[0];
+    if (path === '#/evidence' || path === '#/receipts') {
+      window.history.replaceState(null, '', `${window.location.search}#/agent`);
+      return 'agent' as const;
+    }
+    return routes.find((r) => `#/${r}` === path) ?? 'home';
+  };
+  const [deskOpen, setDeskOpen] = useState(false);
   const [route, setRoute] = useState<AppRoute>(initialRoute ?? readRoute);
   useEffect(() => {
     const change = () => setRoute(readRoute());
@@ -58,72 +67,8 @@ export function App({
   }, []);
   if (route === 'home') return <Landing />;
   return (
-    <div className="shell console-shell">
-      <aside className="console-sidebar">
-        <a className="wordmark" href="#/home">
-          <span className="brand-mark">N</span>NALVIS
-        </a>
-        <span className="sidebar-label">WORKSPACE</span>
-        <nav aria-label="Dashboard views">
-          {routes.map((r, i) => (
-            <a
-              key={r}
-              href={`#/${r}`}
-              aria-current={route === r ? 'page' : undefined}
-              onClick={() => setRoute(r)}
-            >
-              <span className="nav-symbol">{routeIcons[i]}</span>
-              {routeLabels[i]}
-              {r === 'desk' && <span className="nav-new">AI</span>}
-            </a>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="sidebar-note">
-            <span className="status-light" />
-            <b>{demo ? 'Recorded session' : 'Read-only market evidence'}</b>
-            <p>
-              {demo
-                ? 'Local Anvil. Prices are not real.'
-                : 'Mainnet evidence. Bounded testnet execution.'}
-            </p>
-          </div>
-          <a href="#/home">← Back to Nalvis</a>
-        </div>
-      </aside>
-      <header className="console-topbar">
-        <div className="console-breadcrumb">
-          <span>Workspace</span>
-          <i>/</i>
-          <b>{routeLabels[routes.indexOf(route)]}</b>
-        </div>
-        <div className="network">
-          <label className="demo-toggle">
-            <input
-              type="checkbox"
-              checked={demo}
-              onChange={(e) => setDemo(e.target.checked)}
-            />{' '}
-            Demo mode
-          </label>
-          <span className="dot" />{' '}
-          <label>
-            Execution network
-            <select
-              aria-label="Execution network"
-              value={demo ? 31337 : chain}
-              disabled={demo}
-              onChange={(e) =>
-                setChain(Number(e.target.value) as DashboardChain)
-              }
-            >
-              <option value={133}>HashKey testnet · 133</option>
-              <option value={31337}>Local Anvil · 31337</option>
-              <option value={177}>Mainnet · 177 · read-only</option>
-            </select>
-          </label>
-        </div>
-      </header>
+    <div className="shell ux-shell">
+      <Header demo={demo} onDesk={() => setDeskOpen(true)} />
       {demo && (
         <div className="banner" role="note">
           DEMO · local anvil — prices not real · offline recorded receipts
@@ -152,7 +97,9 @@ export function App({
             </div>
           }
         >
-          {route === 'desk' ? (
+          {route === 'agent' ? (
+            <AgentView chain={chain} />
+          ) : route === 'desk' ? (
             <DeskView
               demo={demo}
               chain={chain}
@@ -177,12 +124,24 @@ export function App({
                     enableOwner
                       ? (d, s) => (
                           <Suspense fallback={<p>Loading owner panel…</p>}>
-                            <OwnerPanel
+                            <MandateWizard
                               chain={chain}
                               vault={d.vault}
                               snapshot={s}
-                              proposal={proposal}
                             />
+                            <OwnerActions
+                              chain={chain}
+                              vault={d.vault}
+                              snapshot={s}
+                            />
+                            {proposal && (
+                              <OwnerPanel
+                                chain={chain}
+                                vault={d.vault}
+                                snapshot={s}
+                                proposal={proposal}
+                              />
+                            )}
                           </Suspense>
                         )
                       : undefined
@@ -196,6 +155,36 @@ export function App({
           )}
         </Suspense>
       </main>
+      {deskOpen && (
+        <div className="desk-backdrop">
+          <aside
+            className="desk-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="AI desk"
+          >
+            <button autoFocus onClick={() => setDeskOpen(false)}>
+              Close desk
+            </button>
+            <Suspense fallback={<p>Loading desk…</p>}>
+              <DeskView
+                demo={demo}
+                chain={chain}
+                onProposal={
+                  enableOwner && !demo && chain === 133
+                    ? (p) => {
+                        setProposal(p);
+                        window.location.hash = '#/mandate';
+                        setRoute('mandate');
+                        setDeskOpen(false);
+                      }
+                    : undefined
+                }
+              />
+            </Suspense>
+          </aside>
+        </div>
+      )}
       <footer>
         <span>Market evidence · mainnet 177 · read-only</span>
         <span>No proven edge. Bounded, provable execution.</span>

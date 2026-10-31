@@ -109,10 +109,32 @@ export function MandateView({
         </p>
       )}
       {resource.error && (
-        <p role="status">
-          Mandate unavailable — {resource.error}. No verified network deployment
-          is currently listed.
-        </p>
+        <div role="status" className="agent-card">
+          <h3>Not deployed on 133 yet</h3>
+          <p>
+            The vault deployment could not be loaded or verified. Follow the
+            human testnet bootstrap:
+          </p>
+          <ol>
+            <li>
+              Create separate deployer and agent testnet wallets; connect the
+              Ledger owner.
+            </li>
+            <li>Claim test HSK, wrap it and acquire test USDT.</li>
+            <li>
+              Deploy and fund on chain 133, then verify owners and deployment
+              receipts.
+            </li>
+            <li>
+              Build the mandate calldata and review it on Ledger with blind
+              signing enabled.
+            </li>
+          </ol>
+          <p>
+            See scripts/testnet-bootstrap.md. No keys or transactions are
+            handled by Codex.
+          </p>
+        </div>
       )}
       {resource.data && (
         <>
