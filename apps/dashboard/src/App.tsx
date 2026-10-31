@@ -1,3 +1,4 @@
+import { LedgerProvider } from './owner/LedgerContext.js';
 import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
 import { AgentView } from './views/Agent.js';
@@ -37,7 +38,7 @@ const routes = [
 ] as const;
 type AppRoute = Route | 'home';
 export type Route = (typeof routes)[number];
-export function App({
+function AppContent({
   initialChain = 133,
   initialRoute,
   enableOwner = import.meta.env.VITE_ENABLE_OWNER !== 'false',
@@ -224,5 +225,13 @@ export function App({
         <span>No proven edge. Bounded, provable execution.</span>
       </footer>
     </div>
+  );
+}
+
+export function App(props: React.ComponentProps<typeof AppContent>) {
+  return (
+    <LedgerProvider>
+      <AppContent {...props} />
+    </LedgerProvider>
   );
 }

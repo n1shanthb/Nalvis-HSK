@@ -1,5 +1,6 @@
 import { humanError } from '../lib/errors.js';
-import { useState } from 'react';
+import { LedgerContext } from './LedgerContext.js';
+import { useContext, useState } from 'react';
 import type { Address } from 'viem';
 import { connectLedger } from './ledger.js';
 import { clientFor, loadDeployment } from '../lib/clients.js';
@@ -20,7 +21,10 @@ export function ConnectLedger({
   readOwner?: (vault: Address) => Promise<Address>;
   onAddress?: (address?: Address) => void;
 }) {
-  const [address, setAddress] = useState<Address>();
+  const shared = useContext(LedgerContext);
+  const [localAddress, setLocalAddress] = useState<Address>();
+  const address = shared ? shared.address : localAddress;
+  const setAddress = shared ? shared.setAddress : setLocalAddress;
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   async function connect() {

@@ -1,5 +1,6 @@
 import { humanError } from '../lib/errors.js';
-import { useEffect, useState } from 'react';
+import { LedgerContext } from './LedgerContext.js';
+import { useContext, useEffect, useState } from 'react';
 import { encodeFunctionData, keccak256, type Address, type Hex } from 'viem';
 import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
 import {
@@ -109,15 +110,17 @@ export function MandateWizard({
   previewOnly?: boolean;
   onConfirmed?: () => void | Promise<void>;
 }) {
+  const shared = useContext(LedgerContext);
   const [step, setStep] = useState(0),
     [fields, setFields] = useState(() => fieldsFor(snapshot)),
     [days, setDays] = useState(7),
-    [account, setAccount] = useState<Address>();
+    [localAccount, setAccount] = useState<Address>();
   const [review, setReview] = useState<{ data: Hex; context: string }>(),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
     [hash, setHash] = useState<Hex>(),
     [confirmedBlock, setConfirmedBlock] = useState<bigint>();
+  const account = shared ? shared.address : localAccount;
   const context = JSON.stringify(
     { chain, vault, owner: snapshot.owner, mandate: snapshot.mandate },
     (_, v) => (typeof v === 'bigint' ? String(v) : v),
@@ -200,6 +203,13 @@ export function MandateWizard({
       {step === 0 && (
         <>
           <ConnectLedger vault={vault} onAddress={setAccount} />
+          {account && (
+            <p>
+              {account.toLowerCase() === snapshot.owner.toLowerCase()
+                ? 'Owner ✓'
+                : 'Not the vault owner'}
+            </p>
+          )}
           <p>Unlock Ledger and open the Ethereum app.</p>
           <button
             disabled={

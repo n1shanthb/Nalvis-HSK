@@ -25,7 +25,7 @@ export function Header({
         {demo ? 'Switch to Live' : 'Watch Demo'}
       </a>
       <button onClick={onDesk}>AI desk</button>
-      <ConnectLedger />
+      {!demo && <ConnectLedger />}
     </header>
   );
 }
