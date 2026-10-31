@@ -70,6 +70,16 @@ export const receiptSchema = z
         sizeB: z.number().positive().optional(),
         amountIn: integer.optional(),
         minOut: integer.optional(),
+        validUntil: z.number().int().nonnegative().optional(),
+        riskCheck: z
+          .object({
+            samples: z.number().int().positive(),
+            sigma: z.number().finite().nonnegative(),
+            worstCostBps: z.number().finite(),
+            accepted: z.boolean(),
+          })
+          .strict()
+          .optional(),
         ruleTrace: trace,
       })
       .strict(),
@@ -91,6 +101,7 @@ export const receiptSchema = z
           .transform((v) => v as Hex),
         minOut: integer,
         deadline: z.number().int().nonnegative(),
+        validUntil: z.number().int().nonnegative().optional(),
         nonce: integer,
       })
       .strict(),
@@ -138,6 +149,7 @@ const transactionSchema = z
   .passthrough();
 export type Transaction = z.infer<typeof transactionSchema>;
 export interface ChainReader {
+  timestamp?(block: bigint): Promise<number>;
   chainId(): Promise<number>;
   receipt(hash: Hex): Promise<unknown>;
   transaction(hash: Hex): Promise<unknown>;
@@ -199,6 +211,8 @@ export function rpcReader(url: string): ChainReader {
     transport: http(url, { retryCount: 0, timeout: 15000 }),
   });
   return {
+    timestamp: async (blockNumber) =>
+      Number((await client.getBlock({ blockNumber })).timestamp),
     chainId: () => client.getChainId(),
     receipt: (hash) => client.getTransactionReceipt({ hash }),
     transaction: (hash) => client.getTransaction({ hash }),
@@ -336,6 +350,9 @@ export async function verify(
         minOut: r.tx.minOut,
         deadline: r.tx.deadline,
         nonce: r.tx.nonce,
+        ...(r.tx.validUntil !== undefined
+          ? { validUntil: r.tx.validUntil }
+          : {}),
       },
     };
     const coreHash = receiptHash(r as unknown as ReceiptBody);
@@ -362,6 +379,18 @@ export async function verify(
       policyHash(policy) === r.policyHash &&
         mandate.policyHash === r.policyHash,
     );
+    if (
+      evidence.validUntil !== undefined ||
+      r.tx.validUntil !== undefined ||
+      r.decision.validUntil !== undefined
+    )
+      check(
+        'decision_expiry',
+        evidence.validUntil === evidence.now + (policy.decisionTtlSec ?? 120) &&
+          r.tx.validUntil === evidence.validUntil &&
+          r.decision.validUntil === evidence.validUntil &&
+          r.tx.deadline <= evidence.validUntil!,
+      );
     const replay = decide(evidence, policy, mandate, state);
     check(
       'decision_replay',
@@ -390,6 +419,15 @@ export async function verify(
     check(current, (await reader.chainId()) === r.executionChainId);
     current = 'mined_receipt';
     const mined = minedSchema.parse(await reader.receipt(txHash!));
+    if (r.tx.validUntil !== undefined) {
+      const at = reader.timestamp
+        ? await reader.timestamp(mined.blockNumber)
+        : undefined;
+      check(
+        'mined_before_expiry',
+        at !== undefined && at >= evidence.now && at <= r.tx.validUntil,
+      );
+    }
     current = 'mined_transaction';
     const tx = transactionSchema.parse(await reader.transaction(txHash!));
     check(
@@ -481,6 +519,7 @@ export async function verify(
         receiptHash?: Hex;
         prevHead?: Hex;
         deadline?: bigint;
+        validUntil?: bigint;
         nonce?: bigint;
         kind?: number;
       };
@@ -496,17 +535,22 @@ export async function verify(
           same(p.receiptHash, r.receiptHash) &&
             same(p.prevHead, r.prevHead) &&
             p.deadline === BigInt(r.tx.deadline) &&
+            (r.tx.validUntil === undefined ||
+              p.validUntil === BigInt(r.tx.validUntil)) &&
             p.nonce === r.tx.nonce &&
             p.kind === ev.kind,
         );
       else {
-        const deadline =
-          (call.args!.length > 4 ? call.args![4] : call.args![3]) as bigint;
+        const deadline = (
+          call.args!.length > 4 ? call.args![4] : call.args![3]
+        ) as bigint;
         check(
           'calldata_commitment',
           same(call.args![0], r.receiptHash) &&
             same(call.args![1], r.prevHead) &&
             deadline === BigInt(r.tx.deadline) &&
+            (r.tx.validUntil === undefined ||
+              call.args![3] === BigInt(r.tx.validUntil)) &&
             ev.kind === 0,
         );
       }

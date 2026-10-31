@@ -34,6 +34,15 @@ export const evidenceSchema = z
     blockNumber: z.bigint().nonnegative(),
     executionBlockNumber: z.bigint().nonnegative(),
     now: time,
+    validUntil: time.optional(),
+    riskInput: z
+      .object({
+        sigma: z.number().finite().nonnegative().max(1),
+        observations: z.number().int().min(2),
+        historyHash: z.string().regex(/^0x[0-9a-f]{64}$/),
+      })
+      .strict()
+      .optional(),
     decimalsA: z.number().int().min(0).max(36),
     decimalsB: z.number().int().min(0).max(36),
     dexMid: positive.optional(),
@@ -74,6 +83,13 @@ export type Decision = {
   sizeB?: number;
   amountIn?: bigint;
   minOut?: bigint;
+  validUntil?: number;
+  riskCheck?: {
+    samples: number;
+    sigma: number;
+    worstCostBps: number;
+    accepted: boolean;
+  };
   ruleTrace: RuleTrace;
 };
 export const engineStateSchema = z

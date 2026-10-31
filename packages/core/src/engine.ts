@@ -1,3 +1,4 @@
+import { riskCheck } from './risk.js';
 import {
   evidenceSchema,
   engineStateSchema,
@@ -22,10 +23,18 @@ export function decide(
   state: EngineState,
 ): Decision {
   const ruleTrace: RuleTrace = [];
+  let lastRisk: Decision['riskCheck'];
   const trace = (rule: string, pass: boolean, detail: string) => {
     ruleTrace.push({ rule, pass, detail });
   };
-  const finish = (kind: Decision['kind']): Decision => ({ kind, ruleTrace });
+  const finish = (kind: Decision['kind']): Decision => ({
+    kind,
+    ruleTrace,
+    ...(lastRisk ? { riskCheck: lastRisk } : {}),
+    ...(evidence.validUntil !== undefined
+      ? { validUntil: evidence.validUntil }
+      : {}),
+  });
   const ep = evidenceSchema.safeParse(evidence),
     pp = policySchema.safeParse(policy),
     mp = mandateSchema.safeParse(mandate),
@@ -37,6 +46,21 @@ export function decide(
   const e = ep.data,
     p = pp.data,
     m = mp.data;
+  if (
+    e.validUntil !== undefined &&
+    e.validUntil !== e.now + (p.decisionTtlSec ?? 120)
+  ) {
+    trace('decision_expiry', false, 'Evidence expiry differs from policy');
+    return finish('REJECT');
+  }
+  if (e.validUntil !== undefined && !e.riskInput) {
+    trace(
+      'risk_input',
+      false,
+      'Historical volatility is required for new decisions',
+    );
+    return finish('REJECT');
+  }
   const failure = quality(e, p);
   trace('data_quality', !failure, failure);
   if (failure) return finish('REJECT');
@@ -127,8 +151,21 @@ export function decide(
       basis,
     );
     trace('size', valid, `${sizeB}: cost=${cost}`);
-    if (valid)
+    const risk =
+      valid && e.riskInput
+        ? riskCheck(e, quote, preset.edgeBufferBps)
+        : undefined;
+    if (risk) lastRisk = risk;
+    if (risk)
+      trace(
+        'monte_carlo',
+        risk.accepted,
+        `${sizeB}: 256 bounded price stresses; worst cost ${risk.worstCostBps.toFixed(4)} bps`,
+      );
+    if (valid && (!risk || risk.accepted))
       return {
+        ...(e.validUntil !== undefined ? { validUntil: e.validUntil } : {}),
+        ...(risk ? { riskCheck: risk } : {}),
         kind: i === 0 ? 'TRADE' : 'RESIZE',
         direction,
         sizeB,
@@ -136,6 +173,14 @@ export function decide(
         minOut,
         ruleTrace,
       };
+  }
+  if (ruleTrace.some((t) => t.rule === 'monte_carlo' && !t.pass)) {
+    trace(
+      'risk_reject',
+      false,
+      'No smaller grid size survives historical sigma stress',
+    );
+    return finish('REJECT');
   }
   trace('edge_or_caps', false, 'No valid grid size');
   return finish('WAIT');

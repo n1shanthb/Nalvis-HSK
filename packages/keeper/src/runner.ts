@@ -7,6 +7,7 @@ import {
   open,
   unlink,
 } from 'node:fs/promises';
+import { hash } from '../../core/src/canonical.js';
 import { join } from 'node:path';
 import { zeroHash, type Address, type Hex } from 'viem';
 import {
@@ -24,7 +25,7 @@ import {
   type PresetChooser,
   type ReceiptBody,
 } from '../../core/src/index.js';
-import type { Options } from './config.js';
+import { repositoryRoot, type Options } from './config.js';
 
 export type Snapshot = {
   blockNumber?: bigint;
@@ -133,6 +134,21 @@ export async function tick(
   // Run even for holds: a revoked agent must not submit anything.
   await execution.check(snapshot);
   const evidence = await execution.collect(snapshot);
+  evidence.validUntil = evidence.now + (policy.decisionTtlSec ?? 120);
+  const history = JSON.parse(
+    await readFile(
+      join(repositoryRoot(), 'data/research/market_history.json'),
+      'utf8',
+    ),
+  );
+  const sigma = Number(history.summary.cex_hourly_logret_pct.stdev) / 100;
+  if (!Number.isFinite(sigma) || sigma < 0 || sigma > 1)
+    throw new Error('Invalid historical volatility');
+  evidence.riskInput = {
+    sigma,
+    observations: history.summary.hours_in_window - 1,
+    historyHash: hash(history),
+  };
   evidence.sources.keeperState = {
     address: execution.contract,
     method: 'execution-state',
@@ -229,7 +245,8 @@ export async function tick(
       to: execution.contract,
       data: '0x',
       minOut,
-      deadline: snapshot.now + 120,
+      deadline: Math.min(snapshot.now + 120, evidence.validUntil),
+      validUntil: evidence.validUntil,
       nonce: snapshot.nonce,
     },
   });
@@ -239,6 +256,12 @@ export async function tick(
   if (options.exec !== 'dry') {
     // This intent is durable before any signature/broadcast. Uncertain sends never auto-retry.
     await execution.check(snapshot);
+    const fresh = await execution.snapshot();
+    if (
+      fresh.now > evidence.validUntil ||
+      Math.floor(Date.now() / 1000) > evidence.validUntil
+    )
+      throw new Error('Stale decision dropped before signing');
     const pending = join(directory, '.pending.json');
     await saveJSON(pending, {
       contract: execution.contract,

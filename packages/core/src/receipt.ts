@@ -21,6 +21,7 @@ export type ReceiptInput = {
     data: Hex;
     minOut: bigint;
     deadline: number;
+    validUntil?: number;
     nonce: bigint;
   };
 };
@@ -93,6 +94,7 @@ export function receiptHash(receipt: ReceiptBody) {
       minOut: tx.minOut,
       deadline: tx.deadline,
       nonce: tx.nonce,
+      ...(tx.validUntil !== undefined ? { validUntil: tx.validUntil } : {}),
     },
   });
 }
