@@ -230,7 +230,7 @@ export async function fitToMandate(args: {
       action = reply.revisedAction!;
       const q = await args.quote(action, s);
       const c = check(action, s, q);
-      if (c.ok && action.type !== 'HOLD')
+      if (c.ok && action.type !== 'HOLD' && action.type === args.action.type)
         return finish({
           outcome: 'fits',
           rounds: round,

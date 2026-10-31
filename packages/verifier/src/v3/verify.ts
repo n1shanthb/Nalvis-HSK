@@ -346,10 +346,8 @@ export async function verifyV3(
         require('v3_revised_action', equal(reply.revisedAction, finalAction));
     }
     if (r.final.direction !== 'HOLD' && r.final.direction !== r.intent.type)
-      require('v3_direction_acceptance', (r.fit.acceptedDirectionChange &&
-        (acceptedReply as { decision?: string })?.decision === 'accept') ||
-        (r.fit.acceptedDirectionChange &&
-          (acceptedReply as { decision?: string })?.decision === 'revise'));
+      require('v3_direction_acceptance', r.fit.acceptedDirectionChange &&
+        (acceptedReply as { decision?: string })?.decision === 'accept');
     const txHash = options.txHash ?? r.settlement?.transactionHash;
     require('v3_settlement', !!txHash);
     const mined = z

@@ -727,6 +727,12 @@ export async function createAgent({
           );
           return;
         }
+        if (runtime.state === 'BUDGET_PAUSED' || runtime.state === 'OFFLINE')
+          await state(
+            config.mode === 'rules-demo' ? 'DEMO' : 'ONLINE',
+            'Model configured and budget window available',
+            now,
+          );
         if (fired.length) return wakeInternal(fired, now);
       }),
   };
