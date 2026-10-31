@@ -251,16 +251,34 @@ export function MandateWizard({
                 type="range"
                 aria-label={label}
                 min={min}
-                max={max}
+                max={
+                  key === 'maxSlippageBps'
+                    ? 100
+                    : Math.max(max, Number(fieldsFor(snapshot)[key]) / scale)
+                }
                 step={increment}
                 value={Number(fields[key]) / scale}
                 onChange={(e) =>
                   setFields({
                     ...fields,
-                    [key]: String(
-                      Math.round(
-                        Math.max(min, Math.min(max, Number(e.target.value))) *
-                          scale,
+                    [key]: (
+                      Math.max(
+                        min,
+                        Math.min(
+                          key === 'maxSlippageBps'
+                            ? 100
+                            : Math.max(
+                                max,
+                                Number(fieldsFor(snapshot)[key]) / scale,
+                              ),
+                          Number(e.target.value),
+                        ),
+                      ) * scale
+                    ).toFixed(
+                      Math.max(
+                        0,
+                        (String(increment).split('.')[1]?.length ?? 0) -
+                          Math.log10(scale),
                       ),
                     ),
                   })

@@ -199,3 +199,48 @@ test('Agent uses demo fixtures only under explicit query flag', async () => {
   );
   expect(screen.queryByText(/Agent wanted 200 USDT BUY/)).toBeNull();
 });
+
+test('WHSK slider preserves 0.5 and UI preset calldata matches the existing form builder', () => {
+  vi.useFakeTimers();
+  try {
+    render(
+      <MandateWizard
+        chain={133}
+        vault={vault}
+        snapshot={snapshot}
+        previewOnly
+      />,
+    );
+    fireEvent.click(screen.getByText('Choose a preset'));
+    fireEvent.click(screen.getByRole('button', { name: /Balanced/ }));
+    fireEvent.change(screen.getByRole('slider', { name: 'WHSK per trade' }), {
+      target: { value: '0.5' },
+    });
+    fireEvent.click(screen.getByText('Compare current and proposed'));
+    fireEvent.click(screen.getByText('Build Ledger review'));
+    const data = screen
+      .getByText('Exact mandate calldata')
+      .parentElement!.querySelector('code')!.textContent;
+    const fields = {
+      ...fieldsFor(snapshot),
+      maxTradeInA: '0.5',
+      maxTradeInB: '100',
+      maxDailyInB: '500',
+      maxExposureBps: '8000',
+      maxSlippageBps: '50',
+      maxDrawdownBps: '2000',
+      minIntervalSec: '300',
+      expiry: String(Math.floor(Date.now() / 1000) + 7 * 86400),
+    };
+    expect(data).toBe(
+      encodeFunctionData({
+        abi: vaultAbi,
+        functionName: 'setMandate',
+        args: [validateMandate(fields, snapshot)],
+      }),
+    );
+    expect(validateMandate(fields, snapshot).maxTradeInA).toBe(5n * 10n ** 17n);
+  } finally {
+    vi.useRealTimers();
+  }
+});
