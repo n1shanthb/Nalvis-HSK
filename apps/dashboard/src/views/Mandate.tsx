@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
 import { addresses } from '../../../../packages/core/src/addresses.js';
 import {
+  DeploymentError,
   loadDeployment,
   readVault,
   explorerLink,
@@ -109,33 +110,43 @@ export function MandateView({
         </p>
       )}
       {resource.error && (
-        <div role="status" className="agent-card">
-          <h3>Not deployed on 133 yet</h3>
-          <p>
-            The vault deployment could not be loaded or verified. Follow the
-            human testnet bootstrap:
-          </p>
-          <ol>
-            <li>
-              Create separate deployer and agent testnet wallets; connect the
-              Ledger owner.
-            </li>
-            <li>Claim test HSK, wrap it and acquire test USDT.</li>
-            <li>
-              Deploy and fund on chain 133, then verify owners and deployment
-              receipts.
-            </li>
-            <li>
-              Build the mandate calldata and review it on Ledger with blind
-              signing enabled.
-            </li>
-          </ol>
-          <p>
-            See scripts/testnet-bootstrap.md. No keys or transactions are
-            handled by Codex.
-          </p>
-        </div>
+        <p role="status">
+          {resource.data ? 'Data stale, retrying. ' : ''}
+          {resource.cause instanceof DeploymentError
+            ? resource.cause.message
+            : 'RPC unavailable, retrying'}
+        </p>
       )}
+      {!resource.data &&
+        resource.cause instanceof DeploymentError &&
+        resource.cause.kind === 'missing' && (
+          <div role="status" className="agent-card">
+            <h3>Not deployed on 133 yet</h3>
+            <p>
+              The vault deployment could not be loaded or verified. Follow the
+              human testnet bootstrap:
+            </p>
+            <ol>
+              <li>
+                Create separate deployer and agent testnet wallets; connect the
+                Ledger owner.
+              </li>
+              <li>Claim test HSK, wrap it and acquire test USDT.</li>
+              <li>
+                Deploy and fund on chain 133, then verify owners and deployment
+                receipts.
+              </li>
+              <li>
+                Build the mandate calldata and review it on Ledger with blind
+                signing enabled.
+              </li>
+            </ol>
+            <p>
+              See scripts/testnet-bootstrap.md. No keys or transactions are
+              handled by Codex.
+            </p>
+          </div>
+        )}
       {resource.data && (
         <>
           <h3>deployments/{chain}.json</h3>

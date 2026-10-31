@@ -58,8 +58,19 @@ const deploymentSchema = z.object({
   commit: z.string().regex(/^[0-9a-f]{40}$/),
 });
 export type Deployment = z.infer<typeof deploymentSchema>;
+export class DeploymentError extends Error {
+  constructor(public readonly kind: 'missing' | 'unverified') {
+    super(
+      kind === 'missing'
+        ? 'Not deployed on 133 yet'
+        : 'Deployment not verified against docs/ADDRESSES.md',
+    );
+  }
+}
 export async function readJSON(path: string): Promise<unknown> {
   const response = await fetch(path, { signal: AbortSignal.timeout(15000) });
+  if (response.status === 404 && path === '/deployments/133.json')
+    throw new DeploymentError('missing');
   if (
     !response.ok ||
     !(response.headers.get('content-type') ?? '').includes('json')
@@ -74,17 +85,16 @@ export async function readJSON(path: string): Promise<unknown> {
 export async function loadDeployment(
   chain: DashboardChain,
 ): Promise<Deployment> {
-  const deployment = deploymentSchema.parse(
-    await readJSON(`/deployments/${chain}.json`),
-  );
+  const raw = await readJSON(`/deployments/${chain}.json`);
+  const parsed = deploymentSchema.safeParse(raw);
+  if (!parsed.success) throw new DeploymentError('unverified');
+  const deployment = parsed.data;
   const documented = new Set(
     (addressBook.match(/0x[0-9a-fA-F]{40}/g) ?? []).map((v) => v.toLowerCase()),
   );
   for (const contract of [deployment.vault, deployment.router]) {
     if (!documented.has(contract.toLowerCase()))
-      throw Error(
-        'UNVERIFIED deployment: add a verified entry to docs/ADDRESSES.md first',
-      );
+      throw new DeploymentError('unverified');
   }
   return deployment;
 }
