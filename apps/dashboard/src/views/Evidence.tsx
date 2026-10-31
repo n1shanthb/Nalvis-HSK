@@ -1,3 +1,4 @@
+import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
 import { MarketChart } from './MarketChart.js';
 import type { Evidence } from '../../../../packages/core/src/types.js';
 import { useCallback, useEffect, useState } from 'react';
@@ -22,6 +23,14 @@ export const evidenceFetcher: typeof fetch = (input, init) => {
       url = '/cex/mexc/api/v3/ticker/bookTicker?symbol=HSKUSDT';
     if (url === endpoints.gate)
       url = '/cex/gate/api/v4/spot/tickers?currency_pair=HSK_USDT';
+  }
+  if (import.meta.env.PROD && (url === endpoints.mexc || url === endpoints.gate)) {
+    const venue = url === endpoints.mexc ? 'mexc' : 'gate';
+    return fetch(`/api/market?venue=${venue}`, init).then(async (response) => {
+      if (!response.ok) return response;
+      const body = await response.json();
+      return Response.json(body[venue]);
+    });
   }
   return fetch(url, init);
 };
@@ -165,6 +174,7 @@ export function EvidenceView() {
       {resource.error && (
         <p role="status">Evidence unavailable — {resource.error}</p>
       )}
+      <CoinGeckoReference />
       <MarketChart points={history} />
       {resource.data && <EvidenceDetails e={resource.data} />}
     </section>
