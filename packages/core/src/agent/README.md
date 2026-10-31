@@ -14,7 +14,10 @@ Import the server library from `agent/index.js`. Construct a `Provider` with
 `openRouter(env, fetch, optionalPerModelRates)`, a `Store` with
 `jsonFileStore(root)`, and `createAgent({provider,store,clients,config})`.
 `configFromEnv(exactPolicyFileBytes)` parses the documented environment variables.
-No model identifiers are hardcoded. A missing OpenRouter key or strategist model
+Model identifiers are selected through configuration. The strategist and fitter
+use only `AGENT_OPENROUTER_API_KEY`, never the desk's `OPENROUTER_API_KEY`. The
+agent does not read or change `DESK_AI_ENABLED`; the example configuration keeps
+desk AI disabled until its separate rate-limit and spend-cap work lands. A missing dedicated agent key or strategist model
 makes the agent OFFLINE: it continues polling cheap evidence and never calls a
 model, sends a transaction, or falls back to rules. Offline state is recorded at
 most once per hour. Only explicitly selecting `AGENT_MODE=rules-demo` enables

@@ -50,7 +50,7 @@ it('OpenRouter uses JSON mode, configured model, headers and actual returned mod
   );
   const provider = openRouter(
     {
-      OPENROUTER_API_KEY: 'test-only-placeholder',
+      AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
       STRATEGIST_MODEL: 'configured',
       OPENROUTER_APP_URL: 'https://example.org',
       OPENROUTER_APP_NAME: 'test',
@@ -99,7 +99,7 @@ it('retries once on 429, 5xx and timeout, never exposes provider errors', async 
       });
     });
     await openRouter(
-      { OPENROUTER_API_KEY: 'placeholder', STRATEGIST_MODEL: 'm' },
+      { AGENT_OPENROUTER_API_KEY: 'placeholder', STRATEGIST_MODEL: 'm' },
       send,
     ).complete({ role: 'fitter', system: '', input: '' });
     expect(calls).toBe(2);
@@ -526,7 +526,10 @@ it('configured model estimates, including 288 typical calls/day, remain below $1
     ['unknown-model', defaultTokenRates] as const,
   ]) {
     const provider = openRouter(
-      { OPENROUTER_API_KEY: 'test-only-placeholder', STRATEGIST_MODEL: model },
+      {
+        AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
+        STRATEGIST_MODEL: model,
+      },
       async () =>
         Response.json({
           model,
@@ -561,7 +564,10 @@ it.each([undefined, 0, 0.123])(
     const model = Object.keys(modelRates)[0],
       journal = await createJournal(memoryStore());
     const provider = openRouter(
-      { OPENROUTER_API_KEY: 'test-only-placeholder', STRATEGIST_MODEL: model },
+      {
+        AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
+        STRATEGIST_MODEL: model,
+      },
       async () =>
         Response.json({
           model,
@@ -592,7 +598,7 @@ it.each([undefined, 0, 0.123])(
 it('missing token usage has a labelled byte-based estimate rather than a flat $1', async () => {
   const provider = openRouter(
     {
-      OPENROUTER_API_KEY: 'test-only-placeholder',
+      AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
       STRATEGIST_MODEL: 'unknown',
     },
     async () =>
@@ -610,4 +616,61 @@ it('missing token usage has a labelled byte-based estimate rather than a flat $1
   expect(call.costEstimate?.tokenSource).toBe('usage-and-byte-estimate');
   expect(call.costUsdEst).toBeGreaterThan(0);
   expect(call.costUsdEst).toBeLessThan(0.01);
+});
+
+it('a desk-only key leaves the agent OFFLINE without model calls or sends', async () => {
+  const h = await harness([]),
+    send = vi.fn<typeof fetch>();
+  const provider = openRouter(
+    {
+      OPENROUTER_API_KEY: 'test-desk-placeholder',
+      STRATEGIST_MODEL: 'mock',
+      DESK_AI_ENABLED: 'true',
+    },
+    send,
+  );
+  expect(provider.isConfigured()).toBe(false);
+  await expect(
+    provider.complete({ role: 'strategist', system: '', input: '{}' }),
+  ).rejects.toThrow('offline');
+  const agent = await createAgent({
+    provider,
+    store: h.store,
+    clients: h.clients,
+    config: h.config,
+  });
+  await agent.tick(100000);
+  await agent.tick(104000);
+  expect(agent.mode).toBe('offline');
+  expect(send).not.toHaveBeenCalled();
+  expect(h.send).not.toHaveBeenCalled();
+});
+it('agent requests use only their dedicated key and never enable desk AI', async () => {
+  const env = {
+    AGENT_OPENROUTER_API_KEY: 'test-agent-placeholder',
+    OPENROUTER_API_KEY: 'test-desk-placeholder',
+    STRATEGIST_MODEL: 'mock',
+    DESK_AI_ENABLED: 'false',
+  };
+  const send = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      model: 'mock',
+      choices: [{ message: { content: '{}' } }],
+      usage: { cost: 0.01 },
+    }),
+  );
+  const provider = openRouter(env, send);
+  expect(provider.isConfigured()).toBe(true);
+  for (const role of ['strategist', 'fitter'] as const)
+    await provider.complete({ role, system: '', input: '{}' });
+  for (const [, init] of send.mock.calls)
+    expect(new Headers(init?.headers).get('Authorization')).toBe(
+      'Bearer test-agent-placeholder',
+    );
+  expect(env.DESK_AI_ENABLED).toBe('false');
+  const example = await import('node:fs/promises').then((fs) =>
+    fs.readFile(new URL('../../../../.env.example', import.meta.url), 'utf8'),
+  );
+  expect(example).toMatch(/^DESK_AI_ENABLED=false$/m);
+  expect(example).toMatch(/^AGENT_OPENROUTER_API_KEY=$/m);
 });

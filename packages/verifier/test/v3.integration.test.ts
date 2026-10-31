@@ -63,7 +63,7 @@ it.skipIf(!hasAnvil)(
       ];
       const provider = openRouter(
         {
-          OPENROUTER_API_KEY: 'test-only-placeholder',
+          AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
           STRATEGIST_MODEL: 'mock',
           FITTER_MODEL: 'mock',
         },

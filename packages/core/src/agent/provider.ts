@@ -63,7 +63,9 @@ export function openRouter(
       fitter: env.FITTER_MODEL ?? env.STRATEGIST_MODEL ?? '',
     },
     isConfigured: () =>
-      Boolean(env.OPENROUTER_API_KEY?.trim() && env.STRATEGIST_MODEL?.trim()),
+      Boolean(
+        env.AGENT_OPENROUTER_API_KEY?.trim() && env.STRATEGIST_MODEL?.trim(),
+      ),
     async complete(request) {
       if (!this.isConfigured())
         throw new Error('Agent offline: OpenRouter key/model missing');
@@ -80,7 +82,7 @@ export function openRouter(
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+                Authorization: `Bearer ${env.AGENT_OPENROUTER_API_KEY}`,
                 ...(env.OPENROUTER_APP_URL
                   ? { 'HTTP-Referer': env.OPENROUTER_APP_URL }
                   : {}),
