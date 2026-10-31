@@ -67,14 +67,17 @@ it('OpenRouter uses JSON mode, configured model, headers and actual returned mod
   expect((send.mock.calls as unknown as [string, RequestInit][])[0][0]).toBe(
     'https://openrouter.ai/api/v1/chat/completions',
   );
-  const body = JSON.parse(
-    String((send.mock.calls as unknown as [string, RequestInit][])[0][1].body),
-  );
-  expect(body).toMatchObject({
-    model: 'configured',
-    temperature: 0,
-    response_format: { type: 'json_object' },
-  });
+  await provider.complete({ role: 'fitter', system: 'system', input: '{}' });
+  for (const [, request] of send.mock.calls) {
+    const body = JSON.parse(String(request?.body));
+    expect(body).toMatchObject({
+      model: 'configured',
+      temperature: 0,
+      response_format: { type: 'json_object' },
+      provider: { require_parameters: true },
+      reasoning: { effort: 'low', exclude: true },
+    });
+  }
 });
 it('retries once on 429, 5xx and timeout, never exposes provider errors', async () => {
   for (const first of [429, 503, 'timeout']) {

@@ -79,6 +79,8 @@ export function openRouter(
                 ],
                 temperature: 0,
                 response_format: { type: 'json_object' },
+                provider: { require_parameters: true },
+                reasoning: { effort: 'low', exclude: true },
               }),
               signal: AbortSignal.timeout(20000),
             },
