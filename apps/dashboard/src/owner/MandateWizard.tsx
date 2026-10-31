@@ -1,3 +1,4 @@
+import { humanError } from '../lib/errors.js';
 import { useEffect, useState } from 'react';
 import { encodeFunctionData, keccak256, type Address, type Hex } from 'viem';
 import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
@@ -138,7 +139,7 @@ export function MandateWizard({
       setReview({ data: wizardCalldata(fields, snapshot), context });
       setStep(4);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Review the mandate values.');
+      setMessage(humanError(e));
     }
   }
   async function sign() {
@@ -167,9 +168,7 @@ export function MandateWizard({
       setStep(5);
       setMessage('Mandate confirmed');
     } catch (e) {
-      setMessage(
-        e instanceof Error ? e.message : 'Ledger signing failed. Please retry.',
-      );
+      setMessage(humanError(e));
     } finally {
       setBusy(false);
     }

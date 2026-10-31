@@ -1,3 +1,4 @@
+import { humanError } from '../lib/errors.js';
 import { useState } from 'react';
 import type { Address } from 'viem';
 import { connectLedger } from './ledger.js';
@@ -49,11 +50,7 @@ export function ConnectLedger({
         );
       }
     } catch (e) {
-      setMessage(
-        e instanceof Error
-          ? e.message
-          : 'Could not connect to Ledger. Unlock it and open the Ethereum app.',
-      );
+      setMessage(humanError(e));
     } finally {
       setBusy(false);
     }

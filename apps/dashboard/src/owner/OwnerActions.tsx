@@ -1,3 +1,4 @@
+import { humanError } from '../lib/errors.js';
 import { useState } from 'react';
 import {
   encodeFunctionData,
@@ -99,7 +100,7 @@ export function OwnerActions({
       );
       setReview({ data, action, context });
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Could not build review');
+      setMessage(humanError(e));
     }
   }
   async function sign() {
@@ -127,9 +128,7 @@ export function OwnerActions({
           : 'Transaction reverted; refresh vault state and review again.',
       );
     } catch (e) {
-      setMessage(
-        e instanceof Error ? e.message : 'Ledger action failed. Please retry.',
-      );
+      setMessage(humanError(e));
     } finally {
       setBusy(false);
     }
