@@ -230,18 +230,6 @@ export async function createAgent({
       );
       return;
     }
-    if (s.mandate.policyHash !== local) {
-      await state(
-        'NEEDS_OWNER',
-        'On-chain policyHash differs from exact local policy bytes',
-        now,
-      );
-      return;
-    }
-    if (needsOwner(s)) {
-      await state('NEEDS_OWNER', 'Mandate paused/revoked/expired', now);
-      return;
-    }
     const common = {
       provider,
       journal,
@@ -352,6 +340,19 @@ export async function createAgent({
           await journal.append('WATCH_CHANGE', { ...event, request }, now);
       }
       await save();
+    }
+    // The strategist may think and manage watches even when execution needs the owner.
+    if (s.mandate.policyHash !== local) {
+      await state(
+        'NEEDS_OWNER',
+        'On-chain policyHash differs from exact local policy bytes',
+        now,
+      );
+      return;
+    }
+    if (needsOwner(s)) {
+      await state('NEEDS_OWNER', 'Mandate paused/revoked/expired', now);
+      return;
     }
     const intent = output?.action ?? empty;
     let action = intent;

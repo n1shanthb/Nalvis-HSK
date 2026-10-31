@@ -487,3 +487,23 @@ it('a provider outside the signed strategy cannot call a model or execute', asyn
   expect(h.send).not.toHaveBeenCalled();
   expect(h.agent.journal.entries.at(-1)?.data.state).toBe('NEEDS_OWNER');
 });
+
+it('a paused mandate does not gate strategist thinking or watch management', async () => {
+  const answer = output();
+  answer.watches.create.push(draft('pause-research'));
+  const h = await harness([answer]);
+  h.s.paused = true;
+  await h.agent.tick(100000);
+  await h.agent.tick(104000);
+  expect(h.provider.calls).toHaveLength(1);
+  expect(h.send).not.toHaveBeenCalled();
+  expect(
+    h.agent.journal.entries.some(
+      (e) =>
+        e.type === 'WATCH_CHANGE' &&
+        e.data.watchId === 'pause-research' &&
+        e.data.accepted,
+    ),
+  ).toBe(true);
+  expect(h.agent.journal.entries.at(-1)?.data.state).toBe('NEEDS_OWNER');
+});
