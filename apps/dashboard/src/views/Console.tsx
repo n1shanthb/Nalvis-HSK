@@ -22,8 +22,8 @@ export function DemoConsole({ route }: { route: Route }) {
               : 'Decision timeline'}
       </h2>
       <p>
-        Four recorded fork receipts. Offline RPC replay. Local anvil — prices
-        not real. Captured {displayTime(demoEvidence[0].now)}.
+        {demoReceipts.length} recorded fork receipts. Offline RPC replay. Local
+        anvil — prices not real. Captured {displayTime(demoEvidence[0].now)}.
       </p>
       {resource.loading && (
         <div className="skeleton" role="status">
@@ -59,7 +59,7 @@ export function DemoConsole({ route }: { route: Route }) {
               <strong>
                 {resource.data?.results.filter((r) => r.status === 'PASS')
                   .length ?? '—'}{' '}
-                / 4
+                / {demoReceipts.length}
               </strong>
               <small>TRADE · WAIT · RESIZE · REJECT</small>
             </article>
@@ -93,7 +93,12 @@ export function DemoConsole({ route }: { route: Route }) {
                 </article>
                 <article>
                   <span>Mandate expiry</span>
-                  <strong>Expired</strong>
+                  <strong>
+                    {resource.data.mandate.expiry <=
+                    Math.floor(Date.now() / 1000)
+                      ? 'Expired'
+                      : `${resource.data.mandate.expiry - Math.floor(Date.now() / 1000)}s remaining`}
+                  </strong>
                   <small>
                     {displayTime(resource.data.mandate.expiry)} · historical
                     recording
@@ -146,8 +151,9 @@ export function DemoConsole({ route }: { route: Route }) {
           ))}
         </details>
         <p>
-          Legacy recording: expiry and Monte Carlo fields were not captured. New
-          keeper decisions include both.
+          {r.version === 1
+            ? 'Legacy recording: expiry and risk fields were not captured.'
+            : `T8 v2: valid until ${displayTime(r.tx.validUntil!)}. ±σ worst-case stress uses frozen Oct 27 volatility.`}
         </p>
       </article>
       {route === 'verify' && resource.data && (

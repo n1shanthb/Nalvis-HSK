@@ -11,9 +11,9 @@ import {
 } from '../../../../packages/verifier/src/verify.js';
 import { recordedReader } from '../../../../packages/verifier/src/recorded.js';
 import { pnl } from '../../../../packages/verifier/src/pnl.js';
-import recording from '../../../../packages/verifier/test/fixtures/chain.json';
+import recording from '../../../../packages/verifier/test/fixtures/t8/chain.json';
 const files = import.meta.glob(
-  '../../../../packages/verifier/test/fixtures/receipts/*.json',
+  '../../../../packages/verifier/test/fixtures/t8/receipts/*.json',
   { eager: true, import: 'default' },
 );
 export const demoReceipts = Object.values(files)
@@ -26,7 +26,7 @@ export async function demoContext() {
   const results = await Promise.all(
     demoReceipts.map((r) => verify(r, recordedReader(recording))),
   );
-  const raw = demoEvidence[0].sources.replay.raw as {
+  const raw = demoEvidence.at(-1)!.sources.replay.raw as {
     policy: unknown;
     mandate: Record<string, unknown>;
   };
@@ -39,16 +39,21 @@ export async function demoContext() {
       ]),
     ),
   });
+  const latestPriced = [...demoEvidence]
+    .reverse()
+    .find((e) => e.dexMid && e.cex.length === 2);
   return {
+    evidenceLabel: 'Recorded local Anvil snapshot; not a live quote',
+    paused: false,
     agent: getAddress(
       recording.transactions.find(
-        (t) => t.hash === demoReceipts[0].settlement?.transactionHash,
+        (t) => t.hash === demoReceipts.at(-1)!.settlement?.transactionHash,
       )!.from,
     ),
     results,
     portfolio: pnl(results),
     receipts: demoReceipts,
-    evidence: demoEvidence[0],
+    evidence: latestPriced ?? demoEvidence[0],
     policy: policySchema.parse(raw.policy),
     mandate,
   };

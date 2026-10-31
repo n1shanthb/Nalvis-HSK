@@ -1,3 +1,4 @@
+import type { OwnerProposal } from '../../../packages/core/src/desk/proposal.js';
 import { lazy, Suspense, useEffect, useState } from 'react';
 const MandateView = lazy(() =>
   import('./views/Mandate.js').then((m) => ({ default: m.MandateView })),
@@ -35,6 +36,7 @@ export function App({
     import.meta.env.VITE_DEMO_MODE === 'true' ||
       new URLSearchParams(window.location.search).get('demo') === '1',
   );
+  const [proposal, setProposal] = useState<OwnerProposal>();
   const [chain, setChain] = useState<DashboardChain>(initialChain);
   const readRoute = () =>
     routes.find((r) => `#/${r}` === window.location.hash) ?? 'mandate';
@@ -139,7 +141,19 @@ export function App({
           }
         >
           {route === 'desk' ? (
-            <DeskView demo={demo} chain={chain} />
+            <DeskView
+              demo={demo}
+              chain={chain}
+              onProposal={
+                enableOwner && !demo && chain === 133
+                  ? (p) => {
+                      setProposal(p);
+                      window.location.hash = '#/mandate';
+                      setRoute('mandate');
+                    }
+                  : undefined
+              }
+            />
           ) : demo ? (
             <DemoConsole route={route} />
           ) : (
@@ -155,6 +169,7 @@ export function App({
                               chain={chain}
                               vault={d.vault}
                               snapshot={s}
+                              proposal={proposal}
                             />
                           </Suspense>
                         )

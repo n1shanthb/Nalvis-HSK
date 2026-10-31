@@ -1,4 +1,9 @@
 import {
+  assertProposal,
+  type OwnerProposal,
+  type SignedMandate,
+} from '../../../../packages/core/src/desk/proposal.js';
+import {
   DeviceActionStatus,
   DeviceManagementKitBuilder,
   type DeviceActionState,
@@ -150,6 +155,7 @@ export async function sendOwnerAction({
   data,
   signer,
   client = clientFor(133),
+  proposal,
 }: {
   chainId: number;
   vault: Address;
@@ -157,13 +163,15 @@ export async function sendOwnerAction({
   data: Hex;
   signer: OwnerSigner;
   client?: ReturnType<typeof clientFor>;
+  proposal?: OwnerProposal;
 }) {
   try {
     assertOwnerChain(chainId);
     const action = decodeFunctionData({ abi: vaultAbi, data });
     if (
       action.functionName !== 'setMandate' &&
-      action.functionName !== 'revoke'
+      action.functionName !== 'revoke' &&
+      action.functionName !== 'pause'
     )
       throw Error('Unsupported owner action');
     assertOwnerChain(await client.getChainId());
@@ -194,6 +202,56 @@ export async function sendOwnerAction({
       value: 0n,
     };
     assertOwnerChain(await client.getChainId());
+    async function checkLiveProposal() {
+      if (proposal) {
+        if (
+          proposal.target?.chainId !== chainId ||
+          proposal.target.vault.toLowerCase() !== vault.toLowerCase()
+        )
+          throw Error('Desk proposal target mismatch');
+        const blockNumber = await client.getBlockNumber();
+        const [m, paused] = await Promise.all([
+          client.readContract({
+            address: vault,
+            abi: vaultAbi,
+            functionName: 'mandate',
+            blockNumber,
+          }),
+          client.readContract({
+            address: vault,
+            abi: vaultAbi,
+            functionName: 'paused',
+            blockNumber,
+          }),
+        ]);
+        const [
+          agent,
+          expiry,
+          maxTradeInA,
+          maxTradeInB,
+          maxDailyInB,
+          maxExposureBps,
+          maxSlippageBps,
+          maxDrawdownBps,
+          minIntervalSec,
+          policyHash,
+        ] = m;
+        const signed: SignedMandate = {
+          agent,
+          expiry,
+          maxTradeInA,
+          maxTradeInB,
+          maxDailyInB,
+          maxExposureBps,
+          maxSlippageBps,
+          maxDrawdownBps,
+          minIntervalSec,
+          policyHash,
+        };
+        assertProposal(proposal, signed, paused, data);
+      }
+    }
+    await checkLiveProposal();
     const signature = await signer.signTransaction(
       serializeTransaction(tx),
       chainId,
@@ -220,6 +278,7 @@ export async function sendOwnerAction({
     )
       throw Error('Signed transaction does not recover to vault owner');
     assertOwnerChain(await client.getChainId());
+    await checkLiveProposal();
     return await client.sendRawTransaction({ serializedTransaction: signed });
   } finally {
     await signer.disconnect();

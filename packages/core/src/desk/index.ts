@@ -1,5 +1,10 @@
-import { encodeFunctionData, keccak256, type Address } from 'viem';
-import { vaultAbi } from '../abi/index.js';
+import { keccak256, type Address, type Hex } from 'viem';
+import {
+  proposalCalldata,
+  mandateBaseline,
+  type SignedMandate,
+  type OwnerProposal,
+} from './proposal.js';
 import { nlToParamDiff } from '../llm.js';
 import type { Policy, Mandate } from '../policy.js';
 import type { Evidence, RuleTrace } from '../types.js';
@@ -11,7 +16,7 @@ export type DeskIntent =
   | { kind: 'why'; verdict?: string; seq?: number }
   | { kind: 'change'; text: string };
 export const supportedCommands =
-  "Try: show positions, show P&L, why did you WAIT last, why REJECT #2, what's the spread now, set cap to 25, slippage 50 bps, pause, revoke.";
+  'Try: show positions, show P&L, why did you WAIT last, why REJECT #3, show spread, set cap to 25, slippage 50 bps, pause, revoke.';
 /** Whole-input matching prevents accidentally interpreting extra instructions as an owner action. */
 export function parseIntent(input: string): DeskIntent {
   const t = input
@@ -47,7 +52,7 @@ export function parseIntent(input: string): DeskIntent {
       ...(why[2]?.startsWith('#') ? { seq: Number(why[2].slice(1)) } : {}),
     };
   if (
-    /^(set cap to \d+(?:\.\d+)?|slippage \d+ bps|pause|revoke|cap \d+(?:\.\d+)? karo|slippage \d+ bps karo|rok do|mandate revoke karo)$/.test(
+    /^(set cap to \d+(?:\.\d+)?(?: usdt)?|slippage \d+ bps|pause|revoke|band karo|mat karo|cap \d+(?:\.\d+)?(?: usdt)? karo|slippage \d+ bps karo|rok do|mandate revoke karo)$/.test(
       t,
     )
   )
@@ -55,6 +60,10 @@ export function parseIntent(input: string): DeskIntent {
   return { kind: 'unknown' };
 }
 export type DeskContext = {
+  paused?: boolean;
+  proposalError?: string;
+  evidenceLabel?: string;
+  target?: { vault: Address; chainId: number };
   decimalsB?: number;
   agent?: Address;
   policy?: Policy;
@@ -80,6 +89,7 @@ export type DeskReply = {
   diff?: Record<string, unknown>;
   calldataHash?: string;
   ruleTrace?: RuleTrace;
+  proposal?: OwnerProposal;
 };
 /** Pure read-only desk: no transport, wallet, account or execution callback is accepted. */
 export function desk(input: string, context: DeskContext = {}): DeskReply {
@@ -131,9 +141,11 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
       return `${q.direction} $${q.sizeB}: ${((1 - Number(q.quotedOut) / 10 ** (buy ? e.decimalsA : e.decimalsB) / fair) * 100).toFixed(4)}%`;
     });
     return answer(
-      `Snapshot ${e.now} (UTC seconds). DEX: ${e.dexMid.toFixed(8)}; ${mids}; basis: ${((e.dexMid / mid - 1) * 100).toFixed(4)}%. Measured cost at size: ${costs.join('; ') || 'unavailable'}.`,
+      `${context.evidenceLabel ?? 'Captured snapshot; not a live quote'}. Snapshot ${e.now} (UTC seconds). DEX: ${e.dexMid.toFixed(8)}; ${mids}; basis: ${((e.dexMid / mid - 1) * 100).toFixed(4)}%. Measured cost at size: ${costs.join('; ') || 'unavailable'}.`,
     );
   }
+  if (context.proposalError)
+    return answer(`Owner proposal unavailable: ${context.proposalError}`);
   if (!context.policy || !context.mandate)
     return answer(
       'Owner proposal unavailable: a policy and signed mandate must be loaded first.',
@@ -153,43 +165,42 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
       : 'revoked' in proposal.diff
         ? 'revoke'
         : 'setMandate';
-  if (
-    action === 'setMandate' &&
-    (!context.agent || m.maxDrawdownBps === undefined)
-  )
+  if (!context.agent || m.maxDrawdownBps === undefined)
     return answer(
       'Exact owner calldata unavailable: agent and Task 9 drawdown cap must be read from the signed mandate.',
     );
-  const calldata = encodeFunctionData({
-    abi: vaultAbi,
-    functionName: action,
-    args:
-      action === 'setMandate'
-        ? [
-            {
-              agent: context.agent!,
-              expiry: BigInt(m.expiry),
-              maxTradeInA: m.maxTradeInA,
-              maxTradeInB: BigInt(
-                String(proposal.diff.maxTradeInB ?? m.maxTradeInB),
-              ),
-              maxDailyInB: m.maxDailyInB,
-              maxExposureBps: m.maxExposureBps,
-              maxSlippageBps: Number(
-                proposal.diff.maxSlippageBps ?? m.maxSlippageBps,
-              ),
-              maxDrawdownBps: m.maxDrawdownBps!,
-              minIntervalSec: BigInt(m.minIntervalSec),
-              policyHash: m.policyHash,
-            },
-          ]
-        : [],
-  } as never);
+  const signed: SignedMandate = {
+    agent: context.agent!,
+    expiry: BigInt(m.expiry),
+    maxTradeInA: m.maxTradeInA,
+    maxTradeInB: m.maxTradeInB,
+    maxDailyInB: m.maxDailyInB,
+    maxExposureBps: m.maxExposureBps,
+    maxSlippageBps: m.maxSlippageBps,
+    maxDrawdownBps: m.maxDrawdownBps!,
+    minIntervalSec: BigInt(m.minIntervalSec),
+    policyHash: m.policyHash as Hex,
+  };
+  const calldata = proposalCalldata(action, proposal.diff, signed);
+  const ownerProposal: OwnerProposal = {
+    action,
+    diff: proposal.diff,
+    calldataHash: keccak256(calldata),
+    baselineHash: mandateBaseline(signed, context.paused ?? false),
+    ...(context.target ? { target: context.target } : {}),
+  };
   return {
     intent,
     message:
       'Proposal only. Review the diff in the Owner panel; the owner must sign with Ledger.',
     diff: proposal.diff,
-    calldataHash: keccak256(calldata),
+    calldataHash: ownerProposal.calldataHash,
+    proposal: ownerProposal,
   };
 }
+
+export const receiptSequenceOrder = (
+  a: { seq: bigint | string },
+  b: { seq: bigint | string },
+) =>
+  BigInt(a.seq) < BigInt(b.seq) ? -1 : BigInt(a.seq) > BigInt(b.seq) ? 1 : 0;

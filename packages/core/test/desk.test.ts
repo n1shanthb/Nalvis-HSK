@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { desk, parseIntent } from '../src/desk/index.js';
+import { desk, parseIntent, receiptSequenceOrder } from '../src/desk/index.js';
 import { scenario } from './helpers.js';
-import { addresses } from '../src/addresses.js';
-import { encodeFunctionData, keccak256 } from 'viem';
+import { mnemonicToAccount } from 'viem/accounts';
+const agent = mnemonicToAccount(
+  'test test test test test test test test test test test junk',
+  { addressIndex: 1 },
+).address;
+import { encodeFunctionData, keccak256, parseAbi } from 'viem';
 import { vaultAbi } from '../src/abi/index.js';
 describe('deterministic desk', () => {
   it.each([
@@ -38,6 +42,10 @@ describe('deterministic desk', () => {
     'cap 20 karo',
     'slippage 20 bps karo',
     'rok do',
+    'band karo',
+    'mat karo',
+    'set cap to 25 usdt',
+    'cap 25 usdt karo',
   ])('proposal: %s', (t) => expect(parseIntent(t).kind).toBe('change'));
   it.each([
     'buy 100 HSK',
@@ -52,9 +60,32 @@ describe('deterministic desk', () => {
   ])('refuses: %s', (t) => expect(desk(t).message).toContain('Try:'));
   it('returns a hash of exact pause calldata, without broadcasting or accepting a signer', () => {
     const s = scenario();
-    const send = vi.fn();
+
     const fetcher = vi.spyOn(globalThis, 'fetch');
-    const reply = desk('pause', { policy: s.policy, mandate: s.mandate });
+    const ctx = { policy: s.policy, mandate: s.mandate, agent };
+    for (const key of [
+      'sendTransaction',
+      'signTransaction',
+      'sign',
+      'broadcast',
+    ])
+      Object.defineProperty(ctx, key, {
+        get() {
+          throw Error('Desk attempted execution capability');
+        },
+      });
+    for (const command of [
+      'pause',
+      'revoke',
+      'set cap to 25',
+      'slippage 50 bps',
+      'show spread',
+      'show P&L',
+      'why WAIT last',
+      'unknown',
+    ])
+      expect(() => desk(command, ctx)).not.toThrow();
+    const reply = desk('pause', ctx);
     expect(reply.diff).toEqual({ paused: true });
     expect(reply.calldataHash).toBe(
       keccak256(encodeFunctionData({ abi: vaultAbi, functionName: 'pause' })),
@@ -64,8 +95,8 @@ describe('deterministic desk', () => {
       'diff',
       'intent',
       'message',
+      'proposal',
     ]);
-    expect(send).not.toHaveBeenCalled();
     expect(fetcher).not.toHaveBeenCalled();
     fetcher.mockRestore();
   });
@@ -75,11 +106,12 @@ describe('deterministic desk', () => {
       policy: s.policy,
       mandate: s.mandate,
       evidence: s.e,
-      agent: addresses[133].usdt.address,
+      agent,
     };
     expect(desk('slippage 101 bps', ctx).diff).toBeUndefined();
     expect(desk('set cap to 1000', ctx).diff).toBeUndefined();
-    expect(desk('set cap to 0', ctx).diff).toBeUndefined();
+    expect(desk('set cap to 0', ctx).message).toContain('greater than zero');
+    expect(desk('slippage 0 bps', ctx).message).toContain('between 1 and 100');
     expect(desk('set cap to 25', ctx).diff).toEqual({
       maxTradeInB: '25000000',
     });
@@ -101,3 +133,41 @@ describe('deterministic desk', () => {
     );
   });
 });
+
+it('commits every setMandate field to a known-good independent ABI encoding', () => {
+  const { policy, mandate: m, e } = scenario();
+  const reply = desk('set cap to 25', {
+    policy,
+    mandate: m,
+    evidence: e,
+    agent,
+  });
+  const expected = encodeFunctionData({
+    abi: parseAbi([
+      'function setMandate((address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint16 maxDrawdownBps,uint256 minIntervalSec,bytes32 policyHash) m)',
+    ]),
+    functionName: 'setMandate',
+    args: [
+      {
+        agent,
+        expiry: BigInt(m.expiry),
+        maxTradeInA: m.maxTradeInA,
+        maxTradeInB: 25000000n,
+        maxDailyInB: m.maxDailyInB,
+        maxExposureBps: m.maxExposureBps,
+        maxSlippageBps: m.maxSlippageBps,
+        maxDrawdownBps: m.maxDrawdownBps!,
+        minIntervalSec: BigInt(m.minIntervalSec),
+        policyHash: m.policyHash as `0x${string}`,
+      },
+    ],
+  });
+  expect(reply.calldataHash).toBe(keccak256(expected));
+});
+
+it('sorts sequences numerically beyond nine', () =>
+  expect(
+    [{ seq: '11' }, { seq: '2' }, { seq: '10' }, { seq: '0' }]
+      .sort(receiptSequenceOrder)
+      .map((r) => r.seq),
+  ).toEqual(['0', '2', '10', '11']));

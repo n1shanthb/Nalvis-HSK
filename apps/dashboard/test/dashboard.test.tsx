@@ -1,3 +1,9 @@
+import {
+  proposalCalldata,
+  mandateBaseline,
+  type OwnerProposal,
+} from '../../../packages/core/src/desk/proposal.js';
+import { keccak256 } from 'viem';
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createPublicClient, custom, decodeFunctionData, zeroHash } from 'viem';
@@ -235,4 +241,57 @@ describe('views', () => {
     expect(result.decimalsB).toBe(18);
     expect(request).toHaveBeenCalled();
   });
+});
+
+test('owner panel reviews exact desk calldata and rejects changed mandate/hash before signer factory', () => {
+  const diff = { maxTradeInB: String(10n * 10n ** 18n) };
+  const data = proposalCalldata('setMandate', diff, snapshot.mandate);
+  const proposal: OwnerProposal = {
+    action: 'setMandate',
+    diff,
+    calldataHash: keccak256(data),
+    baselineHash: mandateBaseline(snapshot.mandate, false),
+    target: { vault: owner, chainId: 133 },
+  };
+  const signerFactory = vi.fn();
+  const view = render(
+    <MandateForm
+      chain={133}
+      vault={owner}
+      snapshot={snapshot}
+      proposal={proposal}
+      signerFactory={signerFactory}
+    />,
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  expect(
+    screen.getByText('Exact calldata').parentElement!.querySelector('code')!
+      .textContent,
+  ).toBe(data);
+  view.rerender(
+    <MandateForm
+      chain={133}
+      vault={owner}
+      snapshot={{
+        ...snapshot,
+        mandate: { ...snapshot.mandate, maxSlippageBps: 20 },
+      }}
+      proposal={proposal}
+      signerFactory={signerFactory}
+    />,
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  expect(screen.getByRole('status').textContent).toContain('changed');
+  expect(signerFactory).not.toHaveBeenCalled();
+});
+test('owner panel can build pause calldata', () => {
+  render(<MandateForm chain={133} vault={owner} snapshot={snapshot} />);
+  fireEvent.click(screen.getByText('Build pause review'));
+  const data = screen
+    .getByText('Exact calldata')
+    .parentElement!.querySelector('code')!.textContent!;
+  expect(
+    decodeFunctionData({ abi: vaultAbi, data: data as `0x${string}` })
+      .functionName,
+  ).toBe('pause');
 });

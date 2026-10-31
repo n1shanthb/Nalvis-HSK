@@ -1,3 +1,4 @@
+import type { OwnerProposal } from '../../../../packages/core/src/desk/proposal.js';
 import { useState, useCallback } from 'react';
 import {
   desk,
@@ -12,9 +13,11 @@ import { useResource } from '../lib/useResource.js';
 export function DeskView({
   demo = false,
   chain = 133,
+  onProposal,
 }: {
   demo?: boolean;
   chain?: DashboardChain;
+  onProposal?: (p: OwnerProposal) => void;
 }) {
   const resource = useResource(
     useCallback(
@@ -54,13 +57,11 @@ export function DeskView({
         <p role="alert">Recorded evidence unavailable: {resource.error}</p>
       )}
       <div>
-        {['show P&L', 'kyu wait kiya', "what's the spread now", 'pause'].map(
-          (t) => (
-            <button key={t} className="secondary" onClick={() => submit(t)}>
-              {t}
-            </button>
-          ),
-        )}
+        {['show P&L', 'kyu wait kiya', 'show spread', 'pause'].map((t) => (
+          <button key={t} className="secondary" onClick={() => submit(t)}>
+            {t}
+          </button>
+        ))}
       </div>
       <div className="conversation" role="log" aria-live="polite">
         {!messages.length && (
@@ -81,6 +82,14 @@ export function DeskView({
                   2,
                 )}
               </pre>
+            )}
+            {m.reply.proposal && onProposal && (
+              <button
+                className="secondary"
+                onClick={() => onProposal(m.reply.proposal!)}
+              >
+                Review exact proposal with Ledger
+              </button>
             )}
             {m.reply.ruleTrace?.map((t, i) => (
               <p key={i}>
