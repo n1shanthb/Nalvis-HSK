@@ -4,6 +4,24 @@ const reverts: Record<string, string> = {
   InvalidMandate: 'The mandate is invalid. Check the agent, expiry and limits.',
   Inactive:
     'The mandate is paused, revoked or expired. Ask the owner to review it.',
+  InvalidConfig:
+    'The vault configuration is invalid. Check the verified deployment.',
+  Deadline: 'This transaction deadline has passed. Build a fresh review.',
+  DecisionExpired: 'The agent decision expired. Request a fresh decision.',
+  Nonce: 'Vault activity changed. Refresh and build a new review.',
+  Interval: 'The minimum trade interval has not elapsed. Please wait.',
+  TradeCap: 'The trade exceeds the per-trade mandate cap.',
+  DailyCap:
+    'The daily mandate cap has been reached. Wait for the next UTC day.',
+  Exposure: 'The trade would exceed the mandate exposure cap.',
+  Underfill: 'The swap could not meet the reviewed minimum output.',
+  InvalidToken: 'This token is outside the vault pair. Choose a vault token.',
+  OracleInvalid:
+    'Oracle evidence is unavailable or outside the permitted limits.',
+  Drawdown:
+    'The drawdown circuit breaker is active. The owner must review the mandate.',
+  PreviousHead: 'The receipt chain changed. Refresh before retrying.',
+  InvalidKind: 'This decision type is not valid for the requested action.',
   Paused: 'The vault is paused. Unpause it before trading.',
   Slippage: 'The quote exceeds the slippage limit. Request a fresh quote.',
   CapExceeded: 'The action exceeds a mandate cap.',

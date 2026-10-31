@@ -15,6 +15,10 @@ test.each([
   ['Unauthorized', 'current vault owner'],
   ['InvalidMandate', 'mandate is invalid'],
   ['Inactive', 'paused, revoked or expired'],
+  ['TradeCap', 'per-trade mandate cap'],
+  ['Interval', 'minimum trade interval'],
+  ['Drawdown', 'drawdown circuit breaker'],
+  ['DecisionExpired', 'decision expired'],
 ])('nested %s contract revert is explained', (errorName, explanation) => {
   vi.spyOn(console, 'debug').mockImplementation(() => {});
   expect(humanError({ cause: { data: { errorName } } })).toContain(explanation);
