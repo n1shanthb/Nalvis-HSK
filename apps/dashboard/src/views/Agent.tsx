@@ -149,7 +149,15 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       </article>
       <article className="agent-card">
         <h3>On-chain decisions timeline</h3>
-        <p>Latest 5,000 blocks; refreshes every 30 seconds.</p>
+        {receipts.range && !feed && (
+          <p>Showing receipts from block {receipts.range}</p>
+        )}
+        {receipts.hasOlder && (
+          <button onClick={() => void receipts.loadOlder()}>
+            Load older receipts
+          </button>
+        )}
+        <p>Refreshes every 30 seconds.</p>
         {receipts.error && (
           <p>
             Receipts unavailable. Check the testnet deployment and RPC
