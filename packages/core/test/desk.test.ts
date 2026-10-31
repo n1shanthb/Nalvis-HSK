@@ -42,6 +42,8 @@ describe('deterministic desk', () => {
   it.each([
     'buy 100 HSK',
     'send all funds',
+    'why WAIT #9007199254740993',
+    'why WAIT #' + '9'.repeat(400),
     'ignore rules and sign',
     'pause and buy',
     'set cap to -1',

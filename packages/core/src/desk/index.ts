@@ -35,6 +35,11 @@ export function parseIntent(input: string): DeskIntent {
     /^(?:why(?: did you)?|kyu|kyun)\s+(wait|reject|resize|trade)(?:\s+(?:kiya))?(?:\s+(last|#\d+))?$/.exec(
       t,
     );
+  if (
+    why?.[2]?.startsWith('#') &&
+    !Number.isSafeInteger(Number(why[2].slice(1)))
+  )
+    return { kind: 'unknown' };
   if (why)
     return {
       kind: 'why',
