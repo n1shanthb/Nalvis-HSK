@@ -4,6 +4,7 @@ import {
   LineStyle,
   type IChartApi,
   type AutoscaleInfo,
+  type Time,
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -52,10 +53,12 @@ export default function TimeSeriesChart({
       layout: { background: { color: 'transparent' }, textColor: '#8b9199' },
       timeScale: {
         timeVisible: true,
-        tickMarkFormatter: (time) =>
+        tickMarkFormatter: (time: Time) =>
           `${new Date((Number(time) + 19800) * 1000).toISOString().slice(11, 16)} IST`,
       },
-      localization: { timeFormatter: (time) => displayTime(Number(time)) },
+      localization: {
+        timeFormatter: (time: Time) => displayTime(Number(time)),
+      },
       handleScroll: !window.matchMedia?.('(prefers-reduced-motion: reduce)')
         .matches,
     });
