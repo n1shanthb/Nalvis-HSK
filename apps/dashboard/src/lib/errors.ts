@@ -28,20 +28,36 @@ const reverts: Record<string, string> = {
   Cooldown: 'The minimum trade interval has not elapsed. Please wait.',
   InsufficientBalance: 'The vault has insufficient funds for this amount.',
 };
+const ledgerStatuses = new Map<number, string>([
+  [0x6985, 'Transaction rejected on Ledger. Nothing was sent.'],
+  [0x5515, 'Unlock your Ledger, then retry.'],
+  [0x6e00, 'Open the Ethereum app on your Ledger, then retry.'],
+  [0x6d00, 'Open the Ethereum app on your Ledger, then retry.'],
+  [0x6a80, 'Enable Blind signing in the Ethereum app settings, then retry'],
+]);
+const ledgerNames = new Map<string, number>([
+  ['UserRefusedOnDevice', 0x6985],
+  ['RefusedByUserDAError', 0x6985],
+  ['LockedDeviceError', 0x5515],
+  ['DeviceLockedError', 0x5515],
+]);
 export function humanError(error: unknown): string {
   console.debug('Owner action error', error);
   const seen = new Set<unknown>();
   let current = error;
   const messages: string[] = [];
   let short: string | undefined;
+  let ledgerMessage: string | undefined;
   while (current && typeof current === 'object' && !seen.has(current)) {
     seen.add(current);
     const value = current as {
       data?: { errorName?: string };
       shortMessage?: string;
       message?: string;
-      statusCode?: number;
-      statusWord?: number;
+      statusCode?: unknown;
+      statusWord?: unknown;
+      _tag?: string;
+      constructor?: { name?: string };
       name?: string;
       cause?: unknown;
       originalError?: unknown;
@@ -54,19 +70,22 @@ export function humanError(error: unknown): string {
       );
     short ??= value.shortMessage;
     messages.push(value.message ?? '', value.name ?? '');
-    const status = value.statusCode ?? value.statusWord;
-    if (status !== undefined) messages.push(status.toString(16));
+    // Never infer an APDU status from diagnostic text: it can contain a
+    // broadcast transaction hash, calldata or an address with those digits.
+    for (const status of [value.statusCode, value.statusWord]) {
+      if (typeof status === 'number')
+        ledgerMessage ??= ledgerStatuses.get(status);
+    }
+    for (const name of [value.name, value._tag, value.constructor?.name]) {
+      const status = name === undefined ? undefined : ledgerNames.get(name);
+      if (status !== undefined) ledgerMessage ??= ledgerStatuses.get(status);
+    }
     current = value.cause ?? value.originalError ?? value.error;
   }
   const detail = messages.join(' ');
-  if (/6985|user.*reject|reject.*user/i.test(detail))
-    return 'Transaction rejected on Ledger. Nothing was sent.';
-  if (/5515|device.*locked/i.test(detail))
-    return 'Unlock your Ledger, then retry.';
-  if (/6e00|6d00/i.test(detail))
-    return 'Open the Ethereum app on your Ledger, then retry.';
-  if (/6a80/i.test(detail))
-    return 'Enable Blind signing in the Ethereum app settings, then retry';
+  if (ledgerMessage) return ledgerMessage;
+  if (/\b(?:user rejected|denied by the user)\b/i.test(detail))
+    return ledgerStatuses.get(0x6985)!;
   if (/NotAllowedError|permission denied|access denied/i.test(detail))
     return 'Ledger permission was denied. Allow WebHID access and retry.';
   if (/WebHID|hid.*unavailable|unsupported.*browser/i.test(detail))
