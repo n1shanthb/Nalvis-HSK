@@ -92,6 +92,21 @@ describe('honest accessible charts', () => {
       ),
     );
     expect(api.createPriceLine.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const scaleOptions = api.applyOptions.mock.calls.find(
+      ([options]) => options.autoscaleInfoProvider,
+    )?.[0];
+    const range = scaleOptions.autoscaleInfoProvider(() => ({
+      priceRange: { minValue: 0.09, maxValue: 0.091 },
+    })).priceRange;
+    const mid =
+      (first.cex[0].bid +
+        first.cex[0].ask +
+        first.cex[1].bid +
+        first.cex[1].ask) /
+      4;
+    expect(range.minValue).toBeLessThanOrEqual(mid * 0.95);
+    expect(range.maxValue).toBeGreaterThanOrEqual(mid * 1.05);
+
     view.unmount();
     expect(api.remove).toHaveBeenCalledOnce();
   });

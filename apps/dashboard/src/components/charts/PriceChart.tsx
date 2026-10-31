@@ -146,6 +146,7 @@ export default function PriceChart({
         <TimeSeries
           series={['dex', 'cex'].map((k, i) => ({
             name: k.toUpperCase(),
+            precision: 6,
             color: i ? '#75baff' : '#47a878',
             points: rows.map((r) => ({
               time: r.time,

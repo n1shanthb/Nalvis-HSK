@@ -3,11 +3,18 @@ import {
   createChart,
   LineStyle,
   type IChartApi,
+  type AutoscaleInfo,
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { Point } from '../../lib/chart-data.js';
-export type Series = { name: string; color: string; points: Point[] };
+import { displayTime } from '../../lib/clients.js';
+export type Series = {
+  name: string;
+  color: string;
+  points: Point[];
+  precision?: number;
+};
 export type Marker = {
   time: number;
   position: 'aboveBar';
@@ -43,7 +50,12 @@ export default function TimeSeriesChart({
       height: 220,
       width: host.current.clientWidth || 320,
       layout: { background: { color: 'transparent' }, textColor: '#8b9199' },
-      timeScale: { timeVisible: true },
+      timeScale: {
+        timeVisible: true,
+        tickMarkFormatter: (time) =>
+          `${new Date((Number(time) + 19800) * 1000).toISOString().slice(11, 16)} IST`,
+      },
+      localization: { timeFormatter: (time) => displayTime(Number(time)) },
       handleScroll: !window.matchMedia?.('(prefers-reduced-motion: reduce)')
         .matches,
     });
@@ -55,7 +67,16 @@ export default function TimeSeriesChart({
       setSelected(marker);
     });
     handles.current = series.map((s) =>
-      c.addLineSeries({ color: s.color, title: s.name, lineWidth: 2 }),
+      c.addLineSeries({
+        color: s.color,
+        title: s.name,
+        lineWidth: 2,
+        priceFormat: {
+          type: 'price',
+          precision: s.precision ?? 2,
+          minMove: 10 ** -(s.precision ?? 2),
+        },
+      }),
     );
     const resize =
       typeof ResizeObserver !== 'undefined'
@@ -108,6 +129,25 @@ export default function TimeSeriesChart({
   useEffect(() => {
     const api = handles.current[0];
     if (!api) return;
+    api.applyOptions({
+      autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        const base = original();
+        if (!base || !lines.length) return base;
+        return {
+          ...base,
+          priceRange: {
+            minValue: Math.min(
+              base.priceRange.minValue,
+              ...lines.map((l) => l.value),
+            ),
+            maxValue: Math.max(
+              base.priceRange.maxValue,
+              ...lines.map((l) => l.value),
+            ),
+          },
+        };
+      },
+    });
     const added = lines.map((l) =>
       api.createPriceLine({
         price: l.value,
