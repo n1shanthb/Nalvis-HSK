@@ -24,7 +24,10 @@ export const evidenceFetcher: typeof fetch = (input, init) => {
     if (url === endpoints.gate)
       url = '/cex/gate/api/v4/spot/tickers?currency_pair=HSK_USDT';
   }
-  if (import.meta.env.PROD && (url === endpoints.mexc || url === endpoints.gate)) {
+  if (
+    import.meta.env.PROD &&
+    (url === endpoints.mexc || url === endpoints.gate)
+  ) {
     const venue = url === endpoints.mexc ? 'mexc' : 'gate';
     return fetch(`/api/market?venue=${venue}`, init).then(async (response) => {
       if (!response.ok) return response;
