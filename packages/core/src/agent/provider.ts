@@ -11,6 +11,7 @@ export type Completion = {
   costSource: string;
 };
 export interface Provider {
+  models?: { strategist: string; fitter: string };
   id: string;
   isConfigured(): boolean;
   complete(request: CompletionRequest): Promise<Completion>;
@@ -40,6 +41,10 @@ export function openRouter(
 ): Provider {
   return {
     id: 'openrouter',
+    models: {
+      strategist: env.STRATEGIST_MODEL ?? '',
+      fitter: env.FITTER_MODEL ?? env.STRATEGIST_MODEL ?? '',
+    },
     isConfigured: () =>
       Boolean(env.OPENROUTER_API_KEY?.trim() && env.STRATEGIST_MODEL?.trim()),
     async complete(request) {

@@ -1,3 +1,4 @@
+import { decide } from '../engine.js';
 import { zeroHash, formatUnits, type Hex } from 'viem';
 import { hash } from '../canonical.js';
 import { assertWritableChain } from '../addresses.js';
@@ -42,7 +43,7 @@ export type AgentClients = {
   /** send must enforce RPC chain, wallet pending nonce, latest head/nonce and eth_call immediately before signing. No retries. */
   send(receipt: ReceiptV3): Promise<{ transactionHash: Hex }>;
   /** Explicit demo callback invokes legacy decide() with its existing evidence/policy/mandate/state. */
-  rulesDemo?(): Promise<StrategistOutput>;
+  rulesDemo?(): Promise<Parameters<typeof decide>>;
 };
 export async function createAgent({
   provider,
@@ -57,6 +58,10 @@ export async function createAgent({
 }) {
   const journal = await createJournal(store);
   await store.writeText('policy.json', config.policyFile);
+  await store.writeText(
+    `policies/${hash(config.policyFile)}.json`,
+    config.policyFile,
+  );
   type Runtime = {
     budget: Budget;
     thesis: string;
@@ -66,6 +71,7 @@ export async function createAgent({
     state?: string;
     stateAt?: number;
     ownerEvents: string[];
+    pendingOwnerEvents?: NonNullable<EvidenceLite['ownerEvents']>;
   };
   const runtime = (await store.read<Runtime>('runtime.json')) ?? {
     budget: { wakes: [], costs: [] },
@@ -123,6 +129,8 @@ export async function createAgent({
   const charge = async (usd: number, now: number) => {
     runtime.budget.costs.push({ at: now, usd });
     await save();
+    if (left(now).usd <= 0)
+      await state('BUDGET_PAUSED', 'Daily model budget exhausted', now);
   };
   const addRetry = async (at: number, now: number, legOf?: string) => {
     if (!watches) watches = await initWatches(now);
@@ -176,6 +184,13 @@ export async function createAgent({
       'testnet sandbox; prices are not real',
       now,
     );
+    const ownerIds = fired
+      .filter((f) => f.watch.id.startsWith('owner:'))
+      .map((f) => f.watch.id.slice(6));
+    runtime.ownerEvents.push(...ownerIds);
+    runtime.pendingOwnerEvents = (runtime.pendingOwnerEvents ?? []).filter(
+      (e) => !ownerIds.includes(e.id),
+    );
     runtime.budget.wakes.push(now);
     runtime.budget.lastWake = now;
     for (const f of fired) {
@@ -203,6 +218,8 @@ export async function createAgent({
     let local: Hex;
     try {
       local = validateAgentPolicy(config);
+      if (provider.models && hash(provider.models) !== hash(config.models))
+        throw new Error('Provider models differ from signed strategy');
     } catch {
       await state(
         'NEEDS_OWNER',
@@ -250,9 +267,32 @@ export async function createAgent({
       amountIn: 0n,
       amountOut: 0n,
     });
+    const demo =
+      config.mode === 'rules-demo' && clients.rulesDemo
+        ? decide(...(await clients.rulesDemo()))
+        : undefined;
+    const demoOutput: StrategistOutput | undefined = demo
+      ? {
+          thesis: 'Explicit rules-demo: legacy decide()',
+          action: {
+            type:
+              demo.kind === 'TRADE' || demo.kind === 'RESIZE'
+                ? demo.direction === 'BUY_A'
+                  ? 'BUY'
+                  : 'SELL'
+                : 'HOLD',
+            ...(demo.sizeB ? { notionalB: String(demo.sizeB) } : {}),
+            urgency: 'now',
+            reason: 'rules-demo legacy deterministic engine',
+          },
+          watches: { create: [], update: [], delete: [] },
+          confidence: 1,
+          signals: [],
+        }
+      : undefined;
     const output =
       config.mode === 'rules-demo'
-        ? await clients.rulesDemo?.()
+        ? demoOutput
         : await runStrategist({
             ...common,
             input: {
@@ -329,7 +369,10 @@ export async function createAgent({
         a.type === 'HOLD'
           ? { block: st.block, at: st.blockTime, amountIn: 0n, amountOut: 0n }
           : await clients.quote(a, st);
-      const c = check(a, st, q, { validUntil: st.blockTime + config.ttlSec });
+      const c = check(a, st, q, {
+        validUntil: st.blockTime + config.ttlSec,
+        kind: a.type === 'HOLD' ? 'WAIT' : fit.rounds > 0 ? 'RESIZE' : 'TRADE',
+      });
       const stateHash = await journal.artifact('states', st);
       await journal.append(
         'MANDATE_CHECK',
@@ -348,6 +391,31 @@ export async function createAgent({
       return { q, c, stateHash };
     };
     let checked = await recordCheck(action, s);
+    if (action.type !== 'HOLD' && checked.c.ok) {
+      const initialSim = await clients.simulate(s, checked.c.prepared);
+      if (!initialSim.ok) {
+        checked.c.ok = false;
+        checked.c.violations.push({
+          limit: initialSim.error ?? 'eth_call',
+          required: 'simulation succeeds',
+          allowed: 'revert',
+        });
+        await journal.append(
+          'MANDATE_CHECK',
+          {
+            stateBlock: String(s.block),
+            stateHash: checked.stateHash,
+            action,
+            quote: checked.q,
+            ok: false,
+            violations: checked.c.violations,
+            headroom: checked.c.headroom,
+            simulation: initialSim,
+          },
+          now,
+        );
+      }
+    }
     if (action.type !== 'HOLD' && !checked.c.ok) {
       fit = await fitToMandate({
         ...common,
@@ -355,6 +423,7 @@ export async function createAgent({
         thesis: runtime.thesis,
         state: s,
         initial: checked.c,
+        market: evidence,
         quote: clients.quote,
         rounds: config.fitRounds,
       });
@@ -477,13 +546,85 @@ export async function createAgent({
       journalFrom: runtime.journalFrom,
       simulation,
     });
+    // Refresh immediately before durable intent/send; changes require a new wake.
+    const guardState = await clients.readState();
+    assertWritableChain(guardState.chainId);
+    const guardQuote =
+      action.type === 'HOLD'
+        ? {
+            block: guardState.block,
+            at: guardState.blockTime,
+            amountIn: 0n,
+            amountOut: 0n,
+          }
+        : await clients.quote(action, guardState);
+    const guard = check(action, guardState, guardQuote, receipt.final);
+    if (
+      !guard.ok ||
+      guardState.mandate.policyHash !== local ||
+      guardState.vault !== s.vault ||
+      guardState.chainId !== s.chainId ||
+      hash(guardState.mandate) !== hash(s.mandate)
+    ) {
+      await journal.append(
+        'MANDATE_CHECK',
+        {
+          stateBlock: String(guardState.block),
+          stateHash: await journal.artifact('states', guardState),
+          action,
+          quote: guardQuote,
+          ok: guard.ok,
+          violations: guard.violations,
+          headroom: guard.headroom,
+          prepared: guard.prepared,
+        },
+        now,
+      );
+      await addRetry(guardState.blockTime + 60, now);
+      return;
+    }
     // Hash-dependent calldata has a second preflight. Durable intent precedes send.
     const finalSim = await clients.simulate(
-      s,
+      guardState,
       receipt.final,
       receipt.receiptHash,
     );
-    if (!finalSim.ok) return;
+    if (!finalSim.ok) {
+      await journal.append(
+        'MANDATE_CHECK',
+        {
+          stateBlock: String(guardState.block),
+          stateHash: await journal.artifact('states', guardState),
+          action,
+          quote: guardQuote,
+          ok: false,
+          violations: [
+            {
+              limit: finalSim.error ?? 'eth_call',
+              required: 'simulation succeeds',
+              allowed: 'revert',
+            },
+          ],
+          headroom: guard.headroom,
+          simulation: finalSim,
+        },
+        now,
+      );
+      await addRetry(guardState.blockTime + 60, now);
+      await journal.append(
+        'ACTION',
+        {
+          kind: 'WAIT',
+          amountIn: '0',
+          minOut: '0',
+          receiptHash: zeroHash,
+          reason: 'Hash-dependent simulation failed; retry scheduled',
+          mode: config.mode,
+        },
+        now,
+      );
+      return;
+    }
     await store.write(`receipts/${receipt.receiptHash}.json`, receipt);
     await store.write('pending.json', {
       receiptHash: receipt.receiptHash,
@@ -546,22 +687,26 @@ export async function createAgent({
         watches ??= await initWatches(now);
         const lite = await clients.evidenceLite();
         const fired = evaluate(watches.watches, lite, now);
+        runtime.pendingOwnerEvents ??= [];
         for (const event of lite.ownerEvents ?? [])
-          if (!runtime.ownerEvents.includes(event.id)) {
-            runtime.ownerEvents.push(event.id);
-            fired.push({
-              watch: {
-                id: `owner:${event.id}`,
-                kind: { type: 'time', at: now },
-                note: event.name,
-                createdBy: 'system',
-                createdAt: now,
-                cooldownSec: 60,
-                fireCount: 0,
-              },
-              why: `Owner event ${event.name}; refresh live mandate`,
-            });
-          }
+          if (
+            !runtime.ownerEvents.includes(event.id) &&
+            !runtime.pendingOwnerEvents.some((e) => e.id === event.id)
+          )
+            runtime.pendingOwnerEvents.push(event);
+        for (const event of runtime.pendingOwnerEvents)
+          fired.push({
+            watch: {
+              id: `owner:${event.id}`,
+              kind: { type: 'time', at: now },
+              note: event.name,
+              createdBy: 'system',
+              createdAt: now,
+              cooldownSec: 60,
+              fireCount: 0,
+            },
+            why: `Owner event ${event.name}; refresh live mandate`,
+          });
         await save();
         if (
           config.mode === 'offline' ||

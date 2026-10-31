@@ -29,12 +29,15 @@ export function needsOwner(s: MandateState) {
   return s.paused || s.revoked || BigInt(s.blockTime) >= s.mandate.expiry;
 }
 export function retryAt(s: MandateState, c: CheckResult): number {
+  const daily = c.violations.some((v) => v.limit === 'DailyCap')
+    ? s.turnover
+        .filter((t) => t.expiresAt > s.blockTime)
+        .sort((a, b) => a.expiresAt - b.expiresAt)[0]?.expiresAt
+    : undefined;
   return Math.max(
     s.blockTime + 60,
     ...c.violations.map((v) => v.resetsAt ?? 0),
-    ...(c.violations.some((v) => v.limit === 'DailyCap')
-      ? s.turnover.map((t) => t.expiresAt)
-      : []),
+    daily ?? 0,
   );
 }
 export function projectLeg(
@@ -53,6 +56,8 @@ export function projectLeg(
   const balanceA = buy ? s.balanceA + q.amountOut : s.balanceA - amount,
     balanceB = buy ? s.balanceB - amount : s.balanceB + q.amountOut;
   const total = quoteTwap(s, balanceA, false) + balanceB;
+  const preTotal = quoteTwap(s, s.balanceA, false) + s.balanceB;
+  const high = s.highWaterMark > preTotal ? s.highWaterMark : preTotal;
   return {
     ...s,
     blockTime: at,
@@ -62,7 +67,7 @@ export function projectLeg(
     nextNonce: s.nextNonce + 1n,
     spentB: turnover.reduce((n, t) => n + t.amountB, 0n),
     turnover,
-    highWaterMark: total > s.highWaterMark ? total : s.highWaterMark,
+    highWaterMark: total > high ? total : high,
   };
 }
 export async function fitToMandate(args: {
@@ -72,6 +77,7 @@ export async function fitToMandate(args: {
   thesis: string;
   state: MandateState;
   initial: CheckResult;
+  market?: unknown;
   quote: (a: Action, s: MandateState) => Promise<ExecQuote>;
   rounds?: number;
   charge?: (usd: number) => Promise<void>;
@@ -115,6 +121,8 @@ export async function fitToMandate(args: {
       schema: fitterSchema,
       input: {
         original: args.action,
+        market: args.market ?? {},
+        executionQuote: await args.quote(action, s),
         action,
         thesis: args.thesis,
         reason: action.reason,
@@ -213,7 +221,7 @@ export async function fitToMandate(args: {
       input: {
         original: args.action,
         thesis: args.thesis,
-        proposal,
+        fitterProposal: proposal,
         explanation: output.explanation,
       },
     });

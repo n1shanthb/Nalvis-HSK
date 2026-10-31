@@ -1,3 +1,6 @@
+import { projectLeg } from '../../../core/src/agent/fitter.js';
+import type { MandateState } from '../../../core/src/agent/mandate-check.js';
+import type { Action } from '../../../core/src/agent/schema.js';
 import {
   decodeFunctionData,
   decodeEventLog,
@@ -114,6 +117,13 @@ export async function verifyV3(
       acceptedProposal: unknown,
       acceptedReply: unknown;
     let finalCheck: JournalEntry | undefined;
+    let fitBase: MandateState | undefined,
+      projectedState: MandateState | undefined;
+    let projectedAction: Action | undefined,
+      projectedQuote: ExecQuote | undefined,
+      projectedCount = 0,
+      projectedValid = true;
+
     for (const entry of entries.slice(0, to + 1)) {
       const d = entry.data,
         inRange = entry.seq > from;
@@ -146,6 +156,7 @@ export async function verifyV3(
         require('v3_output_hash', typeof d.rawOutput === 'string' &&
           outputHash(d.rawOutput) === d.outputHash &&
           Buffer.byteLength(d.rawOutput) <= 8192);
+        if (d.rawOutputArtifact) await artifact('prompts', d.rawOutputArtifact);
         const schema =
           d.promptVersion === 'STRATEGIST_PROMPT_V1'
             ? strategistSchema
@@ -164,8 +175,14 @@ export async function verifyV3(
         if (parsed.success && inRange) {
           if (d.promptVersion === 'STRATEGIST_PROMPT_V1')
             latestIntent = strategistSchema.parse(parsed.data).action;
-          if (d.promptVersion === 'FITTER_PROMPT_V1')
+          if (d.promptVersion === 'FITTER_PROMPT_V1') {
             acceptedProposal = fitterSchema.parse(parsed.data).proposal;
+            projectedState = fitBase;
+            projectedAction = undefined;
+            projectedQuote = undefined;
+            projectedCount = 0;
+            projectedValid = true;
+          }
           if (d.promptVersion === 'FITTER_REPLY_PROMPT_V1')
             acceptedReply = fitterReplySchema.parse(parsed.data);
         }
@@ -223,6 +240,42 @@ export async function verifyV3(
               nonce: BigInt(prepared.nonce),
             }
           : undefined;
+        if (d.projected) {
+          const proposal = acceptedProposal as z.infer<
+            typeof fitterSchema
+          >['proposal'];
+          const leg = proposal?.legs[projectedCount];
+          require('v3_projected_leg', !!leg &&
+            d.leg === projectedCount &&
+            action.type === proposal!.type &&
+            action.notionalB === leg!.notionalB &&
+            !!projectedState);
+          let expected = projectedState!;
+          if (projectedCount > 0)
+            expected = projectLeg(
+              expected,
+              projectedAction!,
+              projectedQuote!,
+              leg!.notBefore,
+            );
+          expected = {
+            ...expected,
+            blockTime: leg!.notBefore,
+            turnover: expected.turnover.filter(
+              (t) => t.expiresAt > leg!.notBefore,
+            ),
+          };
+          expected.spentB = expected.turnover.reduce(
+            (n, t) => n + t.amountB,
+            0n,
+          );
+          require('v3_projected_state', equal(snapshot, expected));
+          projectedState = snapshot;
+          projectedAction = action;
+          projectedQuote = quote;
+          projectedCount++;
+          projectedValid &&= d.ok === true;
+        } else fitBase = snapshot;
         const replay = check(action, snapshot, quote, restored);
         if (!d.simulation)
           require('v3_mandate_replay', replay.ok === d.ok &&
@@ -272,12 +325,18 @@ export async function verifyV3(
       equal(replay.prepared, r.final) &&
       r.final.direction === finalAction.type &&
       r.prevHead === r.final.prevHead);
+    if (r.final.direction !== 'HOLD' && r.fit.rounds === 0)
+      require('v3_original_action', equal(finalAction, r.intent));
     if (r.final.direction !== 'HOLD' && r.fit.rounds > 0) {
       const reply = acceptedReply as
           z.infer<typeof fitterReplySchema> | undefined,
         proposal = acceptedProposal as z.infer<typeof fitterSchema>['proposal'];
       require('v3_fitter_acceptance', reply?.decision === 'accept' ||
         reply?.decision === 'revise');
+      if (reply?.decision === 'accept') {
+        require('v3_projected_plan', projectedValid &&
+          projectedCount === proposal?.legs.length);
+      }
       if (reply?.decision === 'accept')
         require('v3_accepted_leg', !!proposal &&
           proposal.type === r.final.direction &&

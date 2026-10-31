@@ -201,6 +201,13 @@ export function check(
   if (s.pending)
     fail('Pending', 'no pending transaction', 'pending transaction');
   if (p.prevHead !== s.head) fail('PreviousHead', p.prevHead, s.head);
+  if (
+    action.type === 'HOLD' &&
+    (p.amountIn !== 0n ||
+      p.minOut !== 0n ||
+      !['WAIT', 'REJECT'].includes(p.kind))
+  )
+    fail('HoldFields', 'zero amounts and hold kind', p.kind);
   if (action.type === 'HOLD')
     return { ok: violations.length === 0, violations, headroom, prepared: p };
   if (!['TRADE', 'RESIZE'].includes(p.kind))
@@ -217,6 +224,8 @@ export function check(
     )
   )
     fail('InvalidToken', p.tokenIn, 'vault pair');
+  if (p.tokenIn.toLowerCase() !== (buy ? s.tokenB : s.tokenA).toLowerCase())
+    fail('Direction', p.tokenIn, buy ? s.tokenB : s.tokenA);
   if (p.amountIn !== amountIn) fail('Sizing', p.amountIn, amountIn);
   if (p.amountIn === 0n || p.amountIn > (buy ? m.maxTradeInB : m.maxTradeInA))
     fail('TradeCap', p.amountIn, buy ? m.maxTradeInB : m.maxTradeInA);

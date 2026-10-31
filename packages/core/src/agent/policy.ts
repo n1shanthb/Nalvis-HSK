@@ -42,7 +42,7 @@ export function configFromEnv(
     mode: env.AGENT_MODE ?? 'agent',
     models: {
       strategist: env.STRATEGIST_MODEL ?? '',
-      fitter: env.FITTER_MODEL ?? env.STRATEGIST_MODEL ?? '',
+      fitter: env.FITTER_MODEL || env.STRATEGIST_MODEL || '',
     },
     fitRounds: Number(env.AGENT_FIT_ROUNDS ?? 3),
     heartbeatSec: Number(env.AGENT_HEARTBEAT_SEC ?? 3600),

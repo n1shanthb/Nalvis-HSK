@@ -14,7 +14,10 @@ export const receiptV3Schema = z
     version: z.literal(3),
     marketDataChainId: z.literal(177),
     executionChainId: z.union([z.literal(133), z.literal(31337)]),
-    contract: z.string().regex(/^0x[\da-fA-F]{40}$/).transform(v=>v as `0x${string}`),
+    contract: z
+      .string()
+      .regex(/^0x[\da-fA-F]{40}$/)
+      .transform((v) => v as `0x${string}`),
     seq: uint,
     prevHead: hexSchema,
     policyHash: hexSchema,
@@ -43,7 +46,10 @@ export const receiptV3Schema = z
       .object({
         kind: z.enum(['TRADE', 'RESIZE', 'WAIT', 'REJECT']),
         direction: z.enum(['BUY', 'SELL', 'HOLD']),
-        tokenIn: z.string().regex(/^0x[\da-fA-F]{40}$/).transform(v=>v as `0x${string}`),
+        tokenIn: z
+          .string()
+          .regex(/^0x[\da-fA-F]{40}$/)
+          .transform((v) => v as `0x${string}`),
         amountIn: uint,
         minOut: uint,
         validUntil: seconds,
