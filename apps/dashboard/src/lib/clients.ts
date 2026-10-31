@@ -117,6 +117,11 @@ export type VaultSnapshot = {
   decimalsA: number;
   decimalsB: number;
   blockNumber: bigint;
+  tokenA?: Address;
+  tokenB?: Address;
+  balanceA?: bigint;
+  balanceB?: bigint;
+  tokenMismatch?: boolean;
 };
 export async function readVault(
   chain: DashboardChain,
@@ -125,25 +130,40 @@ export async function readVault(
 ): Promise<VaultSnapshot> {
   if ((await client.getChainId()) !== chain) throw Error('RPC chain mismatch');
   const blockNumber = await client.getBlockNumber();
-  const read = <F extends 'owner' | 'paused' | 'mandate'>(functionName: F) =>
+  const read = <F extends 'owner' | 'paused' | 'mandate' | 'tokenA' | 'tokenB'>(
+    functionName: F,
+  ) =>
     client.readContract({
       address: vault,
       abi: vaultAbi,
       functionName,
       blockNumber,
     });
-  const [owner, paused, raw] = await Promise.all([
+  const [owner, paused, raw, tokenA, tokenB] = await Promise.all([
     read('owner'),
     read('paused'),
     read('mandate'),
+    read('tokenA'),
+    read('tokenB'),
   ]);
   const cfg = addresses[chain === 133 ? 133 : 177];
   const [decimalsA, decimalsB] = await Promise.all(
-    [cfg.whsk.address, cfg.usdt.address].map((token) =>
+    [tokenA as Address, tokenB as Address].map((token) =>
       client.readContract({
         address: token,
         abi: erc20Abi,
         functionName: 'decimals',
+        blockNumber,
+      }),
+    ),
+  );
+  const [balanceA, balanceB] = await Promise.all(
+    [tokenA as Address, tokenB as Address].map((address) =>
+      client.readContract({
+        address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [vault],
         blockNumber,
       }),
     ),
@@ -172,6 +192,13 @@ export async function readVault(
     `0x${string}`,
   ];
   return {
+    tokenA: tokenA as Address,
+    tokenB: tokenB as Address,
+    balanceA,
+    balanceB,
+    tokenMismatch:
+      String(tokenA).toLowerCase() !== cfg.whsk.address.toLowerCase() ||
+      String(tokenB).toLowerCase() !== cfg.usdt.address.toLowerCase(),
     owner: owner as Address,
     paused: paused as boolean,
     mandate: {

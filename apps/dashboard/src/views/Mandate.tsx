@@ -57,6 +57,12 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
           <progress max={100} value={m.maxSlippageBps} />
         </article>
       </div>
+      {snapshot.tokenMismatch && (
+        <p role="alert">
+          Vault token mismatch: tokenA/tokenB differ from the documented
+          WHSK/USDT pair. Check the deployment before proceeding.
+        </p>
+      )}
       <dl>
         {Object.entries({
           Owner: snapshot.owner,

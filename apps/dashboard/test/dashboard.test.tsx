@@ -3,7 +3,7 @@ import {
   mandateBaseline,
   type OwnerProposal,
 } from '../../../packages/core/src/desk/proposal.js';
-import { keccak256 } from 'viem';
+import { keccak256, encodeFunctionData } from 'viem';
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createPublicClient, custom, decodeFunctionData, zeroHash } from 'viem';
@@ -208,6 +208,28 @@ describe('views', () => {
         if (method === 'eth_blockNumber') return '0x1';
         if (method === 'eth_call') {
           const data = (params![0] as { data: string }).data;
+          if (
+            data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenA' }) ||
+            data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenB' })
+          ) {
+            const functionName =
+              data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenA' })
+                ? 'tokenA'
+                : 'tokenB';
+            return encodeFunctionResult({
+              abi: vaultAbi,
+              functionName,
+              result:
+                functionName === 'tokenA'
+                  ? addresses[133].whsk.address
+                  : addresses[133].usdt.address,
+            });
+          }
+          if (data.startsWith('0x70a08231'))
+            return '0x' + (10n ** 18n).toString(16).padStart(64, '0');
           if (data === '0x8da5cb5b')
             return encodeFunctionResult({
               abi: vaultAbi,
