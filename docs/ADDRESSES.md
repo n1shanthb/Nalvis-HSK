@@ -151,3 +151,7 @@ Vault: `0x663f3ad617193148711d28f5334ee4ed07016602`
 Recorded first trade: `0xd537f6804668cda70ed14543400358a81590ad831ad925d7684627286b78c55d`.
 Constructor arguments and fork block match the T6 local setup above. No new
 remote contract address is introduced.
+
+## Display-only reference (T11)
+
+CoinGecko `hashkey-ecopoints`: `https://api.coingecko.com/api/v3/simple/price?ids=hashkey-ecopoints&vs_currencies=usd`. Public GET returned HTTP 200 with a numeric USD price on 31 Oct 2026. Display only, excluded from evidence hashes and decisions; availability, rate limits and terms remain UNVERIFIED.

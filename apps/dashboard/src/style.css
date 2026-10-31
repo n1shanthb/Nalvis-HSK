@@ -2618,3 +2618,173 @@ h2 {
     animation: none;
   }
 }
+
+/* T11: owner and autonomous agent console */
+.ux-shell {
+  display: block;
+  max-width: 1500px;
+  margin: auto;
+}
+.ux-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 20px;
+  border-bottom: 1px solid var(--line, #333);
+}
+.ux-header nav {
+  display: flex;
+  gap: 20px;
+  margin-right: auto;
+}
+.ux-shell main {
+  padding: 24px;
+  min-width: 0;
+}
+.ledger-connect {
+  max-width: 320px;
+}
+.ledger-connect small {
+  display: block;
+  font-size: 11px;
+}
+.agent-card {
+  padding: 24px;
+  margin: 24px 0;
+  border: 1px solid #363434;
+  border-radius: 12px;
+  background: #151515;
+}
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.preset-grid button {
+  padding: 24px;
+}
+.preset-grid small {
+  display: block;
+  margin-top: 12px;
+}
+.wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  gap: 16px;
+  color: #aaa;
+}
+.wizard-steps [aria-current] {
+  color: #ff9966;
+}
+.mandate-wizard label {
+  display: block;
+  margin: 16px 0;
+}
+.mandate-wizard input {
+  width: 100%;
+}
+.mandate-wizard output {
+  float: right;
+}
+.table-scroll {
+  overflow: auto;
+}
+.changed {
+  background: #492d22;
+}
+.action-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.agent-card fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.negotiation-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+.agent-card code,
+.mandate-wizard code {
+  overflow-wrap: anywhere;
+}
+.desk-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #0009;
+  z-index: 100;
+}
+.desk-drawer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: min(700px, 100%);
+  overflow: auto;
+  background: #121212;
+  padding: 24px;
+  box-shadow: -10px 0 40px #0009;
+}
+@media (max-width: 600px) {
+  .ux-header {
+    gap: 14px;
+    padding: 16px;
+  }
+  .ux-header nav {
+    order: 2;
+    width: 100%;
+  }
+  .ux-shell main {
+    padding: 12px;
+  }
+  .agent-card {
+    padding: 16px;
+  }
+  .preset-grid {
+    grid-template-columns: 1fr;
+  }
+  .agent-card fieldset {
+    display: block;
+  }
+  .agent-card fieldset label {
+    display: block;
+    margin: 12px 0;
+  }
+  .ux-shell table {
+    font-size: 12px;
+  }
+}
+.reference-tile {
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid #363434;
+  border-radius: 12px;
+}
+.reference-tile > span,
+.reference-tile > strong,
+.reference-tile > small {
+  display: block;
+}
+.reference-tile > strong {
+  font-size: 28px;
+  margin: 10px 0;
+}
+.mandate-wizard table {
+  table-layout: fixed;
+  width: 100%;
+}
+.mandate-wizard td,
+.mandate-wizard th,
+.mandate-wizard p {
+  overflow-wrap: anywhere;
+}
+.mandate-wizard th:first-child {
+  width: 25%;
+}

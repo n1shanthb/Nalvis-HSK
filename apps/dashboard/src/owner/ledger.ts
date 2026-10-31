@@ -171,7 +171,9 @@ export async function sendOwnerAction({
     if (
       action.functionName !== 'setMandate' &&
       action.functionName !== 'revoke' &&
-      action.functionName !== 'pause'
+      action.functionName !== 'pause' &&
+      action.functionName !== 'unpause' &&
+      action.functionName !== 'withdraw'
     )
       throw Error('Unsupported owner action');
     assertOwnerChain(await client.getChainId());

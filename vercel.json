@@ -1,12 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "corepack pnpm install --frozen-lockfile",
-  "buildCommand": "VITE_ENABLE_OWNER=false VITE_DEMO_MODE=true corepack pnpm --filter @nalvis/dashboard build",
+  "buildCommand": "VITE_ENABLE_OWNER=true VITE_DEMO_MODE=false corepack pnpm --filter @nalvis/dashboard build",
   "outputDirectory": "apps/dashboard/dist",
   "framework": "vite",
   "functions": {
     "api/desk.ts": {
       "maxDuration": 20
+    },
+    "api/market.ts": {
+      "maxDuration": 10
     }
   }
 }

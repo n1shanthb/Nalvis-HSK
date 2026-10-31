@@ -4,13 +4,15 @@ import { Landing } from '../src/views/Landing.js';
 it('opens the recorded console explicitly and keeps product claims grounded', () => {
   render(<Landing />);
   expect(
-    screen.getByRole('link', { name: /Open console/ }).getAttribute('href'),
-  ).toBe('?demo=1#/mandate');
+    screen
+      .getAllByRole('link', { name: /Open live console/ })[0]
+      .getAttribute('href'),
+  ).toBe('#/agent');
   expect(
     screen
-      .getByRole('link', { name: /Enter the recorded demo/ })
+      .getByRole('link', { name: /Watch recorded demo/ })
       .getAttribute('href'),
-  ).toBe('?demo=1#/mandate');
+  ).toBe('?demo=1#/agent');
   expect(screen.getAllByText(/No proven trading edge/i).length).toBeGreaterThan(
     0,
   );

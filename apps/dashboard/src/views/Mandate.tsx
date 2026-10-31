@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
 import { addresses } from '../../../../packages/core/src/addresses.js';
 import {
+  DeploymentError,
   loadDeployment,
   readVault,
   explorerLink,
@@ -56,6 +57,12 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
           <progress max={100} value={m.maxSlippageBps} />
         </article>
       </div>
+      {snapshot.tokenMismatch && (
+        <p role="alert">
+          Vault token mismatch: tokenA/tokenB differ from the documented
+          WHSK/USDT pair. Check the deployment before proceeding.
+        </p>
+      )}
       <dl>
         {Object.entries({
           Owner: snapshot.owner,
@@ -86,7 +93,11 @@ export function MandateView({
   onOwner,
 }: {
   chain: DashboardChain;
-  onOwner?: (d: Deployment, s: VaultSnapshot) => React.ReactNode;
+  onOwner?: (
+    d: Deployment,
+    s: VaultSnapshot,
+    reload: () => Promise<void>,
+  ) => React.ReactNode;
 }) {
   const resource = useResource(
     useCallback(async () => {
@@ -110,10 +121,42 @@ export function MandateView({
       )}
       {resource.error && (
         <p role="status">
-          Mandate unavailable — {resource.error}. No verified network deployment
-          is currently listed.
+          {resource.data ? 'Data stale, retrying. ' : ''}
+          {resource.cause instanceof DeploymentError
+            ? resource.cause.message
+            : 'RPC unavailable, retrying'}
         </p>
       )}
+      {!resource.data &&
+        resource.cause instanceof DeploymentError &&
+        resource.cause.kind === 'missing' && (
+          <div role="status" className="agent-card">
+            <h3>Not deployed on 133 yet</h3>
+            <p>
+              The vault deployment could not be loaded or verified. Follow the
+              human testnet bootstrap:
+            </p>
+            <ol>
+              <li>
+                Create separate deployer and agent testnet wallets; connect the
+                Ledger owner.
+              </li>
+              <li>Claim test HSK, wrap it and acquire test USDT.</li>
+              <li>
+                Deploy and fund on chain 133, then verify owners and deployment
+                receipts.
+              </li>
+              <li>
+                Build the mandate calldata and review it on Ledger with blind
+                signing enabled.
+              </li>
+            </ol>
+            <p>
+              See scripts/testnet-bootstrap.md. No keys or transactions are
+              handled by Codex.
+            </p>
+          </div>
+        )}
       {resource.data && (
         <>
           <h3>deployments/{chain}.json</h3>
@@ -132,7 +175,11 @@ export function MandateView({
             />
           </p>
           <MandateDetails snapshot={resource.data.snapshot} />
-          {onOwner?.(resource.data.deployment, resource.data.snapshot)}
+          {onOwner?.(
+            resource.data.deployment,
+            resource.data.snapshot,
+            resource.reload,
+          )}
         </>
       )}
       <Portfolio chain={chain} />

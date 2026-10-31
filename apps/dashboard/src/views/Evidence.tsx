@@ -1,3 +1,5 @@
+import { VaultValue } from '../components/VaultValue.js';
+import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
 import { MarketChart } from './MarketChart.js';
 import type { Evidence } from '../../../../packages/core/src/types.js';
 import { useCallback, useEffect, useState } from 'react';
@@ -23,9 +25,26 @@ export const evidenceFetcher: typeof fetch = (input, init) => {
     if (url === endpoints.gate)
       url = '/cex/gate/api/v4/spot/tickers?currency_pair=HSK_USDT';
   }
+  if (
+    import.meta.env.PROD &&
+    (url === endpoints.mexc || url === endpoints.gate)
+  ) {
+    const venue = url === endpoints.mexc ? 'mexc' : 'gate';
+    return fetch(`/api/market?venue=${venue}`, init).then(async (response) => {
+      if (!response.ok) return response;
+      const body = await response.json();
+      return Response.json(body[venue]);
+    });
+  }
   return fetch(url, init);
 };
-export function EvidenceDetails({ e }: { e: Evidence }) {
+export function EvidenceDetails({
+  e,
+  compact = false,
+}: {
+  e: Evidence;
+  compact?: boolean;
+}) {
   const mids = e.cex.map((c) => (c.ask + c.bid) / 2);
   const mid = mids.length === 2 ? (mids[0] + mids[1]) / 2 : undefined;
   const now = Math.max(e.now, Math.floor(Date.now() / 1000));
@@ -35,6 +54,10 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
         <article>
           <span>DEX mid / USDT</span>
           <strong>{e.dexMid?.toFixed(8) ?? 'Unavailable'}</strong>
+        </article>
+        <article>
+          <span>CEX mid / USDT</span>
+          <strong>{mid?.toFixed(8) ?? 'Unavailable'}</strong>
         </article>
         <article>
           <span>DEX / CEX basis</span>
@@ -62,70 +85,76 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
           </small>
         </article>
       </div>
-      <p>
-        APRO is never enforced on-chain; the vault oracle is disabled. Evidence
-        captured {displayTime(e.now)}, mainnet block {String(e.blockNumber)}.
-      </p>
-      <div className="metrics">
-        {(['mexc', 'gate'] as const).map((venue) => {
-          const c = e.cex.find((c) => c.venue === venue);
-          return (
-            <article key={venue}>
-              <span>{venue.toUpperCase()} mid</span>
-              <strong>
-                {c ? ((c.bid + c.ask) / 2).toFixed(8) : 'CEX unavailable'}
-              </strong>
-            </article>
-          );
-        })}
-      </div>
-      <h3>QuoterV2 one-way cost curve</h3>
-      <p>
-        Measured against the DEX mid at the same mainnet block. Costs include
-        pool fees and price impact.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Size / USDT</th>
-            <th>Direction</th>
-            <th>One-way cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {e.quotes.map((q) => {
-            const buy = q.direction === 'BUY_A';
-            const fair = e.dexMid
-              ? (Number(q.amountIn) / 10 ** (buy ? e.decimalsB : e.decimalsA)) *
-                (buy ? 1 / e.dexMid : e.dexMid) *
-                10 ** (buy ? e.decimalsA : e.decimalsB)
-              : 0;
-            return (
-              <tr key={`${q.direction}-${q.sizeB}`}>
-                <td>{q.sizeB}</td>
-                <td>{q.direction}</td>
-                <td>
-                  {fair > 0
-                    ? `${((1 - Number(q.quotedOut) / Number(fair)) * 100).toFixed(4)}%`
-                    : 'Unavailable'}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {!e.quotes.length && <p>Quotes unavailable; no cost estimate.</p>}
-      {Object.entries(e.sources)
-        .filter(([, s]) => s.error)
-        .map(([k, s]) => (
-          <p className="muted" key={k}>
-            {k}: unavailable — {s.error}
+      {!compact && (
+        <>
+          <p>
+            APRO is never enforced on-chain; the vault oracle is disabled.
+            Evidence captured {displayTime(e.now)}, mainnet block{' '}
+            {String(e.blockNumber)}.
           </p>
-        ))}
+          <div className="metrics">
+            {(['mexc', 'gate'] as const).map((venue) => {
+              const c = e.cex.find((c) => c.venue === venue);
+              return (
+                <article key={venue}>
+                  <span>{venue.toUpperCase()} mid</span>
+                  <strong>
+                    {c ? ((c.bid + c.ask) / 2).toFixed(8) : 'CEX unavailable'}
+                  </strong>
+                </article>
+              );
+            })}
+          </div>
+          <h3>QuoterV2 one-way cost curve</h3>
+          <p>
+            Measured against the DEX mid at the same mainnet block. Costs
+            include pool fees and price impact.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Size / USDT</th>
+                <th>Direction</th>
+                <th>One-way cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {e.quotes.map((q) => {
+                const buy = q.direction === 'BUY_A';
+                const fair = e.dexMid
+                  ? (Number(q.amountIn) /
+                      10 ** (buy ? e.decimalsB : e.decimalsA)) *
+                    (buy ? 1 / e.dexMid : e.dexMid) *
+                    10 ** (buy ? e.decimalsA : e.decimalsB)
+                  : 0;
+                return (
+                  <tr key={`${q.direction}-${q.sizeB}`}>
+                    <td>{q.sizeB}</td>
+                    <td>{q.direction}</td>
+                    <td>
+                      {fair > 0
+                        ? `${((1 - Number(q.quotedOut) / Number(fair)) * 100).toFixed(4)}%`
+                        : 'Unavailable'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!e.quotes.length && <p>Quotes unavailable; no cost estimate.</p>}
+          {Object.entries(e.sources)
+            .filter(([, s]) => s.error)
+            .map(([k]) => (
+              <p className="muted" key={k}>
+                {k}: unavailable — check source connectivity and freshness.
+              </p>
+            ))}
+        </>
+      )}
     </>
   );
 }
-export function EvidenceView() {
+export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
   const resource = useResource(
     useCallback(
       () =>
@@ -163,10 +192,14 @@ export function EvidenceView() {
         </p>
       )}
       {resource.error && (
-        <p role="status">Evidence unavailable — {resource.error}</p>
+        <p role="status">
+          Evidence unavailable. Please check the network connection and retry.
+        </p>
       )}
-      <MarketChart points={history} />
-      {resource.data && <EvidenceDetails e={resource.data} />}
+      <VaultValue price={resource.data?.dexMid} />
+      <CoinGeckoReference />
+      {!compact && <MarketChart points={history} />}
+      {resource.data && <EvidenceDetails e={resource.data} compact={compact} />}
     </section>
   );
 }

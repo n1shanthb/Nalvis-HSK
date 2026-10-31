@@ -6,17 +6,17 @@ export function Landing() {
   return (
     <div className="landing">
       <header className="landing-nav">
-        <a className="wordmark" href="?demo=1#/home">
+        <a className="wordmark" href="#/home">
           <span className="brand-mark">N</span>NALVIS
           <span className="wordmark-dot">•</span>
         </a>
         <nav aria-label="Landing navigation">
           <button onClick={() => scroll('protocol')}>The protocol</button>
           <button onClick={() => scroll('workflow')}>How it works</button>
-          <a href="?demo=1#/receipts">Audit trail ↗</a>
+          <a href="#/verify">Audit trail ↗</a>
         </nav>
-        <a className="button ember small" href="?demo=1#/mandate">
-          Open console <span>↗</span>
+        <a className="button ember small" href="#/agent">
+          Open live console <span>↗</span>
         </a>
       </header>
       <main className="landing-main">
@@ -42,15 +42,12 @@ export function Landing() {
               decision, and a trail you can verify. Built for HashKey Chain.
             </p>
             <div className="hero-actions">
-              <a className="button ember" href="?demo=1#/mandate">
-                Explore the console <span>↗</span>
+              <a className="button ember" href="#/agent">
+                Open live console <span>↗</span>
               </a>
-              <button
-                className="button ghost"
-                onClick={() => scroll('protocol')}
-              >
-                Meet Nalvis <span>↓</span>
-              </button>
+              <a className="button ghost" href="?demo=1#/agent">
+                Watch recorded demo <span>↗</span>
+              </a>
             </div>
             <p className="hero-footnote">
               <span className="tiny-dot" /> Mainnet evidence · bounded testnet
@@ -100,7 +97,7 @@ export function Landing() {
               Autonomy should come with an envelope. Nalvis separates what an
               agent can suggest from what it is allowed to execute.
             </p>
-            <a className="text-link" href="?demo=1#/mandate">
+            <a className="text-link" href="#/agent">
               Inspect the signed mandate ↗
             </a>
           </div>
@@ -177,14 +174,14 @@ export function Landing() {
             <br />
             Accounted for.
           </h2>
-          <a className="button ember" href="?demo=1#/mandate">
-            Enter the recorded demo ↗
+          <a className="button ember" href="#/agent">
+            Open live console ↗
           </a>
           <p>Local Anvil prices are not real. No proven trading edge.</p>
         </section>
       </main>
       <footer className="landing-footer">
-        <a className="wordmark" href="?demo=1#/home">
+        <a className="wordmark" href="#/home">
           <span className="brand-mark">N</span>NALVIS
         </a>
         <span>EDGEWISE × PROOFTRADE · HASHKEY CHAIN</span>

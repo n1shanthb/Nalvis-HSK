@@ -51,36 +51,50 @@ const address = z
 const deploymentSchema = z.object({
   vault: address,
   router: address,
-  block: z.coerce.bigint().nonnegative(),
+  block: z.coerce.bigint().nonnegative().optional(),
   owner: address,
   agent: address,
   deployer: address,
   commit: z.string().regex(/^[0-9a-f]{40}$/),
 });
 export type Deployment = z.infer<typeof deploymentSchema>;
+export class DeploymentError extends Error {
+  constructor(public readonly kind: 'missing' | 'unverified') {
+    super(
+      kind === 'missing'
+        ? 'Not deployed on 133 yet'
+        : 'Deployment not verified against docs/ADDRESSES.md',
+    );
+  }
+}
 export async function readJSON(path: string): Promise<unknown> {
   const response = await fetch(path, { signal: AbortSignal.timeout(15000) });
+  if (response.status === 404 && path === '/deployments/133.json')
+    throw new DeploymentError('missing');
   if (
     !response.ok ||
     !(response.headers.get('content-type') ?? '').includes('json')
   )
-    throw Error(`Unavailable: ${path}`);
+    throw Error(
+      path.startsWith('/deployments/')
+        ? 'The verified deployment is not available yet. Follow the testnet bootstrap.'
+        : 'The requested data could not be loaded. Please retry shortly.',
+    );
   return response.json();
 }
 export async function loadDeployment(
   chain: DashboardChain,
 ): Promise<Deployment> {
-  const deployment = deploymentSchema.parse(
-    await readJSON(`/deployments/${chain}.json`),
-  );
+  const raw = await readJSON(`/deployments/${chain}.json`);
+  const parsed = deploymentSchema.safeParse(raw);
+  if (!parsed.success) throw new DeploymentError('unverified');
+  const deployment = parsed.data;
   const documented = new Set(
     (addressBook.match(/0x[0-9a-fA-F]{40}/g) ?? []).map((v) => v.toLowerCase()),
   );
   for (const contract of [deployment.vault, deployment.router]) {
     if (!documented.has(contract.toLowerCase()))
-      throw Error(
-        'UNVERIFIED deployment: add a verified entry to docs/ADDRESSES.md first',
-      );
+      throw new DeploymentError('unverified');
   }
   return deployment;
 }
@@ -103,6 +117,11 @@ export type VaultSnapshot = {
   decimalsA: number;
   decimalsB: number;
   blockNumber: bigint;
+  tokenA?: Address;
+  tokenB?: Address;
+  balanceA?: bigint;
+  balanceB?: bigint;
+  tokenMismatch?: boolean;
 };
 export async function readVault(
   chain: DashboardChain,
@@ -111,25 +130,40 @@ export async function readVault(
 ): Promise<VaultSnapshot> {
   if ((await client.getChainId()) !== chain) throw Error('RPC chain mismatch');
   const blockNumber = await client.getBlockNumber();
-  const read = <F extends 'owner' | 'paused' | 'mandate'>(functionName: F) =>
+  const read = <F extends 'owner' | 'paused' | 'mandate' | 'tokenA' | 'tokenB'>(
+    functionName: F,
+  ) =>
     client.readContract({
       address: vault,
       abi: vaultAbi,
       functionName,
       blockNumber,
     });
-  const [owner, paused, raw] = await Promise.all([
+  const [owner, paused, raw, tokenA, tokenB] = await Promise.all([
     read('owner'),
     read('paused'),
     read('mandate'),
+    read('tokenA'),
+    read('tokenB'),
   ]);
   const cfg = addresses[chain === 133 ? 133 : 177];
   const [decimalsA, decimalsB] = await Promise.all(
-    [cfg.whsk.address, cfg.usdt.address].map((token) =>
+    [tokenA as Address, tokenB as Address].map((token) =>
       client.readContract({
         address: token,
         abi: erc20Abi,
         functionName: 'decimals',
+        blockNumber,
+      }),
+    ),
+  );
+  const [balanceA, balanceB] = await Promise.all(
+    [tokenA as Address, tokenB as Address].map((address) =>
+      client.readContract({
+        address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [vault],
         blockNumber,
       }),
     ),
@@ -158,6 +192,13 @@ export async function readVault(
     `0x${string}`,
   ];
   return {
+    tokenA: tokenA as Address,
+    tokenB: tokenB as Address,
+    balanceA,
+    balanceB,
+    tokenMismatch:
+      String(tokenA).toLowerCase() !== cfg.whsk.address.toLowerCase() ||
+      String(tokenB).toLowerCase() !== cfg.usdt.address.toLowerCase(),
     owner: owner as Address,
     paused: paused as boolean,
     mandate: {

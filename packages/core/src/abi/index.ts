@@ -25,6 +25,8 @@ export const vaultAbi = parseAbi([
   'function commitHold(bytes32 receiptHash,bytes32 prevHead,uint8 kind)',
   'function revoke()',
   'function pause()',
+  'function unpause()',
+  'function withdraw(address token,uint256 amount,address to)',
   'function setMandate((address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint16 maxDrawdownBps,uint256 minIntervalSec,bytes32 policyHash) m)',
 ]);
 export const proofRouterAbi = parseAbi([

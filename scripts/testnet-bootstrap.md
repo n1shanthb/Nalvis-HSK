@@ -195,3 +195,11 @@ GO. **NO-GO:** ship ProofTrade only, leave vault code unadvertised, hide owner U
 keeper calls ProofTradeRouter `commitAndSwap`/`commitHold` from its testnet wallet.
 M4–M8 remain unchanged. Faucet, Ledger support and live broadcasts require the
 human to verify them; they are not established by Codex's local tests.
+
+## Publish the verified testnet manifest to the hosted console
+
+After the human chain-133 deploy and both receipt/owner checks, commit
+`contracts/deployments/133.json`, add the verified vault and router deployment
+entries to `docs/ADDRESSES.md`, then redeploy Vercel. The manifest and address
+registry are baked in at build time; live Receipt polling does not publish a
+new deployment manifest automatically. Never commit keys or `.env` files.

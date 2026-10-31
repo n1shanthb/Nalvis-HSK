@@ -49,7 +49,7 @@ export async function receiptLogs(
   const logs = [];
   // Keep each RPC query within the documented 5,000 block maximum.
   for (
-    let fromBlock = deployment.block;
+    let fromBlock = deployment.block ?? (latest > 4999n ? latest - 4999n : 0n);
     fromBlock <= latest;
     fromBlock += 5000n
   ) {
