@@ -1,5 +1,6 @@
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
@@ -33,6 +34,9 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       <h2>Agent</h2>
       {feed ? (
         <>
+          <Suspense fallback={<p>Loading recorded chart…</p>}>
+            <PriceChart points={demoEvidence} demo actions={feed.actions} />
+          </Suspense>
           <EvidenceDetails e={demoEvidence[0]} compact />
           <RecordedVaultValue />
         </>

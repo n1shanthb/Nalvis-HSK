@@ -1,6 +1,8 @@
 import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
-import { MarketChart } from './MarketChart.js';
+import { lazy, Suspense } from 'react';
+import type { ActionView } from '../agent/feed-types.js';
+const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import type { Evidence } from '../../../../packages/core/src/types.js';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -154,7 +156,10 @@ export function EvidenceDetails({
     </>
   );
 }
-export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
+export function EvidenceView({
+  compact = false,
+  actions = [],
+}: { compact?: boolean; actions?: ActionView[] } = {}) {
   const resource = useResource(
     useCallback(
       () =>
@@ -180,6 +185,15 @@ export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
   }, [resource.data]);
   return (
     <section>
+      <Suspense fallback={<p>Loading market chart…</p>}>
+        <PriceChart
+          points={history}
+          actions={actions}
+          unavailable={
+            !!resource.error || (!resource.loading && !resource.data)
+          }
+        />
+      </Suspense>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
       <h2>Live market evidence</h2>
       <p>
@@ -198,7 +212,7 @@ export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
       )}
       <VaultValue price={resource.data?.dexMid} />
       <CoinGeckoReference />
-      {!compact && <MarketChart points={history} />}
+
       {resource.data && <EvidenceDetails e={resource.data} compact={compact} />}
     </section>
   );
