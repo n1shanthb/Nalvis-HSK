@@ -86,7 +86,7 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
     const p = context.portfolio;
     return answer(
       p
-        ? `${p.label}. WHSK: ${p.balanceA.toFixed(6)}; USDT: ${p.balanceB.toFixed(6)}; P&L vs hold after gas: $${p.excessVsHoldUSD.toFixed(4)}. ${p.assumptions ?? "Inventory reconstructed from verified receipts; assumes no deposits or withdrawals. No proven edge."}`
+        ? `${p.label}. WHSK: ${p.balanceA.toFixed(6)}; USDT: ${p.balanceB.toFixed(6)}; P&L vs hold after gas: $${p.excessVsHoldUSD.toFixed(4)}. ${p.assumptions ?? 'Inventory reconstructed from verified receipts; assumes no deposits or withdrawals. No proven edge.'}`
         : 'Positions and P&L unavailable: load a contiguous, verified receipt history first.',
     );
   }

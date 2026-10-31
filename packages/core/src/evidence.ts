@@ -2,6 +2,7 @@ import { parseAbi, zeroAddress, type Address, type Abi } from 'viem';
 import { z } from 'zod';
 import { addresses, assertWritableChain } from './addresses.js';
 import { mandateSchema } from './policy.js';
+import { vaultAbi } from './abi/index.js';
 import {
   evidenceSchema,
   sourceSchema,
@@ -29,9 +30,6 @@ const oracleAbi = parseAbi([
 ]);
 const quoterAbi = parseAbi([
   'function quoteExactInputSingle((address tokenIn,address tokenOut,uint256 amountIn,uint24 fee,uint160 sqrtPriceLimitX96) params) returns (uint256,uint160,uint32,uint256)',
-]);
-const vaultAbi = parseAbi([
-  'function mandate() view returns (address,uint256,uint256,uint256,uint256,uint16,uint16,uint256,bytes32)',
 ]);
 const natural = z.bigint().nonnegative();
 const positive = z.bigint().positive();
@@ -114,6 +112,7 @@ export type EvidenceOptions = {
   execClient: EvidenceClient;
   vault?: Address;
   sizes: number[];
+  decisionTtlSec?: number;
   fetcher?: typeof fetch;
   clock?: () => number;
 };
@@ -124,9 +123,16 @@ export async function collectEvidence({
   execClient: exec,
   vault,
   sizes,
+  decisionTtlSec = 120,
   fetcher = fetch,
   clock = () => Math.floor(Date.now() / 1000),
 }: EvidenceOptions): Promise<Evidence> {
+  if (
+    !Number.isInteger(decisionTtlSec) ||
+    decisionTtlSec < 1 ||
+    decisionTtlSec > 3600
+  )
+    throw new Error('Invalid decision TTL');
   if (market.chain?.id !== 177)
     throw new Error('Market client must be chain 177');
   const executionChainId = exec.chain?.id;
@@ -424,6 +430,7 @@ export async function collectEvidence({
     }
   }
   e.now = clock();
+  e.validUntil = e.now + decisionTtlSec;
   if (e.apro) e.apro.ageSec = e.now - e.apro.updatedAt;
   return evidenceSchema.parse(e);
 }

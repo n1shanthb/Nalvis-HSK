@@ -148,3 +148,40 @@ This source is inside the existing evidence commitment; it does not change the
 v1 receipt projection or golden-file contract. `sources.keeperState` continues
 to record the execution snapshot. See `packages/verifier/README.md` for failure
 semantics and execution-unit comparisons.
+
+
+## T8 desk, expiry and risk extension
+
+`pnpm build && pnpm nalvis desk "show P&L" --demo` verifies the four recorded
+Anvil receipts and reuses verifier `pnl()`; without a data option the CLI refuses
+unavailable data honestly. For live verification use `--receipts <directory>
+--rpc <url>`. This command has no wallet, account, signing or broadcast path.
+English and Hinglish commands use the same parser as the dashboard. Parameter
+requests pass through `nlToParamDiff`; only a diff and the keccak256 of exact
+owner calldata are returned. A cap/slippage proposal needs the complete current
+mandate, including agent and Task 9 drawdown cap. Missing values fail closed.
+
+New keeper evidence has `validUntil = evidence.now + (policy.decisionTtlSec ??
+120)` in UTC seconds. The optional policy TTL is restricted to 1–3600 seconds.
+The engine copies it to every decision, including holds. The keeper commits it
+in `tx.validUntil`, includes that value in the receipt hash, and passes it to
+Task 9 vault/router calls independently of the transaction deadline. Signing
+checks chain time immediately before writes, including after router approvals;
+testnet also checks wall time. Historical local Anvil runs use their simulated
+chain clock. The verifier checks policy TTL, equality across evidence, decision
+and transaction, calldata, deadline and the mined block timestamp. Legacy v1
+receipts without these optional fields keep their original hashes and replay
+behavior; they are explicitly historical and cannot be submitted by the new
+keeper. No committed T6 fixture was altered.
+
+The keeper reads frozen `data/research/market_history.json`, commits its hash,
+719 return observations and the recorded CEX hourly log-return sigma (percentage
+converted to fraction). Each executable size is stress-tested with 256 seeded
+uniform draws in [-sigma,+sigma], explicitly including both endpoints. The
+model reprices fair output around the **measured QuoterV2 cost curve**; it is a
+bounded stress proxy, not a fresh QuoterV2 RPC at hypothetical pool states or a
+forecast. A size must retain positive edge after worst stressed cost and policy
+buffer. The engine iterates the existing descending size grid only; this check
+can resize down or reject and cannot increase size or promote WAIT to TRADE.
+Inputs and results are committed in evidence and the decision/receipt. Historical
+backtest inputs and `backtest.json` are unchanged: no new edge is claimed.

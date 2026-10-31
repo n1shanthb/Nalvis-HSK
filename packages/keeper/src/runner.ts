@@ -70,7 +70,11 @@ export interface Execution {
   ): Promise<{ quote: bigint; floor: bigint }>;
   calldata(receipt: ReceiptBody & { receiptHash: Hex }): Hex;
   check(snapshot: Snapshot): Promise<void>;
-  send(data: Hex, onHash: (hash: Hex) => Promise<void>): Promise<Settlement>;
+  send(
+    data: Hex,
+    onHash: (hash: Hex) => Promise<void>,
+    validUntil: number,
+  ): Promise<Settlement>;
   // Reconcile from chain, including committed JSON files whose settlement append was interrupted.
   reconcile(directory: string): Promise<number>;
 }
@@ -181,6 +185,15 @@ export async function tick(
     raw: { policy, mandate: snapshot.mandate, state },
   };
   const decision = decide(evidence, policy, snapshot.mandate, state);
+  evidence.sources.riskSimulation = {
+    address: execution.contract,
+    method: 'seeded-bounded-price-stress-v1',
+    fetchedAt: evidence.now,
+    raw: decision.riskCheck ?? {
+      skipped:
+        'No executable candidate after deterministic quality/mandate gates',
+    },
+  };
   let minOut = 0n;
   if (decision.kind === 'TRADE' || decision.kind === 'RESIZE') {
     if (!decision.amountIn || !decision.direction)
@@ -259,7 +272,8 @@ export async function tick(
     const fresh = await execution.snapshot();
     if (
       fresh.now > evidence.validUntil ||
-      Math.floor(Date.now() / 1000) > evidence.validUntil
+      (execution.chainId === 133 &&
+        Math.floor(Date.now() / 1000) > evidence.validUntil)
     )
       throw new Error('Stale decision dropped before signing');
     const pending = join(directory, '.pending.json');
@@ -281,6 +295,7 @@ export async function tick(
           transactionHash,
         });
       },
+      evidence.validUntil,
     );
     if (
       settlement.log.receiptHash !== receipt.receiptHash ||

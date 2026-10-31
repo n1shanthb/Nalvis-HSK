@@ -205,3 +205,44 @@ describe('recorded genuine T5 fork execution', () => {
     expect(r.metrics?.slippageQuoteBps).not.toBeNull();
   });
 });
+
+describe('T8 decision expiry', () => {
+  const modernHold = () => {
+    const r = structuredClone(wait);
+    const until = r.evidence.now + 120;
+    r.evidence.validUntil = until;
+    r.evidence.riskInput = {
+      sigma: 0.0045,
+      observations: 719,
+      historyHash: '0x' + 'a'.repeat(64),
+    };
+    r.decision.validUntil = until;
+    r.tx.validUntil = until;
+    r.tx.deadline = until;
+    rehash(r);
+    return r;
+  };
+  test('rejects mismatched committed expiry before touching the chain', async () => {
+    const r = modernHold();
+    r.tx.validUntil++;
+    rehash(r);
+    expect(failures(await verify(r, recordedReader(chain)))).toContain(
+      'decision_expiry',
+    );
+  });
+  test('rejects a receipt mined after its evidence expiry', async () => {
+    const r = modernHold();
+    const reader = {
+      ...recordedReader(chain),
+      timestamp: async () => r.evidence.validUntil + 1,
+    };
+    const result = await verify(r, reader);
+    expect(result.checks.find((c) => c.name === 'decision_expiry')?.pass).toBe(
+      true,
+    );
+    expect(result.checks.find((c) => c.name === 'decision_replay')?.pass).toBe(
+      true,
+    );
+    expect(failures(result)).toContain('mined_before_expiry');
+  });
+});

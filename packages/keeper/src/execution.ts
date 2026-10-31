@@ -355,7 +355,7 @@ export async function connectExecution(
     await guardSigning(client, chainId);
     if (
       sendingValidUntil !== undefined &&
-      (Math.floor(Date.now() / 1000) > sendingValidUntil ||
+      ((chainId === 133 && Math.floor(Date.now() / 1000) > sendingValidUntil) ||
         Number((await client.getBlock()).timestamp) > sendingValidUntil)
     )
       throw new Error('Stale decision dropped before signature');
@@ -423,6 +423,7 @@ export async function connectExecution(
         execClient: client as unknown as EvidenceClient,
         vault: deployment.vault,
         sizes: policy.presets[options.preset].sizeGridB,
+        decisionTtlSec: policy.decisionTtlSec ?? 120,
       });
       // Market retrieval times remain UTC wall time; execution deadlines use the chain clock.
       void s;
@@ -546,7 +547,9 @@ export async function connectExecution(
         ],
       });
     },
-    async send(data, onHash) {
+    async send(data, onHash, validUntil) {
+      if (!Number.isSafeInteger(validUntil) || validUntil < 0)
+        throw new Error('Missing decision expiry');
       const { decodeFunctionData } = await import('viem');
       const parsed = decodeFunctionData({
         abi: [...vaultAbi, ...proofRouterAbi],
@@ -557,7 +560,9 @@ export async function connectExecution(
           ? Number(parsed.args[0].validUntil)
           : parsed.functionName === 'commitAndSwap'
             ? Number(parsed.args[3])
-            : undefined;
+            : validUntil;
+      if (sendingValidUntil !== validUntil)
+        throw new Error('Decision/calldata expiry mismatch');
       // Router approvals are exact and cleared. The intent journal already exists before this first write.
       let token: Address | undefined;
       if (options.target === 'router') {

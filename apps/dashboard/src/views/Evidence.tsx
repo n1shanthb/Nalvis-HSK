@@ -157,7 +157,11 @@ export function EvidenceView() {
         Read-only observations. Refreshes 30 seconds after each completed poll.
         No proven edge.
       </p>
-      {resource.loading && <p className="skeleton" role="status">Collecting evidence…</p>}
+      {resource.loading && (
+        <p className="skeleton" role="status">
+          Collecting evidence…
+        </p>
+      )}
       {resource.error && (
         <p role="status">Evidence unavailable — {resource.error}</p>
       )}

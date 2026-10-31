@@ -97,6 +97,8 @@ are not evidence of real hardware compatibility.
 
 ## T8 read-only Vercel demo
 
+Hosted demo: https://nalvis-hsk-demo.vercel.app (recorded local Anvil; prices not real).
+
 Import the repository into Vercel with **repository root** as Root Directory.
 The root `vercel.json` installs the pnpm workspace, builds the dashboard with
 `VITE_ENABLE_OWNER=false VITE_DEMO_MODE=true`, and publishes `apps/dashboard/dist`.
