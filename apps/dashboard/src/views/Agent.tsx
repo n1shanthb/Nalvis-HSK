@@ -1,3 +1,4 @@
+import { CostChart } from '../components/charts/CostChart.js';
 import { DemoLimits } from '../components/charts/DemoLimits.js';
 const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
@@ -231,6 +232,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       </article>
       <article className="agent-card">
         <h3>Model stats</h3>
+        <CostChart feed={feed} />
         {feed ? (
           <p>
             {feed.stats.calls24h} calls / 24h · ${feed.stats.estimatedSpendUsd}{' '}
