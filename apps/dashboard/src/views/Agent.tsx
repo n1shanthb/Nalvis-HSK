@@ -1,3 +1,4 @@
+import { DemoLimits } from '../components/charts/DemoLimits.js';
 const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
 import { lazy, Suspense, useState } from 'react';
@@ -43,6 +44,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
           </Suspense>
           <EvidenceDetails e={demoEvidence[0]} compact />
           <RecordedVaultValue />
+          <DemoLimits />
         </>
       ) : (
         <>

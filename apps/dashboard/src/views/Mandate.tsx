@@ -1,8 +1,10 @@
+import { LimitChart } from '../components/charts/LimitChart.js';
 import { Portfolio } from './Portfolio.js';
 import { useCallback, useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
 import { addresses } from '../../../../packages/core/src/addresses.js';
 import {
+  clientFor,
   DeploymentError,
   loadDeployment,
   readVault,
@@ -13,6 +15,7 @@ import {
   type Deployment,
 } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
+import { readChartRisk } from '../lib/chart-data.js';
 export function ContractLink({
   chain,
   value,
@@ -102,7 +105,14 @@ export function MandateView({
   const resource = useResource(
     useCallback(async () => {
       const deployment = await loadDeployment(chain);
-      return { deployment, snapshot: await readVault(chain, deployment.vault) };
+      const snapshot = await readVault(chain, deployment.vault);
+      const risk = await readChartRisk(
+        clientFor(chain),
+        deployment.vault,
+        snapshot.blockNumber,
+        snapshot.decimalsB,
+      ).catch(() => undefined);
+      return { deployment, snapshot, risk };
     }, [chain]),
   );
   const cfg = addresses[chain === 133 ? 133 : 177];
@@ -182,6 +192,22 @@ export function MandateView({
           )}
         </>
       )}
+      <LimitChart
+        mandate={
+          resource.data
+            ? {
+                ...resource.data.snapshot.mandate,
+                minIntervalSec: Number(
+                  resource.data.snapshot.mandate.minIntervalSec,
+                ),
+              }
+            : undefined
+        }
+        at={resource.data?.risk?.at}
+        decimalsB={resource.data?.snapshot.decimalsB}
+        dailySpentB={resource.data?.risk?.dailySpentB}
+        lastTradeAt={resource.data?.risk?.lastTradeAt}
+      />
       <Portfolio chain={chain} />
       <h3>Verified network contracts</h3>
       <dl>

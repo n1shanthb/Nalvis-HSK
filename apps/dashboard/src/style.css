@@ -2816,3 +2816,17 @@ h2 {
     display: none;
   }
 }
+
+.chart-table { max-height: 20rem; overflow: auto; }
+.chart details { margin-top: .75rem; }
+.chart [role="img"]:focus-visible { outline: 2px solid var(--accent, #75baff); outline-offset: 3px; }
+.chart-heading { gap: .75rem; flex-wrap: wrap; }
+.limit-row { margin: 1rem 0; display: grid; gap: .35rem; }
+.limit-row > span { overflow-wrap: anywhere; }
+.limit-track { height: .7rem; position: relative; background: #8b919922; border-radius: .2rem; }
+.limit-track > span { display: block; height: 100%; background: #47a878; }
+.limit-track > i { position: absolute; right: 0; top: -.15rem; height: 1rem; border-right: 2px dashed currentColor; }
+.limit-row.warning .limit-track > span { background: #c38924; }
+.limit-row.danger .limit-track > span { background: #cd5353; }
+.chart .danger { color: #cd5353; }
+@media (prefers-reduced-motion: reduce) { .chart *, .limit-track > span { transition: none; animation: none; } }

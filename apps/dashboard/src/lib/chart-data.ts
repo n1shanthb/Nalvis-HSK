@@ -134,3 +134,49 @@ export function vaultSeries(results: Verification[]) {
     };
   });
 }
+
+/** Extra pinned public reads run alongside the existing resource poll, never a signer. */
+export async function readChartRisk(
+  client: Pick<import('viem').PublicClient, 'readContract' | 'getBlock'>,
+  vault: import('viem').Address,
+  blockNumber: bigint,
+  decimalsB: number,
+) {
+  const { vaultAbi } =
+    await import('../../../../packages/core/src/abi/index.js');
+  const [last, spent, bucket, high, block] = await Promise.all([
+    client.readContract({
+      address: vault,
+      abi: vaultAbi,
+      functionName: 'lastTradeAt',
+      blockNumber,
+    }),
+    client.readContract({
+      address: vault,
+      abi: vaultAbi,
+      functionName: 'dailyNotionalB',
+      blockNumber,
+    }),
+    client.readContract({
+      address: vault,
+      abi: vaultAbi,
+      functionName: 'dailyBucket',
+      blockNumber,
+    }),
+    client.readContract({
+      address: vault,
+      abi: vaultAbi,
+      functionName: 'highWaterMark',
+      blockNumber,
+    }),
+    client.getBlock({ blockNumber }),
+  ]);
+  return {
+    at: Number(block.timestamp),
+    lastTradeAt: Number(last),
+    dailySpentB:
+      Number(BigInt(bucket) === block.timestamp / 86400n ? spent : 0n) /
+      10 ** decimalsB,
+    highWaterB: Number(high) / 10 ** decimalsB,
+  };
+}

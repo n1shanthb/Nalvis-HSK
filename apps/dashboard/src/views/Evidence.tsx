@@ -1,3 +1,4 @@
+import { LimitChart } from '../components/charts/LimitChart.js';
 const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
@@ -12,7 +13,7 @@ import {
 } from '../../../../packages/core/src/evidence.js';
 import { policySchema } from '../../../../packages/core/src/policy.js';
 import policyJSON from '../../../../policy/default.json';
-import { clientFor, displayTime } from '../lib/clients.js';
+import { clientFor, displayTime, loadDeployment } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
 const policy = policySchema.parse(policyJSON);
 const sizes = [
@@ -162,17 +163,17 @@ export function EvidenceView({
   actions = [],
 }: { compact?: boolean; actions?: ActionView[] } = {}) {
   const resource = useResource(
-    useCallback(
-      () =>
-        collectEvidence({
-          marketClient177: market,
-          execClient: execution,
-          sizes,
-          decisionTtlSec: policy.decisionTtlSec ?? 120,
-          fetcher: evidenceFetcher,
-        }),
-      [],
-    ),
+    useCallback(async () => {
+      const deployment = await loadDeployment(133).catch(() => undefined);
+      return collectEvidence({
+        vault: deployment?.vault,
+        marketClient177: market,
+        execClient: execution,
+        sizes,
+        decisionTtlSec: policy.decisionTtlSec ?? 120,
+        fetcher: evidenceFetcher,
+      });
+    }, []),
   );
   const [history, setHistory] = useState<Evidence[]>([]);
   useEffect(() => {
@@ -214,6 +215,11 @@ export function EvidenceView({
           Evidence unavailable. Please check the network connection and retry.
         </p>
       )}
+      <LimitChart
+        mandate={resource.data?.vault?.mandate}
+        evidence={resource.data}
+        at={resource.data?.now}
+      />
       <VaultValue price={resource.data?.dexMid} />
       <CoinGeckoReference />
 
