@@ -72,3 +72,7 @@ Organizer confirmation of testnet-only eligibility remains outstanding. No
 Telegram message, reply or screenshot is claimed. Ledger hardware and testnet
 broadcasts remain with the project owner. No mainnet signing/broadcast path was
 introduced and nothing has been merged into main.
+
+## Follow-up timestamp binding
+
+V2 `decisionTime` must equal the RPC timestamp of `evidence.executionBlockNumber`, which must also be the replay source's execution snapshot block on the receipt's execution chain/contract. This is the block read before deciding, **not the later mined transaction block**. The mined block must follow that snapshot and remain within validUntil. Server wall time can differ without changing either chain-time check. The keeper now commits the snapshot block consistently. T8 recordings were regenerated from actual local Anvil transactions with independent RPC timestamps for all eight snapshot/mined blocks; T6 recordings remain unchanged.

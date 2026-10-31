@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import {
+  clientIdentity,
+  createBudgetStore,
+  type BudgetStore,
+  type Credits,
+} from './budget.js';
+import {
   parseIntent,
   supportedCommands,
 } from '../../../packages/core/src/desk/index.js';
@@ -41,8 +47,8 @@ const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 export function createDeskHandler(
   env: Env = process.env,
   send: typeof fetch = fetch,
+  budget: BudgetStore | undefined = createBudgetStore(env, send),
 ) {
-  const limits = new Map<string, { at: number; count: number }>();
   const json = (body: unknown, status = 200) =>
     Response.json(body, {
       status,
@@ -51,20 +57,59 @@ export function createDeskHandler(
         'X-Content-Type-Options': 'nosniff',
       },
     });
-  return async (request: Request): Promise<Response> => {
-    const available = Object.entries(providers).map(([id, p]) => ({
-      id,
-      available:
-        env.DESK_AI_ENABLED !== 'false' &&
-        Boolean(env[`${p.prefix}_API_KEY`] && env[`${p.prefix}_MODEL`]),
-      model: env[`${p.prefix}_MODEL`] ?? null,
-    }));
-    if (request.method === 'GET') return json({ providers: available });
+  return async (request: Request, peerIp?: string): Promise<Response> => {
+    const enabled = env.DESK_AI_ENABLED === 'true';
+    const identity = clientIdentity(request, env, peerIp);
+    const configured = (prefix: string) =>
+      enabled &&
+      Boolean(
+        env[`${prefix}_API_KEY`] &&
+        env[`${prefix}_MODEL`] &&
+        budget &&
+        identity,
+      );
+    if (request.method === 'GET') {
+      let credits: Credits | null = null,
+        allowed = false;
+      if (Object.values(providers).some((p) => configured(p.prefix))) {
+        try {
+          const status = await budget!.check(identity!, false);
+          credits = status.credits;
+          allowed = status.allowed;
+        } catch {
+          return json(
+            {
+              providers: Object.keys(providers).map((id) => ({
+                id,
+                available: false,
+              })),
+              credits: null,
+              status: 'unavailable',
+            },
+            503,
+          );
+        }
+      }
+      return json({
+        providers: Object.entries(providers).map(([id, p]) => ({
+          id,
+          available: configured(p.prefix) && allowed,
+        })),
+        credits,
+        status: !enabled
+          ? 'disabled'
+          : credits
+            ? allowed
+              ? 'ready'
+              : 'exhausted'
+            : 'unavailable',
+      });
+    }
     if (request.method !== 'POST')
       return json({ error: 'Method not allowed' }, 405);
     const origin = request.headers.get('origin');
-    if (origin && origin !== new URL(request.url).origin)
-      return json({ error: 'Origin not allowed' }, 403);
+    if (!origin || origin !== new URL(request.url).origin)
+      return json({ error: 'Same-origin browser request required' }, 403);
     if (!request.headers.get('content-type')?.startsWith('application/json'))
       return json({ error: 'JSON required' }, 415);
     let input: z.infer<typeof inputSchema>;
@@ -89,23 +134,49 @@ export function createDeskHandler(
     } catch {
       return json({ error: 'Invalid desk request' }, 400);
     }
+    if (/^mat\s+karo[?!.]*$/i.test(input.text))
+      return json(
+        {
+          error:
+            'A negated request does not authorize an owner action. Use built-in commands.',
+          credits: null,
+        },
+        422,
+      );
     const p = providers[input.provider],
       key = env[`${p.prefix}_API_KEY`],
       model = env[`${p.prefix}_MODEL`];
-    if (env.DESK_AI_ENABLED === 'false' || !key || !model)
+    if (!configured(p.prefix) || !key || !model)
       return json(
-        { error: 'Provider is not configured. Use built-in commands.' },
+        {
+          error:
+            'AI is disabled or its provider and shared budget are not configured. Use built-in commands.',
+          credits: null,
+        },
         503,
       );
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
-    const now = Date.now();
-    for (const [id, l] of limits) if (now - l.at > 60000) limits.delete(id);
-    const limit = limits.get(ip) ?? { at: now, count: 0 };
-    if (limit.count >= 15 || (!limits.has(ip) && limits.size >= 1000))
-      return json({ error: 'Please wait before asking again.' }, 429);
-    limit.count++;
-    limits.set(ip, limit);
+    let credits: Credits;
+    try {
+      const reservation = await budget!.check(identity!, true);
+      credits = reservation.credits;
+      if (!reservation.allowed)
+        return json(
+          {
+            error:
+              'AI request budget exhausted. Use built-in commands until the budget resets.',
+            credits,
+          },
+          429,
+        );
+    } catch {
+      return json(
+        {
+          error: 'Shared AI budget unavailable. Use built-in commands.',
+          credits: null,
+        },
+        503,
+      );
+    }
     try {
       const response = await send(p.url, {
         method: 'POST',
@@ -136,12 +207,14 @@ export function createDeskHandler(
           {
             error:
               'AI could not map this to one supported command. Please use a built-in command.',
+            credits,
           },
           422,
         );
       return json({
         provider: input.provider,
         model,
+        credits,
         command: output.command,
         promptHash: hash(system + '\n' + input.text),
         outputHash: hash(raw),
@@ -151,6 +224,7 @@ export function createDeskHandler(
         {
           error:
             'AI unavailable or returned an invalid command. Use built-in commands.',
+          credits,
         },
         502,
       );

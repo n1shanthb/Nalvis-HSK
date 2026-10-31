@@ -315,3 +315,69 @@ test.each(['hash', 'tightening', 'during-signature'] as const)(
     expect(client.sendRawTransaction).not.toHaveBeenCalled();
   },
 );
+
+// Regress the UI-to-signer path, not just an isolated callback.
+test('a loaded desk cap proposal cannot block a manual emergency revoke', async () => {
+  const { createElement } = await import('react');
+  const { render, screen, fireEvent, waitFor } =
+    await import('@testing-library/react');
+  const { MandateForm } = await import('../src/owner/MandateForm.js');
+  const ledger = await import('../src/owner/ledger.js');
+  const mandate: SignedMandate = {
+    agent: mnemonicToAccount(
+      'test test test test test test test test test test test junk',
+      { addressIndex: 1 },
+    ).address,
+    expiry: 1900000000n,
+    maxTradeInA: 10n ** 18n,
+    maxTradeInB: 100n * 10n ** 18n,
+    maxDailyInB: 500n * 10n ** 18n,
+    maxExposureBps: 8000,
+    maxSlippageBps: 50,
+    maxDrawdownBps: 1000,
+    minIntervalSec: 30n,
+    policyHash: zeroHash,
+  };
+  const diff = { maxTradeInB: String(25n * 10n ** 18n) };
+  const proposal: OwnerProposal = {
+    action: 'setMandate',
+    diff,
+    calldataHash: keccak256(proposalCalldata('setMandate', diff, mandate)),
+    baselineHash: mandateBaseline(mandate, false),
+    target: { vault: params.vault, chainId: 133 },
+  };
+  const signer = new MockSigner(),
+    client = mockClient(),
+    clear = vi.fn();
+  const original = ledger.sendOwnerAction;
+  const send = vi
+    .spyOn(ledger, 'sendOwnerAction')
+    .mockImplementation((args) =>
+      original({ ...args, client: client as never }),
+    );
+  render(
+    createElement(MandateForm, {
+      chain: 133,
+      vault: params.vault,
+      snapshot: {
+        owner: account.address,
+        mandate,
+        paused: false,
+        blockNumber: 1n,
+        decimalsA: 18,
+        decimalsB: 18,
+      },
+      proposal,
+      onProposalClear: clear,
+      signerFactory: async () => signer,
+    }),
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  fireEvent.click(screen.getByText('Build revoke review'));
+  fireEvent.click(screen.getByText('Sign and send reviewed action'));
+  await waitFor(() => expect(signer.signTransaction).toHaveBeenCalledOnce());
+  await waitFor(() => expect(client.sendRawTransaction).toHaveBeenCalledOnce());
+  expect(send.mock.calls[0][0].proposal).toBeUndefined();
+  expect(send.mock.calls[0][0].data).toBe('0xb6549f75');
+  expect(clear).toHaveBeenCalledTimes(2);
+});

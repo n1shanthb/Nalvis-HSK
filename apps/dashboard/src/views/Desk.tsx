@@ -11,19 +11,29 @@ import { liveDeskContext } from '../lib/desk-context.js';
 import type { DashboardChain } from '../lib/clients.js';
 import { demoContext } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
+const creditsSchema = z
+  .object({
+    remaining: z.number().int().nonnegative(),
+    globalRemaining: z.number().int().nonnegative(),
+    resetAt: z.number().int().positive(),
+    retryAfter: z.number().int().nonnegative(),
+  })
+  .strict();
 const providerSchema = z.object({
   providers: z.array(
     z.object({
       id: z.enum(['groq', 'openrouter']),
       available: z.boolean(),
-      model: z.string().nullable(),
     }),
   ),
+  credits: creditsSchema.nullable(),
+  status: z.enum(['disabled', 'unavailable', 'ready', 'exhausted']),
 });
 const translationSchema = z
   .object({
     provider: z.enum(['groq', 'openrouter']),
     model: z.string(),
+    credits: creditsSchema,
     command: z.string().max(120),
     promptHash: z.string().regex(/^[a-f0-9]{64}$/),
     outputHash: z.string().regex(/^[a-f0-9]{64}$/),
@@ -51,13 +61,33 @@ export function DeskView({
     z.infer<typeof providerSchema>['providers']
   >([]);
   const [pending, setPending] = useState(false);
+  const [credits, setCredits] = useState<z.infer<typeof creditsSchema> | null>(
+    null,
+  );
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/desk', { signal: controller.signal })
-      .then((r) => r.json())
-      .then((data) => setProviders(providerSchema.parse(data).providers))
-      .catch(() => {});
-    return () => controller.abort();
+    const refresh = () =>
+      fetch('/api/desk', { signal: controller.signal })
+        .then((r) => r.json())
+        .then((data) => {
+          const status = providerSchema.parse(data);
+          setProviders(status.providers);
+          setCredits(status.credits);
+          if (!status.providers.some((p) => p.available)) setProvider('rules');
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            setProviders([]);
+            setCredits(null);
+            setProvider('rules');
+          }
+        });
+    void refresh();
+    const timer = setInterval(() => void refresh(), 30000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
   }, []);
   const [messages, setMessages] = useState<
     {
@@ -85,8 +115,26 @@ export function DeskView({
           body: JSON.stringify({ provider, text }),
           signal: AbortSignal.timeout(15000),
         });
-        if (!response.ok) throw new Error('AI unavailable');
-        const result = translationSchema.parse(await response.json());
+        const body: unknown = await response.json();
+        if (!response.ok) {
+          const error = z
+            .object({ credits: creditsSchema.nullable().optional() })
+            .safeParse(body);
+          if (error.success) setCredits(error.data.credits ?? null);
+          if (response.status === 429) {
+            setProvider('rules');
+            warning =
+              'AI request budget or rate limit reached. Using built-in commands.';
+          }
+          throw new Error('AI unavailable');
+        }
+        const result = translationSchema.parse(body);
+        setCredits(result.credits);
+        if (
+          result.credits.remaining === 0 ||
+          result.credits.globalRemaining === 0
+        )
+          setProvider('rules');
         command = result.command;
         source = `${result.provider === 'groq' ? 'Groq' : 'OpenRouter'} · ${result.model}`;
         transcript = {
@@ -95,7 +143,7 @@ export function DeskView({
         };
       }
     } catch {
-      warning =
+      warning ??=
         'AI unavailable or unable to interpret this request. Answered using the original text and built-in commands.';
     }
     setMessages((m) => [
@@ -132,7 +180,11 @@ export function DeskView({
               <option
                 key={id}
                 value={id}
-                disabled={!providers.find((p) => p.id === id)?.available}
+                disabled={
+                  !providers.find((p) => p.id === id)?.available ||
+                  credits?.remaining === 0 ||
+                  credits?.globalRemaining === 0
+                }
               >
                 {id === 'groq' ? 'Groq' : 'OpenRouter'}
                 {providers.find((p) => p.id === id)?.available
@@ -147,9 +199,14 @@ export function DeskView({
             ? providers.some((p) => p.available)
               ? 'Choose an AI provider, or use built-in commands without a key.'
               : 'Groq / OpenRouter not configured. Built-in commands are available.'
-            : `${providers.find((p) => p.id === provider)?.model ?? ''} · interprets language only. Verified rules decide.`}
+            : 'AI interprets language only. Verified rules decide.'}
         </p>
       </div>
+      <p className="ai-meta" aria-live="polite">
+        {credits
+          ? `AI credits: ${credits.remaining} remaining today · shared daily budget: ${credits.globalRemaining} calls remaining. Resets ${new Date(credits.resetAt * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.${credits.retryAfter ? ` Rate limit: retry in ${credits.retryAfter}s.` : ''}`
+          : 'AI credits unavailable · providers are disabled until shared budgets and credentials are configured.'}
+      </p>
       <details className="desk-supported">
         <summary>What can I ask?</summary>
         <p className="muted">{supportedCommands}</p>

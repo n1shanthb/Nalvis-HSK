@@ -483,6 +483,21 @@ export async function verify(
     check(current, (await reader.chainId()) === r.executionChainId);
     current = 'mined_receipt';
     const mined = minedSchema.parse(await reader.receipt(txHash!));
+    if (r.version === 2) {
+      current = 'decision_time_binding';
+      const source = evidence.sources.replay;
+      const block = evidence.executionBlockNumber;
+      check(
+        current,
+        source?.blockNumber === block &&
+          source.chainId === r.executionChainId &&
+          same(source.address, r.contract) &&
+          block <= mined.blockNumber &&
+          !!reader.timestamp &&
+          (await reader.timestamp!(block)) === evidence.decisionTime,
+        'decisionTime must equal the committed execution snapshot block timestamp',
+      );
+    }
     if (r.tx.validUntil !== undefined) {
       const at = reader.timestamp
         ? await reader.timestamp(mined.blockNumber)

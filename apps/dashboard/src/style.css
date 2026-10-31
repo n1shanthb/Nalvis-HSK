@@ -2788,3 +2788,31 @@ h2 {
 .mandate-wizard th:first-child {
   width: 25%;
 }
+
+.landing-nav .live-console-link {
+  color: #ccc6bd;
+  font-size: 11px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .landing-nav {
+    flex-wrap: wrap;
+  }
+  .landing-nav .live-console-link {
+    order: 3;
+    width: 100%;
+    text-align: right;
+    font-size: 10px;
+    margin-top: 2px;
+  }
+  .landing-hero {
+    padding-top: 115px;
+  }
+}
+
+@media (max-width: 950px) {
+  .landing-nav nav {
+    display: none;
+  }
+}

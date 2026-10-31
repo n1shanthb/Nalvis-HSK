@@ -118,7 +118,7 @@ export function nlToParamDiff(
   decimalsB = 6,
 ): { diff: Record<string, unknown>; refused?: string } {
   const normalized = text.trim().toLowerCase();
-  if (/^(pause|rok do|band karo|mat karo)$/.test(normalized))
+  if (/^(pause|rok do|band karo)$/.test(normalized))
     return { diff: { paused: true } };
   if (/^(revoke|mandate revoke karo)$/.test(normalized))
     return { diff: { revoked: true } };
