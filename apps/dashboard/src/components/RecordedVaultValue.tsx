@@ -4,7 +4,7 @@ import { useResource } from '../lib/useResource.js';
 export function RecordedVaultValue() {
   const resource = useResource(useCallback(demoContext, []));
   return (
-    <article>
+    <article className="reference-tile">
       <span>Recorded vault value (USDT)</span>
       <strong>
         {resource.data?.portfolio.portfolioUSD.toFixed(2) ??

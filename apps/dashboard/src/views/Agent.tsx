@@ -33,12 +33,12 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       <h2>Agent</h2>
       {feed ? (
         <>
-          <EvidenceDetails e={demoEvidence[0]} />
+          <EvidenceDetails e={demoEvidence[0]} compact />
           <RecordedVaultValue />
         </>
       ) : (
         <>
-          <EvidenceView />
+          <EvidenceView compact />
           <Portfolio chain={chain} />
         </>
       )}

@@ -33,7 +33,7 @@ export function VaultValue({ price }: { price?: number }) {
     }, []),
   );
   return (
-    <article>
+    <article className="reference-tile">
       <span>Vault value (USDT) · testnet inventory</span>
       <strong>
         {resource.data && price

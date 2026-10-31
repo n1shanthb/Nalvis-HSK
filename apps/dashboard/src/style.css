@@ -2761,3 +2761,30 @@ h2 {
     font-size: 12px;
   }
 }
+.reference-tile {
+  padding: 20px;
+  margin: 16px 0;
+  border: 1px solid #363434;
+  border-radius: 12px;
+}
+.reference-tile > span,
+.reference-tile > strong,
+.reference-tile > small {
+  display: block;
+}
+.reference-tile > strong {
+  font-size: 28px;
+  margin: 10px 0;
+}
+.mandate-wizard table {
+  table-layout: fixed;
+  width: 100%;
+}
+.mandate-wizard td,
+.mandate-wizard th,
+.mandate-wizard p {
+  overflow-wrap: anywhere;
+}
+.mandate-wizard th:first-child {
+  width: 25%;
+}

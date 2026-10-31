@@ -18,7 +18,7 @@ export function CoinGeckoReference() {
     }, []),
   );
   return (
-    <article>
+    <article className="reference-tile">
       <span>CoinGecko · display reference only</span>
       <strong>{data.data ? `$${data.data}` : 'Reference unavailable'}</strong>
       <small>Excluded from agent decisions</small>
