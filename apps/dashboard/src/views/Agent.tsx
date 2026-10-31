@@ -1,3 +1,4 @@
+import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
 import { useState } from 'react';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
@@ -31,7 +32,10 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       <p className="eyebrow">AUTONOMOUS AGENT / BOUNDED EXECUTION</p>
       <h2>Agent</h2>
       {feed ? (
-        <EvidenceDetails e={demoEvidence[0]} />
+        <>
+          <EvidenceDetails e={demoEvidence[0]} />
+          <RecordedVaultValue />
+        </>
       ) : (
         <>
           <EvidenceView />

@@ -1,3 +1,4 @@
+import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
 import { MarketChart } from './MarketChart.js';
 import type { Evidence } from '../../../../packages/core/src/types.js';
@@ -47,6 +48,10 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
         <article>
           <span>DEX mid / USDT</span>
           <strong>{e.dexMid?.toFixed(8) ?? 'Unavailable'}</strong>
+        </article>
+        <article>
+          <span>CEX mid / USDT</span>
+          <strong>{mid?.toFixed(8) ?? 'Unavailable'}</strong>
         </article>
         <article>
           <span>DEX / CEX basis</span>
@@ -129,9 +134,9 @@ export function EvidenceDetails({ e }: { e: Evidence }) {
       {!e.quotes.length && <p>Quotes unavailable; no cost estimate.</p>}
       {Object.entries(e.sources)
         .filter(([, s]) => s.error)
-        .map(([k, s]) => (
+        .map(([k]) => (
           <p className="muted" key={k}>
-            {k}: unavailable — {s.error}
+            {k}: unavailable — check source connectivity and freshness.
           </p>
         ))}
     </>
@@ -175,8 +180,11 @@ export function EvidenceView() {
         </p>
       )}
       {resource.error && (
-        <p role="status">Evidence unavailable — {resource.error}</p>
+        <p role="status">
+          Evidence unavailable. Please check the network connection and retry.
+        </p>
       )}
+      <VaultValue price={resource.data?.dexMid} />
       <CoinGeckoReference />
       <MarketChart points={history} />
       {resource.data && <EvidenceDetails e={resource.data} />}
