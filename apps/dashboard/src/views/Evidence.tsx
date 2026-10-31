@@ -1,5 +1,6 @@
+import { MarketChart } from './MarketChart.js';
 import type { Evidence } from '../../../../packages/core/src/types.js';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   collectEvidence,
   endpoints,
@@ -132,11 +133,22 @@ export function EvidenceView() {
           marketClient177: market,
           execClient: execution,
           sizes,
+          decisionTtlSec: policy.decisionTtlSec ?? 120,
           fetcher: evidenceFetcher,
         }),
       [],
     ),
   );
+  const [history, setHistory] = useState<Evidence[]>([]);
+  useEffect(() => {
+    if (resource.data)
+      setHistory((h) =>
+        [
+          ...h.filter((e) => e.now !== resource.data!.now),
+          resource.data!,
+        ].slice(-120),
+      );
+  }, [resource.data]);
   return (
     <section>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
@@ -145,10 +157,15 @@ export function EvidenceView() {
         Read-only observations. Refreshes 30 seconds after each completed poll.
         No proven edge.
       </p>
-      {resource.loading && <p role="status">Collecting evidence…</p>}
+      {resource.loading && (
+        <p className="skeleton" role="status">
+          Collecting evidence…
+        </p>
+      )}
       {resource.error && (
         <p role="status">Evidence unavailable — {resource.error}</p>
       )}
+      <MarketChart points={history} />
       {resource.data && <EvidenceDetails e={resource.data} />}
     </section>
   );

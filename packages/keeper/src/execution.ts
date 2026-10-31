@@ -335,6 +335,7 @@ export async function connectExecution(
         'Agent has a pending nonce; refusing another transaction',
       );
   }
+  let sendingValidUntil: number | undefined;
   async function guardedSend(to: Address, data: Hex) {
     await guardSigning(client, chainId);
     await snapshot(); // Every write, including exact approvals, requires a live mandate.
@@ -352,6 +353,11 @@ export async function connectExecution(
     if (nonce !== pending) throw new Error('Pending wallet transaction');
     await client.call({ account: account.address, to, data });
     await guardSigning(client, chainId);
+    if (
+      sendingValidUntil !== undefined &&
+      Number((await client.getBlock()).timestamp) > sendingValidUntil
+    )
+      throw new Error('Stale decision dropped before signature');
     return wallet.sendTransaction({ to, data, nonce, account, chain });
   }
   function settlement(
@@ -416,6 +422,7 @@ export async function connectExecution(
         execClient: client as unknown as EvidenceClient,
         vault: deployment.vault,
         sizes: policy.presets[options.preset].sizeGridB,
+        decisionTtlSec: policy.decisionTtlSec ?? 120,
       });
       // Market retrieval times remain UTC wall time; execution deadlines use the chain clock.
       void s;
@@ -501,11 +508,11 @@ export async function connectExecution(
               amountIn: quote.amountIn,
               minOut: r.tx.minOut,
               deadline: BigInt(r.tx.deadline),
-              // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as { validUntil?: bigint | number }).validUntil ?? r.tx.deadline).
-              // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
               validUntil: BigInt(
-                (r.tx as { validUntil?: bigint | number }).validUntil ??
-                  r.tx.deadline,
+                r.tx.validUntil ??
+                  (() => {
+                    throw new Error('Missing decision expiry');
+                  })(),
               ),
               nonce: r.tx.nonce,
               receiptHash: r.receiptHash,
@@ -529,17 +536,32 @@ export async function connectExecution(
             amountOutMinimum: r.tx.minOut,
             sqrtPriceLimitX96: 0n,
           },
-          // TODO(Engineer A handoff): Currently copying deadline into validUntil as a temporary placeholder ((r.tx as { validUntil?: bigint | number }).validUntil ?? r.tx.deadline).
-          // After PR #9 merges, Engineer A must update the off-chain decision engine to produce genuine off-chain decision expiry in r.tx.validUntil based on policy/evidence freshness.
           BigInt(
-            (r.tx as { validUntil?: bigint | number }).validUntil ??
-              r.tx.deadline,
+            r.tx.validUntil ??
+              (() => {
+                throw new Error('Missing decision expiry');
+              })(),
           ),
           BigInt(r.tx.deadline),
         ],
       });
     },
-    async send(data, onHash) {
+    async send(data, onHash, validUntil) {
+      if (!Number.isSafeInteger(validUntil) || validUntil < 0)
+        throw new Error('Missing decision expiry');
+      const { decodeFunctionData } = await import('viem');
+      const parsed = decodeFunctionData({
+        abi: [...vaultAbi, ...proofRouterAbi],
+        data,
+      });
+      sendingValidUntil =
+        parsed.functionName === 'trade'
+          ? Number(parsed.args[0].validUntil)
+          : parsed.functionName === 'commitAndSwap'
+            ? Number(parsed.args[3])
+            : validUntil;
+      if (sendingValidUntil !== validUntil)
+        throw new Error('Decision/calldata expiry mismatch');
       // Router approvals are exact and cleared. The intent journal already exists before this first write.
       let token: Address | undefined;
       if (options.target === 'router') {

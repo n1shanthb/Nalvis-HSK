@@ -173,3 +173,11 @@ it('HTTP error bodies and invalid JSON remain in raw evidence', async () => {
   expect(limited.sources.mexc.raw).toEqual({ error: 'rate limited' });
   expect(limited.sources.mexc.error).toContain('HTTP 429');
 });
+
+it('collector uses the policy TTL from its final snapshot clock and rejects invalid TTLs', async () => {
+  const e = await collectEvidence({ ...mocks(), decisionTtlSec: 45 });
+  expect(e.validUntil).toBe(e.now + 45);
+  await expect(
+    collectEvidence({ ...mocks(), decisionTtlSec: 0 }),
+  ).rejects.toThrow('Invalid decision TTL');
+});

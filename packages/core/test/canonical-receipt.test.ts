@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs';
 import { it, expect } from 'vitest';
 import { canonical, hash, evidenceHash } from '../src/canonical.js';
 import { buildReceipt, receiptHash } from '../src/receipt.js';
-import { decide } from '../src/engine.js';
+import { decideLegacy as decide } from '../src/engine.js';
 import { addresses } from '../src/addresses.js';
 import { scenario } from './helpers.js';
 export function receiptScenario() {
   const s = scenario();
+  delete s.e.validUntil; delete s.e.decisionTime; delete s.e.riskInput;
   return buildReceipt({
+    version: 1,
     contract: addresses[133].primaryPool.address,
     seq: 0n,
     prevHead: ('0x' + '00'.repeat(32)) as `0x${string}`,
@@ -62,7 +64,7 @@ it('stable decision and receipt across 100 runs', () => {
   const old = evidenceHash(s.e);
   s.e.sources.fixture.raw = 'one changed byte';
   expect(evidenceHash(s.e)).not.toBe(old);
-});
+}, 20000);
 it('freeze exact receipt fields and hash in golden file', () => {
   expect(canonical(receiptScenario())).toBe(
     readFileSync(

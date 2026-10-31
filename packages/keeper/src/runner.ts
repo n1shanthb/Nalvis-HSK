@@ -12,6 +12,7 @@ import { zeroHash, type Address, type Hex } from 'viem';
 import {
   assertWritableChain,
   canonical,
+  hash,
   buildReceipt,
   decide,
   choosePreset,
@@ -24,7 +25,7 @@ import {
   type PresetChooser,
   type ReceiptBody,
 } from '../../core/src/index.js';
-import type { Options } from './config.js';
+import { repositoryRoot, type Options } from './config.js';
 
 export type Snapshot = {
   blockNumber?: bigint;
@@ -69,7 +70,11 @@ export interface Execution {
   ): Promise<{ quote: bigint; floor: bigint }>;
   calldata(receipt: ReceiptBody & { receiptHash: Hex }): Hex;
   check(snapshot: Snapshot): Promise<void>;
-  send(data: Hex, onHash: (hash: Hex) => Promise<void>): Promise<Settlement>;
+  send(
+    data: Hex,
+    onHash: (hash: Hex) => Promise<void>,
+    validUntil: number,
+  ): Promise<Settlement>;
   // Reconcile from chain, including committed JSON files whose settlement append was interrupted.
   reconcile(directory: string): Promise<number>;
 }
@@ -133,6 +138,33 @@ export async function tick(
   // Run even for holds: a revoked agent must not submit anything.
   await execution.check(snapshot);
   const evidence = await execution.collect(snapshot);
+  evidence.decisionTime = snapshot.now;
+  evidence.validUntil = snapshot.now + (policy.decisionTtlSec ?? 120);
+  const history = JSON.parse(
+    await readFile(
+      join(repositoryRoot(), 'data/research/market_history.json'),
+      'utf8',
+    ),
+  );
+  const sigma = Number(history.summary.cex_hourly_logret_pct.stdev) / 100;
+  if (!Number.isFinite(sigma) || sigma < 0 || sigma > 1)
+    throw new Error('Invalid historical volatility');
+  evidence.riskInput = {
+    sigma,
+    observations: history.summary.hours_in_window - 1,
+    historyHash: hash(history),
+  };
+  evidence.sources.volatilityHistory = {
+    url: 'fixture:data/research/market_history.json',
+    method: 'frozen-2026-10-27-hourly-cex-volatility',
+    fetchedAt: evidence.now,
+    raw: {
+      asOf: history.summary.measured_at_IST,
+      historyHash: hash(history),
+      observations: evidence.riskInput.observations,
+      sigma,
+    },
+  };
   evidence.sources.keeperState = {
     address: execution.contract,
     method: 'execution-state',
@@ -165,6 +197,15 @@ export async function tick(
     raw: { policy, mandate: snapshot.mandate, state },
   };
   const decision = decide(evidence, policy, snapshot.mandate, state);
+  evidence.sources.riskStress = {
+    address: execution.contract,
+    method: 'sigma-worst-case-v1',
+    fetchedAt: evidence.now,
+    raw: decision.riskCheck ?? {
+      skipped:
+        'No executable candidate after deterministic quality/mandate gates',
+    },
+  };
   let minOut = 0n;
   if (decision.kind === 'TRADE' || decision.kind === 'RESIZE') {
     if (!decision.amountIn || !decision.direction)
@@ -229,7 +270,8 @@ export async function tick(
       to: execution.contract,
       data: '0x',
       minOut,
-      deadline: snapshot.now + 120,
+      deadline: Math.min(snapshot.now + 120, evidence.validUntil),
+      validUntil: evidence.validUntil,
       nonce: snapshot.nonce,
     },
   });
@@ -239,6 +281,9 @@ export async function tick(
   if (options.exec !== 'dry') {
     // This intent is durable before any signature/broadcast. Uncertain sends never auto-retry.
     await execution.check(snapshot);
+    const fresh = await execution.snapshot();
+    if (fresh.now > evidence.validUntil)
+      throw new Error('Stale decision dropped before signing');
     const pending = join(directory, '.pending.json');
     await saveJSON(pending, {
       contract: execution.contract,
@@ -258,6 +303,7 @@ export async function tick(
           transactionHash,
         });
       },
+      evidence.validUntil,
     );
     if (
       settlement.log.receiptHash !== receipt.receiptHash ||

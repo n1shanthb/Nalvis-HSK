@@ -117,13 +117,41 @@ export function nlToParamDiff(
   mandate: Mandate,
   decimalsB = 6,
 ): { diff: Record<string, unknown>; refused?: string } {
+  const normalized = text.trim().toLowerCase();
+  if (/^(pause|rok do|band karo|mat karo)$/.test(normalized))
+    return { diff: { paused: true } };
+  if (/^(revoke|mandate revoke karo)$/.test(normalized))
+    return { diff: { revoked: true } };
+  const slip = /^slippage (\d+) bps(?: karo)?$/.exec(normalized);
+  if (slip) {
+    const value = Number(slip[1]);
+    if (value === 0)
+      return { diff: {}, refused: 'Slippage must be between 1 and 100 bps' };
+    if (value > 100 || value > mandate.maxSlippageBps)
+      return { diff: {}, refused: 'requires new Ledger-signed mandate' };
+    return { diff: { maxSlippageBps: value } };
+  }
+  const friendlyCap =
+    /^(?:set cap to (\d+(?:\.\d+)?)(?: usdt)?|cap (\d+(?:\.\d+)?)(?: usdt)? karo)$/.exec(
+      normalized,
+    );
+  if (friendlyCap) text = `maxTradeInB ${friendlyCap[1] ?? friendlyCap[2]}`;
   const cap = /\b(maxTradeIn(?:A|B)?)\s*(?:to|=|:)?\s*(\d+(?:\.\d+)?)/i.exec(
     text,
   );
   if (cap) {
     // Generic maxTradeIn refers to tokenB. A requests cannot be sized safely without its decimals/price.
     const key = cap[1].toLowerCase();
-    if (key.endsWith('a') || units(cap[2], decimalsB) > mandate.maxTradeInB)
+    if (units(cap[2], decimalsB) <= 0n)
+      return {
+        diff: {},
+        refused: 'Cap must be greater than zero in token units',
+      };
+    if (
+      key.endsWith('a') ||
+      units(cap[2], decimalsB) <= 0n ||
+      units(cap[2], decimalsB) > mandate.maxTradeInB
+    )
       return { diff: {}, refused: 'requires new Ledger-signed mandate' };
     return { diff: { maxTradeInB: units(cap[2], decimalsB).toString() } };
   }

@@ -148,3 +148,48 @@ This source is inside the existing evidence commitment; it does not change the
 v1 receipt projection or golden-file contract. `sources.keeperState` continues
 to record the execution snapshot. See `packages/verifier/README.md` for failure
 semantics and execution-unit comparisons.
+
+
+## T8 desk, expiry and worst-case stress (review fixes)
+
+`pnpm build && pnpm nalvis desk "show P&L" --demo` verifies the new v2 Anvil
+recording and reuses verifier P&L. `show spread` selects the latest priced
+recording and labels it as a snapshot, never “now”. `why REJECT #3` matches the
+actual fixture. Live CLI requests use `--receipts <directory> --rpc <url>`;
+files are sorted numerically by receipt sequence. Before any live owner proposal,
+the CLI and web desk share a pinned on-chain mandate/pause/decimals read and
+check the current policy hash. RPC/policy errors explicitly block proposals;
+receipt history cannot restore obsolete limits. Paused and revoked are separate.
+
+The desk has no signing/broadcast capability. It returns a diff, exact calldata
+hash, target and baseline commitment. The Owner panel independently rebuilds the
+calldata and asserts the proposed hash. Pause, revoke and setMandate are allowed.
+The live mandate is checked again before Ledger signing and after hardware
+signing, immediately before broadcasting. Changed fields, targets or hashes
+fail closed. Only chain 133 owner signing is permitted. Known-good tests encode
+every setMandate field independently, including drawdown and minimum interval.
+
+New receipts use **version 2**. Evidence must contain `decisionTime` (the pinned
+execution block timestamp), `validUntil`, and volatility input; decisions and
+transaction intents must carry the same expiry. Executable decisions must also
+carry the computed risk result. `validUntil = decisionTime + (policy TTL or
+120 seconds)`. The deadline and stale guards use the same chain clock. Wall
+clock remains a separate market-data freshness observation; server-ahead skew
+does not invalidate an otherwise timely mined receipt. Every v2 field is
+committed and replayed, including calldata expiry and mined-block time.
+
+Legacy v1 verification accepts **only the four pinned T6 receipt hashes**. It
+cannot be selected by removing modern fields or downgrading a new receipt.
+`decide()` is strict; `decideLegacy()` exists only for those historical replays
+and the explicitly labelled research backtest. The original golden file and
+T6 transactions/hashes were not changed.
+
+Risk is honestly named **±σ worst-case stress** (`sigma-worst-case-v1`). The
+measured QuoterV2 curve is evaluated at exactly two endpoints, with no random
+draws and no simulation claim. Price monotonicity makes intermediate samples
+irrelevant. Each descending size must retain positive edge after worst endpoint
+cost and policy buffer; the check may only resize down or reject. Volatility is
+**frozen October 27, 2026 research**, not live estimated volatility; the file
+hash, timestamp, observation count and sigma are recorded in evidence. This
+is a bounded cost-curve stress proxy, not hypothetical live Quoter RPCs or a
+forecast. `backtest.json` is unchanged: no proven edge.

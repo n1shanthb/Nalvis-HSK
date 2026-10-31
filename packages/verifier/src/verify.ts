@@ -23,8 +23,8 @@ import {
   engineStateSchema,
   parseEvidenceJSON,
   decide,
+  decideLegacy,
   addresses,
-  type ReceiptBody,
 } from '../../core/src/index.js';
 import {
   vaultAbi,
@@ -32,6 +32,7 @@ import {
   receiptEvent,
   erc20Abi,
 } from '../../core/src/abi/index.js';
+import { legacyReceiptHashes } from './legacy.js';
 import { canonicalCheck } from './canonical-check.js';
 
 const hex = z
@@ -52,7 +53,7 @@ const trace = z.array(
 );
 export const receiptSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     chainId: z.union([z.literal(133), z.literal(31337)]),
     marketDataChainId: z.literal(177),
     executionChainId: z.union([z.literal(133), z.literal(31337)]),
@@ -70,6 +71,17 @@ export const receiptSchema = z
         sizeB: z.number().positive().optional(),
         amountIn: integer.optional(),
         minOut: integer.optional(),
+        validUntil: z.number().int().nonnegative().optional(),
+        riskCheck: z
+          .object({
+            method: z.literal('sigma-worst-case-v1'),
+            samples: z.literal(2),
+            sigma: z.number().finite().nonnegative(),
+            worstCostBps: z.number().finite(),
+            accepted: z.boolean(),
+          })
+          .strict()
+          .optional(),
         ruleTrace: trace,
       })
       .strict(),
@@ -91,12 +103,28 @@ export const receiptSchema = z
           .transform((v) => v as Hex),
         minOut: integer,
         deadline: z.number().int().nonnegative(),
+        validUntil: z.number().int().nonnegative().optional(),
         nonce: integer,
       })
       .strict(),
     settlement: z.object({ transactionHash: hex }).passthrough().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((r, ctx) => {
+    if (r.version !== 2) return;
+    if (
+      r.evidence.decisionTime === undefined ||
+      r.evidence.validUntil === undefined ||
+      !r.evidence.riskInput ||
+      r.tx.validUntil === undefined ||
+      r.decision.validUntil === undefined ||
+      (['TRADE', 'RESIZE'].includes(r.decision.kind) && !r.decision.riskCheck)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'v2 requires decision time, expiry and volatility/risk fields',
+      });
+  });
 export type StoredReceipt = z.infer<typeof receiptSchema>;
 const logSchema = z
   .object({
@@ -138,6 +166,7 @@ const transactionSchema = z
   .passthrough();
 export type Transaction = z.infer<typeof transactionSchema>;
 export interface ChainReader {
+  timestamp?(block: bigint): Promise<number>;
   chainId(): Promise<number>;
   receipt(hash: Hex): Promise<unknown>;
   transaction(hash: Hex): Promise<unknown>;
@@ -199,6 +228,8 @@ export function rpcReader(url: string): ChainReader {
     transport: http(url, { retryCount: 0, timeout: 15000 }),
   });
   return {
+    timestamp: async (blockNumber) =>
+      Number((await client.getBlock({ blockNumber })).timestamp),
     chainId: () => client.getChainId(),
     receipt: (hash) => client.getTransactionReceipt({ hash }),
     transaction: (hash) => client.getTransaction({ hash }),
@@ -313,6 +344,17 @@ export async function verify(
         r.evidence.executionChainId === r.executionChainId &&
         r.evidence.marketDataChainId === 177,
     );
+    if (r.version === 2)
+      check(
+        'required_v2_fields',
+        r.tx.validUntil !== undefined &&
+          r.decision.validUntil !== undefined &&
+          typeof r.evidence.decisionTime === 'number' &&
+          r.evidence.validUntil !== undefined &&
+          r.evidence.riskInput !== undefined &&
+          (!['TRADE', 'RESIZE'].includes(r.decision.kind) ||
+            r.decision.riskCheck !== undefined),
+      );
     current = 'canonical_evidence';
     check(current, canonical(r.evidence) === canonicalCheck(r.evidence));
     check('evidenceHash', evidenceHash(r.evidence) === r.evidenceHash);
@@ -336,14 +378,24 @@ export async function verify(
         minOut: r.tx.minOut,
         deadline: r.tx.deadline,
         nonce: r.tx.nonce,
+        ...(r.tx.validUntil !== undefined
+          ? { validUntil: r.tx.validUntil }
+          : {}),
       },
     };
-    const coreHash = receiptHash(r as unknown as ReceiptBody);
+    const coreHash = receiptHash({
+      ...r,
+      evidence: parseEvidenceJSON(canonical(r.evidence)),
+    });
     check(
       'canonical_receipt',
       coreHash === keccak256(toBytes(canonicalCheck(independent))),
     );
     check('receiptHash', coreHash === r.receiptHash);
+    check(
+      'receipt_version',
+      r.version === 2 || legacyReceiptHashes.has(r.receiptHash),
+    );
     current = 'replay_snapshot';
     const evidence = parseEvidenceJSON(canonical(r.evidence));
     const raw = z
@@ -362,7 +414,26 @@ export async function verify(
       policyHash(policy) === r.policyHash &&
         mandate.policyHash === r.policyHash,
     );
-    const replay = decide(evidence, policy, mandate, state);
+    if (
+      r.version === 2 ||
+      evidence.validUntil !== undefined ||
+      r.tx.validUntil !== undefined ||
+      r.decision.validUntil !== undefined
+    )
+      check(
+        'decision_expiry',
+        evidence.validUntil ===
+          evidence.decisionTime! + (policy.decisionTtlSec ?? 120) &&
+          r.tx.validUntil === evidence.validUntil &&
+          r.decision.validUntil === evidence.validUntil &&
+          r.tx.deadline <= evidence.validUntil!,
+      );
+    const replay = (r.version === 1 ? decideLegacy : decide)(
+      evidence,
+      policy,
+      mandate,
+      state,
+    );
     check(
       'decision_replay',
       canonical(replay) === canonical(r.decision) &&
@@ -390,6 +461,17 @@ export async function verify(
     check(current, (await reader.chainId()) === r.executionChainId);
     current = 'mined_receipt';
     const mined = minedSchema.parse(await reader.receipt(txHash!));
+    if (r.tx.validUntil !== undefined) {
+      const at = reader.timestamp
+        ? await reader.timestamp(mined.blockNumber)
+        : undefined;
+      check(
+        'mined_before_expiry',
+        at !== undefined &&
+          at >= evidence.decisionTime! &&
+          at <= r.tx.validUntil,
+      );
+    }
     current = 'mined_transaction';
     const tx = transactionSchema.parse(await reader.transaction(txHash!));
     check(
@@ -481,6 +563,7 @@ export async function verify(
         receiptHash?: Hex;
         prevHead?: Hex;
         deadline?: bigint;
+        validUntil?: bigint;
         nonce?: bigint;
         kind?: number;
       };
@@ -496,17 +579,22 @@ export async function verify(
           same(p.receiptHash, r.receiptHash) &&
             same(p.prevHead, r.prevHead) &&
             p.deadline === BigInt(r.tx.deadline) &&
+            (r.tx.validUntil === undefined ||
+              p.validUntil === BigInt(r.tx.validUntil)) &&
             p.nonce === r.tx.nonce &&
             p.kind === ev.kind,
         );
       else {
-        const deadline =
-          (call.args!.length > 4 ? call.args![4] : call.args![3]) as bigint;
+        const deadline = (
+          call.args!.length > 4 ? call.args![4] : call.args![3]
+        ) as bigint;
         check(
           'calldata_commitment',
           same(call.args![0], r.receiptHash) &&
             same(call.args![1], r.prevHead) &&
             deadline === BigInt(r.tx.deadline) &&
+            (r.tx.validUntil === undefined ||
+              call.args![3] === BigInt(r.tx.validUntil)) &&
             ev.kind === 0,
         );
       }

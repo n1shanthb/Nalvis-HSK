@@ -4,6 +4,7 @@ import { hash, evidenceHash } from './canonical.js';
 import { policyHash, type Policy } from './policy.js';
 import type { Evidence, Decision, RuleTrace } from './types.js';
 export type ReceiptInput = {
+  version?: 1 | 2;
   contract: Address;
   seq: bigint;
   prevHead: Hex;
@@ -21,11 +22,12 @@ export type ReceiptInput = {
     data: Hex;
     minOut: bigint;
     deadline: number;
+    validUntil?: number;
     nonce: bigint;
   };
 };
-export type ReceiptBody = Omit<ReceiptInput, 'policy'> & {
-  version: 1;
+export type ReceiptBody = Omit<ReceiptInput, 'policy' | 'version'> & {
+  version: 1 | 2;
   chainId: number;
   marketDataChainId: number;
   executionChainId: number;
@@ -36,10 +38,21 @@ export type ReceiptBody = Omit<ReceiptInput, 'policy'> & {
 export function buildReceipt(
   input: ReceiptInput,
 ): ReceiptBody & { receiptHash: Hex } {
-  const { policy, evidence, decision, tx, ...rest } = input;
+  const { version = 2, policy, evidence, decision, tx, ...rest } = input;
+  if (
+    version === 2 &&
+    (evidence.decisionTime === undefined ||
+      !evidence.riskInput ||
+      evidence.validUntil === undefined ||
+      tx.validUntil !== evidence.validUntil ||
+      decision.validUntil !== evidence.validUntil ||
+      ((decision.kind === 'TRADE' || decision.kind === 'RESIZE') &&
+        !decision.riskCheck))
+  )
+    throw new Error('v2 requires policy expiry and risk evidence');
   assertWritableChain(evidence.executionChainId);
   const receipt: ReceiptBody = {
-    version: 1,
+    version,
     chainId: evidence.executionChainId,
     marketDataChainId: evidence.marketDataChainId,
     executionChainId: evidence.executionChainId,
@@ -93,6 +106,7 @@ export function receiptHash(receipt: ReceiptBody) {
       minOut: tx.minOut,
       deadline: tx.deadline,
       nonce: tx.nonce,
+      ...(tx.validUntil !== undefined ? { validUntil: tx.validUntil } : {}),
     },
   });
 }

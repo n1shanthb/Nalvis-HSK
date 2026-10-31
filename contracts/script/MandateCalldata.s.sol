@@ -13,6 +13,24 @@ contract MandateCalldata is Script {
         address owner = vm.envAddress("OWNER_ADDRESS");
         address agent = vm.envAddress("AGENT_ADDRESS");
         require(owner != address(0) && agent != address(0) && owner != agent, "Mandate: invalid roles");
+        uint256 drawdownEnv = 2000;
+        if (vm.envExists("MAX_DRAWDOWN_BPS")) {
+            string memory val = vm.envString("MAX_DRAWDOWN_BPS");
+            if (bytes(val).length > 0) {
+                drawdownEnv = vm.envUint("MAX_DRAWDOWN_BPS");
+            }
+        }
+        return build(owner, agent, drawdownEnv);
+    }
+
+    /// @notice Explicit inputs avoid process-global environment races in callers/tests.
+    function build(address owner, address agent, uint256 drawdownEnv)
+        public
+        view
+        returns (bytes memory setData, bytes memory revokeData)
+    {
+        require(block.chainid == 133 || block.chainid == 31337, "Mandate: only chains 133/31337");
+        require(owner != address(0) && agent != address(0) && owner != agent, "Mandate: invalid roles");
         uint8 da = IERC20(Addresses.WHSK_133).decimals();
         uint8 db = IERC20(Addresses.USDT_133).decimals();
         require(da == 18 && db == 18, "Mandate: unexpected testnet decimals");
@@ -24,13 +42,6 @@ contract MandateCalldata is Script {
             policy = keccak256(bytes(vm.readFile(path)));
         } else {
             console2.log("WARNING: policy/default.json missing; policyHash = bytes32(0)");
-        }
-        uint256 drawdownEnv = 2000;
-        if (vm.envExists("MAX_DRAWDOWN_BPS")) {
-            string memory val = vm.envString("MAX_DRAWDOWN_BPS");
-            if (bytes(val).length > 0) {
-                drawdownEnv = vm.envUint("MAX_DRAWDOWN_BPS");
-            }
         }
         require(drawdownEnv <= 10000, "Mandate: maxDrawdownBps must be <= 10000");
         uint16 maxDrawdownBps = uint16(drawdownEnv);
