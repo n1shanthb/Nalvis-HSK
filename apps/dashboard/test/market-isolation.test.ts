@@ -28,3 +28,17 @@ test('one venue failure preserves the other ticker and selected requests fetch o
   expect(fetcher).toHaveBeenCalledOnce();
   expect(fetcher.mock.calls[0][0]).toBe(endpoints.gate);
 });
+
+test.each(['foo', '', 'MEXC', 'mexc '])(
+  'unknown venue %j returns 400 without upstream requests',
+  async (venue) => {
+    const fetcher = vi.fn();
+    const handler = createMarketHandler(fetcher);
+    const url = new URL('https://example.test/api/market');
+    url.searchParams.set('venue', venue);
+    const result = await handler(new Request(url));
+    expect(result.status).toBe(400);
+    expect(await result.json()).toEqual({ error: 'Unknown venue' });
+    expect(fetcher).not.toHaveBeenCalled();
+  },
+);
