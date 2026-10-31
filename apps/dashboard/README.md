@@ -93,3 +93,21 @@ apply changes or send transactions. Widening beyond the mandate is refused.
 **UNVERIFIED:** real-device signing, data-hash display and actual Ledger support
 for chain 133. A human must test these before GO. Mocked SDK and MockSigner tests
 are not evidence of real hardware compatibility.
+
+
+## T8 read-only Vercel demo
+
+Import the repository into Vercel with **repository root** as Root Directory.
+The root `vercel.json` installs the pnpm workspace, builds the dashboard with
+`VITE_ENABLE_OWNER=false VITE_DEMO_MODE=true`, and publishes `apps/dashboard/dist`.
+Use Node 22 in Vercel project settings. No secrets or private keys are needed.
+From a signed-in Vercel CLI at the repository root: `vercel` for a preview, then
+`vercel --prod` for production. Save the actual returned URL in the PR. This
+configuration alone does not prove that a hosted deployment exists.
+
+Hash routes (`/#/mandate`, `/#/evidence`, `/#/receipts`, `/#/verify`, `/#/desk`)
+work on static hosting without server rewrites. Demo mode ships the four genuine
+T6 Anvil recordings and replays their recorded RPC responses. It never presents
+them as live prices. Turn it off to attempt browser read-only market calls; CEX
+CORS/RPC availability may vary and failures are displayed explicitly. The
+optional local CEX proxy is development-only and is not a hosted server.

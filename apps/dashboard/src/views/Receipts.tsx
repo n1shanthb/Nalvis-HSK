@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { localReceiptFiles, receiptLogs } from '../lib/receipts.js';
 import {
   loadDeployment,
@@ -26,6 +26,7 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
     }, [chain]),
   );
   const data = resource.data;
+  const [selected,setSelected]=useState('');
   return (
     <section>
       <p className="eyebrow">03 / AUDIT TRAIL</p>
@@ -34,7 +35,7 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
         On-chain Receipt events joined by contract, transaction and receipt hash
         to locally served keeper records.
       </p>
-      {resource.loading && <p role="status">Reading receipts…</p>}
+      {resource.loading && <p className="skeleton" role="status">Reading receipts…</p>}
       {resource.error && <p role="status">{resource.error}</p>}
       {data?.networkError && (
         <p role="status">On-chain events unavailable — {data.networkError}</p>
@@ -48,6 +49,7 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
       {data?.warnings.map((w) => (
         <p key={w}>{w}</p>
       ))}
+      {data && <div className="timeline">{data.local.filter(r=>r.executionChainId===chain).map(r=><button key={r.receiptHash} className={`timeline-item ${selected===r.receiptHash?'selected':''}`} onClick={()=>{setSelected(r.receiptHash);document.getElementById(r.receiptHash)?.scrollIntoView({behavior:'smooth',block:'center'});}}><span className={`badge ${r.decision.kind}`}>{r.decision.kind}</span><span>Receipt #{String(r.seq)}</span></button>)}</div>}
       {data?.logs.map((log) => {
         const local = data.local.find(
           (r) =>
@@ -60,6 +62,7 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
         return (
           <article
             className="receipt"
+            id={local?.receiptHash}
             key={`${log.transactionHash}-${log.logIndex}`}
           >
             <span className={`badge ${kinds[log.args.kind]}`}>
@@ -97,7 +100,7 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
               ),
           )
           .map((r) => (
-            <article className="receipt" key={r.receiptHash}>
+            <article className="receipt" key={r.receiptHash} id={r.receiptHash}>
               <span className={`badge ${r.decision.kind}`}>
                 {r.decision.kind}
               </span>

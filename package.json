@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @nalvis/dashboard dev",
     "keeper": "node packages/keeper/dist/keeper/src/cli.js",
     "verify": "node packages/verifier/dist/verifier/src/cli.js",
-    "nalvis": "node packages/core/dist/desk/cli.js"
+    "nalvis": "node scripts/nalvis.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
@@ -21,5 +21,8 @@
     "typescript": "~5.7.3",
     "typescript-eslint": "^8.46.0",
     "vitest": "^3.2.4"
+  },
+  "bin": {
+    "nalvis": "scripts/nalvis.mjs"
   }
 }

@@ -375,3 +375,163 @@ footer {
     font-size: 10px;
   }
 }
+
+.demo-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+.demo-toggle input {
+  width: auto;
+  accent-color: #c4ef94;
+}
+.network {
+  gap: 20px;
+}
+.intro {
+  padding: 40px 0 28px;
+}
+.intro h1 {
+  font-size: clamp(32px, 4vw, 54px);
+  line-height: 1.15;
+}
+nav {
+  overflow-x: auto;
+}
+nav a {
+  white-space: nowrap;
+}
+.metrics article,
+.chart,
+.receipt {
+  border: 1px solid #304137;
+  background: linear-gradient(135deg, #1a261e, #141d17);
+  border-radius: 12px;
+  padding: 22px;
+}
+.metrics strong {
+  font-variant-numeric: tabular-nums;
+}
+.chart {
+  margin: 24px 0;
+}
+.chart svg {
+  width: 100%;
+  display: block;
+}
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+.cex-legend {
+  color: #75baff;
+  margin-left: 16px;
+}
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.timeline-item {
+  background: #18241c;
+  border: 1px solid #324739;
+  color: #d9e6db;
+  margin: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 12px;
+}
+.timeline-item.selected {
+  border-color: #c4ef94;
+  box-shadow: 0 0 0 1px #c4ef94;
+}
+.badge.TRADE {
+  background: #234a35;
+  color: #9df0b9;
+}
+.badge.RESIZE {
+  background: #493a20;
+  color: #f4c66e;
+}
+.badge.WAIT {
+  background: #343c39;
+  color: #c0cbc5;
+}
+.badge.REJECT {
+  background: #49282c;
+  color: #ffabb2;
+}
+progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin: 18px 0;
+  accent-color: #c4ef94;
+}
+.conversation {
+  min-height: 180px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 22px;
+  background: #101912;
+  border: 1px solid #304137;
+  border-radius: 10px;
+}
+.user-message {
+  color: #c4ef94;
+  font-weight: 650;
+}
+pre,
+code {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.skeleton {
+  padding: 45px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #1a251e, #2a392e, #1a251e);
+  background-size: 200% 100%;
+  animation: pulse 1.8s ease infinite;
+}
+@keyframes pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  header,
+  .network,
+  .chart-heading {
+    flex-wrap: wrap;
+  }
+  .timeline {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shell {
+    padding: 0 18px;
+  }
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+  nav a {
+    padding: 12px;
+  }
+  table {
+    display: block;
+    overflow: auto;
+  }
+  .intro {
+    padding-top: 28px;
+  }
+}
