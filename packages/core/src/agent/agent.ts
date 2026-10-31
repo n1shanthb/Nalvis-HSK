@@ -56,6 +56,7 @@ export async function createAgent({
   config: AgentConfig;
 }) {
   const journal = await createJournal(store);
+  await store.writeText('policy.json', config.policyFile);
   type Runtime = {
     budget: Budget;
     thesis: string;
@@ -75,6 +76,26 @@ export async function createAgent({
   };
   let watches: WatchState | undefined,
     busy = false;
+  const initWatches = async (now: number) => {
+    const saved = await store.read<WatchState>('watches.json');
+    const loaded = await loadWatches(store, now, config.heartbeatSec);
+    if (!saved?.watches.some((w) => w.id === 'heartbeat')) {
+      const after = loaded.watches.find((w) => w.id === 'heartbeat')!;
+      await journal.append(
+        'WATCH_CHANGE',
+        {
+          op: 'create',
+          by: 'system',
+          watchId: after.id,
+          after,
+          reason: after.note,
+          accepted: true,
+        },
+        now,
+      );
+    }
+    return loaded;
+  };
   const save = async () => {
     await store.write('runtime.json', runtime);
     if (watches) await store.write('watches.json', watches);
@@ -104,7 +125,7 @@ export async function createAgent({
     await save();
   };
   const addRetry = async (at: number, now: number, legOf?: string) => {
-    if (!watches) watches = await loadWatches(store, now, config.heartbeatSec);
+    if (!watches) watches = await initWatches(now);
     const id = `retry:${legOf ?? 'wait'}:${at}`;
     if (watches.watches.some((w) => w.id === id)) return;
     const after: Watch = {
@@ -132,7 +153,7 @@ export async function createAgent({
     await save();
   };
   const wakeInternal = async (fired: FiredWatch[], now: number) => {
-    if (!watches) watches = await loadWatches(store, now, config.heartbeatSec);
+    if (!watches) watches = await initWatches(now);
     if (
       config.mode === 'offline' ||
       (config.mode !== 'rules-demo' && !provider.isConfigured())
@@ -169,7 +190,12 @@ export async function createAgent({
       evidenceHash = await journal.artifact('evidence', evidence);
     await journal.append(
       'WAKE',
-      { firedWatches: fired, evidenceHash, mode: config.mode },
+      {
+        firedWatches: fired,
+        evidenceHash,
+        mode: config.mode,
+        activeWatches: watches.watches,
+      },
       now,
     );
     let s = await clients.readState();
@@ -254,15 +280,35 @@ export async function createAgent({
           });
     if (output) {
       runtime.thesis = output.thesis;
-      const applied = applyWatchChanges(
-        watches,
-        output.watches,
-        now,
-        config.watchBounds,
-      );
-      watches = applied.state;
-      for (const event of applied.events)
-        await journal.append('WATCH_CHANGE', { ...event }, now);
+      // Apply/journal each request separately, including rejected original requests.
+      const requests = [
+        ...output.watches.create.map((d) => ({
+          create: [d],
+          update: [],
+          delete: [],
+        })),
+        ...output.watches.update.map((d) => ({
+          create: [],
+          update: [d],
+          delete: [],
+        })),
+        ...output.watches.delete.map((d) => ({
+          create: [],
+          update: [],
+          delete: [d],
+        })),
+      ];
+      for (const request of requests) {
+        const applied = applyWatchChanges(
+          watches,
+          request,
+          now,
+          config.watchBounds,
+        );
+        watches = applied.state;
+        for (const event of applied.events)
+          await journal.append('WATCH_CHANGE', { ...event, request }, now);
+      }
       await save();
     }
     const intent = output?.action ?? empty;
@@ -497,7 +543,7 @@ export async function createAgent({
         )
           return;
         runtime.lastPoll = now;
-        watches ??= await loadWatches(store, now, config.heartbeatSec);
+        watches ??= await initWatches(now);
         const lite = await clients.evidenceLite();
         const fired = evaluate(watches.watches, lite, now);
         for (const event of lite.ownerEvents ?? [])

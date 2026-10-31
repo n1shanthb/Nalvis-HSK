@@ -5,6 +5,7 @@ import { canonical } from '../canonical.js';
 export interface Store {
   read<T>(path: string): Promise<T | undefined>;
   write(path: string, value: unknown): Promise<void>;
+  writeText(path: string, value: string): Promise<void>;
   append(path: string, line: string): Promise<void>;
   text(path: string): Promise<string>;
 }
@@ -30,12 +31,15 @@ export function jsonFileStore(root: string): Store {
       }
     },
     async write(key, value) {
+      return this.writeText(key, canonical(value));
+    },
+    async writeText(key, value) {
       const p = path(key);
       await mkdir(dirname(p), { recursive: true });
       const tmp = p + '.' + randomUUID() + '.tmp';
       const f = await open(tmp, 'wx', 0o600);
       try {
-        await f.writeFile(canonical(value));
+        await f.writeFile(value);
         await f.sync();
       } finally {
         await f.close();
@@ -70,6 +74,9 @@ export function memoryStore(): Store {
     },
     async write(p, v) {
       data.set(p, canonical(v));
+    },
+    async writeText(p, v) {
+      data.set(p, v);
     },
     async append(p, l) {
       data.set(p, (data.get(p) ?? '') + l + '\n');
