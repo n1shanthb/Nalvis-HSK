@@ -121,20 +121,23 @@ test.each(['pause', 'unpause', 'revoke'] as const)(
     );
   },
 );
-test('withdraw calldata matches ABI', () => {
-  const withdrawal = {
-    token: addresses[133].usdt.address,
-    amount: 10n ** 18n,
-    to: owner,
-  };
-  expect(ownerActionCalldata(133, 'withdraw', withdrawal)).toBe(
-    encodeFunctionData({
-      abi: vaultAbi,
-      functionName: 'withdraw',
-      args: [withdrawal.token, withdrawal.amount, owner],
-    }),
-  );
-});
+test.each(['usdt', 'whsk'] as const)(
+  '%s withdraw calldata matches ABI',
+  (token) => {
+    const withdrawal = {
+      token: addresses[133][token].address,
+      amount: 10n ** 18n,
+      to: owner,
+    };
+    expect(ownerActionCalldata(133, 'withdraw', withdrawal)).toBe(
+      encodeFunctionData({
+        abi: vaultAbi,
+        functionName: 'withdraw',
+        args: [withdrawal.token, withdrawal.amount, owner],
+      }),
+    );
+  },
+);
 test.each([177, 31337])(
   'owner actions refuse chain %s before signing',
   (chain) => {
@@ -243,4 +246,42 @@ test('WHSK slider preserves 0.5 and UI preset calldata matches the existing form
   } finally {
     vi.useRealTimers();
   }
+});
+
+test('owner actions respect paused/revoked state and require explicit revoke confirmation', () => {
+  const view = render(
+    <OwnerActions chain={133} vault={vault} snapshot={snapshot} />,
+  );
+  expect((screen.getByText('Unpause') as HTMLButtonElement).disabled).toBe(
+    true,
+  );
+  fireEvent.click(screen.getByText('Revoke'));
+  expect(
+    (screen.getByText('Sign reviewed action on Ledger') as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+  fireEvent.click(
+    screen.getByLabelText('Revoke removes agent authority immediately'),
+  );
+  expect(
+    (screen.getByText('Sign reviewed action on Ledger') as HTMLButtonElement)
+      .disabled,
+  ).toBe(false);
+  view.rerender(
+    <OwnerActions
+      chain={133}
+      vault={vault}
+      snapshot={{
+        ...snapshot,
+        paused: true,
+        mandate: {
+          ...snapshot.mandate,
+          agent: '0x0000000000000000000000000000000000000000',
+        },
+      }}
+    />,
+  );
+  expect((screen.getByText('Pause') as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByText('Revoke') as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText('Agent revoked')).toBeTruthy();
 });

@@ -101,11 +101,13 @@ export function MandateWizard({
   vault,
   snapshot,
   previewOnly = false,
+  onConfirmed,
 }: {
   chain: number;
   vault: Address;
   snapshot: VaultSnapshot;
   previewOnly?: boolean;
+  onConfirmed?: () => void | Promise<void>;
 }) {
   const [step, setStep] = useState(0),
     [fields, setFields] = useState(() => fieldsFor(snapshot)),
@@ -165,6 +167,7 @@ export function MandateWizard({
           'Transaction reverted. Refresh the mandate and build a new review.',
         );
       setConfirmedBlock(receipt.blockNumber);
+      await onConfirmed?.();
       setStep(5);
       setMessage('Mandate confirmed');
     } catch (e) {

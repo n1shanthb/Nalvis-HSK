@@ -10,7 +10,7 @@ import {
   type Hex,
 } from 'viem';
 import { addresses } from '../../../../packages/core/src/addresses.js';
-import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
+import { vaultAbi, erc20Abi } from '../../../../packages/core/src/abi/index.js';
 import { clientFor, explorerLink, type VaultSnapshot } from '../lib/clients.js';
 import {
   assertOwnerChain,
@@ -23,6 +23,10 @@ export function ownerActionCalldata(
   chain: number,
   action: OwnerAction,
   withdrawal?: { token: Address; amount: bigint; to: Address },
+  tokens: readonly Address[] = [
+    addresses[133].whsk.address,
+    addresses[133].usdt.address,
+  ],
 ): Hex {
   assertOwnerChain(chain);
   if (action !== 'withdraw')
@@ -33,11 +37,7 @@ export function ownerActionCalldata(
     getAddress(withdrawal.to) === zeroAddress
   )
     throw Error('Enter a positive amount and a valid recipient.');
-  if (
-    ![addresses[133].whsk.address, addresses[133].usdt.address].some(
-      (a) => a.toLowerCase() === withdrawal.token.toLowerCase(),
-    )
-  )
+  if (!tokens.some((a) => a.toLowerCase() === withdrawal.token.toLowerCase()))
     throw Error('Choose a verified vault token.');
   return encodeFunctionData({
     abi: vaultAbi,
@@ -49,10 +49,12 @@ export function OwnerActions({
   chain,
   vault,
   snapshot,
+  onConfirmed,
 }: {
   chain: number;
   vault: Address;
   snapshot: VaultSnapshot;
+  onConfirmed?: () => void | Promise<void>;
 }) {
   const [token, setToken] = useState<'whsk' | 'usdt'>('usdt'),
     [amount, setAmount] = useState(''),
@@ -64,8 +66,15 @@ export function OwnerActions({
     }>(),
     [message, setMessage] = useState(''),
     [busy, setBusy] = useState(false),
-    [hash, setHash] = useState<Hex>();
-  const context = `${chain}:${vault}:${snapshot.owner}`;
+    [hash, setHash] = useState<Hex>(),
+    [revokeConfirmed, setRevokeConfirmed] = useState(false);
+  const revoked = snapshot.mandate.agent.toLowerCase() === zeroAddress;
+  const tokens =
+    snapshot.tokenA && snapshot.tokenB
+      ? [snapshot.tokenA, snapshot.tokenB]
+      : undefined;
+  const balance = token === 'whsk' ? snapshot.balanceA : snapshot.balanceB;
+  const context = `${chain}:${vault}:${snapshot.owner}:${snapshot.paused}:${snapshot.mandate.agent}:${tokens?.join(',')}`;
   if (chain !== 133)
     return (
       <p role="alert">Owner actions refuse chain {chain}. Chain 133 only.</p>
@@ -74,6 +83,7 @@ export function OwnerActions({
     setReview(undefined);
     setMessage('');
     setHash(undefined);
+    setRevokeConfirmed(false);
     try {
       if (
         action === 'withdraw' &&
@@ -84,12 +94,24 @@ export function OwnerActions({
         throw Error(
           'Enter an exact token amount within its decimal precision.',
         );
+      if (action === 'withdraw' && (!tokens || balance === undefined))
+        throw Error(
+          'Vault token balances are not loaded. Refresh before withdrawing.',
+        );
+      if (
+        action === 'withdraw' &&
+        parseUnits(
+          amount,
+          token === 'whsk' ? snapshot.decimalsA : snapshot.decimalsB,
+        ) > balance!
+      )
+        throw Error('Withdrawal exceeds the vault balance.');
       const data = ownerActionCalldata(
         chain,
         action,
         action === 'withdraw'
           ? {
-              token: addresses[133][token].address,
+              token: tokens![token === 'whsk' ? 0 : 1],
               amount: parseUnits(
                 amount,
                 token === 'whsk' ? snapshot.decimalsA : snapshot.decimalsB,
@@ -97,6 +119,7 @@ export function OwnerActions({
               to: getAddress(to),
             }
           : undefined,
+        tokens,
       );
       setReview({ data, action, context });
     } catch (e) {
@@ -104,11 +127,32 @@ export function OwnerActions({
     }
   }
   async function sign() {
-    if (!review || busy || review.context !== context) return;
+    if (
+      !review ||
+      busy ||
+      review.context !== context ||
+      (review.action === 'revoke' && !revokeConfirmed)
+    )
+      return;
     setBusy(true);
     setMessage('');
     try {
       assertOwnerChain(chain);
+      if (review.action === 'withdraw') {
+        const available = await clientFor(133).readContract({
+          address: tokens![token === 'whsk' ? 0 : 1],
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [vault],
+        });
+        if (
+          parseUnits(
+            amount,
+            token === 'whsk' ? snapshot.decimalsA : snapshot.decimalsB,
+          ) > available
+        )
+          throw Error('Withdrawal exceeds the vault balance.');
+      }
       const tx = await sendOwnerAction({
         chainId: chain,
         vault,
@@ -122,6 +166,7 @@ export function OwnerActions({
       const receipt = await clientFor(133).waitForTransactionReceipt({
         hash: tx,
       });
+      if (receipt.status === 'success') await onConfirmed?.();
       setMessage(
         receipt.status === 'success'
           ? 'Owner action confirmed'
@@ -140,9 +185,25 @@ export function OwnerActions({
   return (
     <article className="agent-card">
       <h3>Owner actions</h3>
+      {revoked && <p>Agent revoked</p>}
+      {snapshot.tokenMismatch && (
+        <p role="alert">
+          Vault token mismatch: withdrawal uses the actual tokenA/tokenB
+          addresses.
+        </p>
+      )}
       <div className="action-bar">
         {(['pause', 'unpause', 'revoke'] as const).map((a) => (
-          <button key={a} disabled={busy} onClick={() => preview(a)}>
+          <button
+            key={a}
+            disabled={
+              busy ||
+              (a === 'pause' && snapshot.paused) ||
+              (a === 'unpause' && !snapshot.paused) ||
+              (a === 'revoke' && revoked)
+            }
+            onClick={() => preview(a)}
+          >
             {a[0].toUpperCase() + a.slice(1)}
           </button>
         ))}
@@ -158,8 +219,12 @@ export function OwnerActions({
               invalidate();
             }}
           >
-            <option value="usdt">USDT</option>
-            <option value="whsk">WHSK</option>
+            <option value="usdt">
+              {snapshot.tokenMismatch ? `Token B (${snapshot.tokenB})` : 'USDT'}
+            </option>
+            <option value="whsk">
+              {snapshot.tokenMismatch ? `Token A (${snapshot.tokenA})` : 'WHSK'}
+            </option>
           </select>
         </label>
         <label>
@@ -201,8 +266,22 @@ export function OwnerActions({
             <summary>Exact action calldata</summary>
             <code>{review.data}</code>
           </details>
+          {review.action === 'revoke' && (
+            <label>
+              <input
+                type="checkbox"
+                checked={revokeConfirmed}
+                onChange={(e) => setRevokeConfirmed(e.target.checked)}
+              />
+              Revoke removes agent authority immediately
+            </label>
+          )}
           <button
-            disabled={busy || review.context !== context}
+            disabled={
+              busy ||
+              review.context !== context ||
+              (review.action === 'revoke' && !revokeConfirmed)
+            }
             onClick={() => void sign()}
           >
             Sign reviewed action on Ledger

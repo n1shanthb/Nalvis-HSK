@@ -93,7 +93,11 @@ export function MandateView({
   onOwner,
 }: {
   chain: DashboardChain;
-  onOwner?: (d: Deployment, s: VaultSnapshot) => React.ReactNode;
+  onOwner?: (
+    d: Deployment,
+    s: VaultSnapshot,
+    reload: () => Promise<void>,
+  ) => React.ReactNode;
 }) {
   const resource = useResource(
     useCallback(async () => {
@@ -171,7 +175,11 @@ export function MandateView({
             />
           </p>
           <MandateDetails snapshot={resource.data.snapshot} />
-          {onOwner?.(resource.data.deployment, resource.data.snapshot)}
+          {onOwner?.(
+            resource.data.deployment,
+            resource.data.snapshot,
+            resource.reload,
+          )}
         </>
       )}
       <Portfolio chain={chain} />

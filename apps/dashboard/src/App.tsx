@@ -134,17 +134,19 @@ export function App({
                   chain={chain}
                   onOwner={
                     enableOwner
-                      ? (d, s) => (
+                      ? (d, s, reload) => (
                           <Suspense fallback={<p>Loading owner panel…</p>}>
                             <MandateWizard
                               chain={chain}
                               vault={d.vault}
                               snapshot={s}
+                              onConfirmed={reload}
                             />
                             <OwnerActions
                               chain={chain}
                               vault={d.vault}
                               snapshot={s}
+                              onConfirmed={reload}
                             />
                             {proposal && (
                               <OwnerPanel
