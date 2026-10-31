@@ -193,3 +193,10 @@ cost and policy buffer; the check may only resize down or reject. Volatility is
 hash, timestamp, observation count and sigma are recorded in evidence. This
 is a bounded cost-curve stress proxy, not hypothetical live Quoter RPCs or a
 forecast. `backtest.json` is unchanged: no proven edge.
+
+## T12 agent core and receipt v3
+
+The autonomous path lives in [agent/README.md](src/agent/README.md). It preserves
+the existing v1/v2 rule engine and receipt hashes. New consumers import the server
+library from `src/agent/index.ts`; v3 receipt builders are also re-exported from
+`receipt.ts`. The always-on service and dashboard integration are T12B.
