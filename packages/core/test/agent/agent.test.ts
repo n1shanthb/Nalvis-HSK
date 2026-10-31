@@ -1,3 +1,7 @@
+import {
+  modelRates,
+  defaultTokenRates,
+} from '../../src/agent/config/model-rates.js';
 import { scenario } from '../helpers.js';
 import { describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -76,6 +80,7 @@ it('OpenRouter uses JSON mode, configured model, headers and actual returned mod
       response_format: { type: 'json_object' },
       provider: { require_parameters: true },
       reasoning: { effort: 'low', exclude: true },
+      usage: { include: true },
     });
   }
 });
@@ -509,4 +514,100 @@ it('a paused mandate does not gate strategist thinking or watch management', asy
     ),
   ).toBe(true);
   expect(h.agent.journal.entries.at(-1)?.data.state).toBe('NEEDS_OWNER');
+});
+
+it('configured model estimates, including 288 typical calls/day, remain below $1', async () => {
+  expect(Object.values(modelRates)).toEqual([
+    { inputPerMillion: 0.1, outputPerMillion: 0.5 },
+    { inputPerMillion: 0.14, outputPerMillion: 0.28 },
+  ]);
+  for (const [model, rate] of [
+    ...Object.entries(modelRates),
+    ['unknown-model', defaultTokenRates] as const,
+  ]) {
+    const provider = openRouter(
+      { OPENROUTER_API_KEY: 'test-only-placeholder', STRATEGIST_MODEL: model },
+      async () =>
+        Response.json({
+          model,
+          choices: [{ message: { content: '{}' } }],
+          usage: { prompt_tokens: 1000, completion_tokens: 500 },
+        }),
+    );
+    let total = 0;
+    for (let i = 0; i < 288; i++) {
+      const completion = await provider.complete({
+        role: i % 2 ? 'fitter' : 'strategist',
+        system: '',
+        input: '{}',
+      });
+      expect(completion.costSource).toBe('estimate');
+      expect(completion.costUsdEst).toBeCloseTo(
+        (1000 * rate.inputPerMillion + 500 * rate.outputPerMillion) / 1e6,
+        12,
+      );
+      expect(completion.costEstimate?.rateSource).toBe(
+        model === 'unknown-model' ? 'default' : 'model',
+      );
+      total += completion.costUsdEst;
+    }
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThan(1);
+  }
+});
+it.each([undefined, 0, 0.123])(
+  'journals estimate versus reported cost (%s)',
+  async (cost) => {
+    const model = Object.keys(modelRates)[0],
+      journal = await createJournal(memoryStore());
+    const provider = openRouter(
+      { OPENROUTER_API_KEY: 'test-only-placeholder', STRATEGIST_MODEL: model },
+      async () =>
+        Response.json({
+          model,
+          choices: [{ message: { content: JSON.stringify(output()) } }],
+          usage: {
+            prompt_tokens: 1000,
+            completion_tokens: 500,
+            ...(cost === undefined ? {} : { cost }),
+          },
+        }),
+    );
+    await runStrategist({ provider, journal, now: 100000, input: {} });
+    const call = journal.entries.at(-1)!;
+    expect(call.data.costSource).toBe(
+      cost === undefined ? 'estimate' : 'openrouter',
+    );
+    if (cost === undefined)
+      expect(call.data.costEstimate).toMatchObject({
+        rateSource: 'model',
+        model,
+      });
+    else {
+      expect(call.data.costUsdEst).toBe(cost);
+      expect(call.data.costEstimate).toBeUndefined();
+    }
+  },
+);
+it('missing token usage has a labelled byte-based estimate rather than a flat $1', async () => {
+  const provider = openRouter(
+    {
+      OPENROUTER_API_KEY: 'test-only-placeholder',
+      STRATEGIST_MODEL: 'unknown',
+    },
+    async () =>
+      Response.json({
+        model: 'unknown',
+        choices: [{ message: { content: '{}' } }],
+      }),
+  );
+  const call = await provider.complete({
+    role: 'strategist',
+    system: 'system',
+    input: '{}',
+  });
+  expect(call.costSource).toBe('estimate');
+  expect(call.costEstimate?.tokenSource).toBe('usage-and-byte-estimate');
+  expect(call.costUsdEst).toBeGreaterThan(0);
+  expect(call.costUsdEst).toBeLessThan(0.01);
 });

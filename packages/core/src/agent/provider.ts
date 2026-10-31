@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  modelRates,
+  defaultTokenRates,
+  type TokenRates,
+} from './config/model-rates.js';
 export type Role = 'strategist' | 'fitter';
 export type CompletionRequest = { role: Role; system: string; input: string };
 export type Completion = {
@@ -8,7 +13,14 @@ export type Completion = {
   latencyMs: number;
   usage: Record<string, unknown>;
   costUsdEst: number;
-  costSource: string;
+  costSource: 'openrouter' | 'estimate';
+  costEstimate?: TokenRates & {
+    rateSource: 'model' | 'custom' | 'default';
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    tokenSource: 'usage' | 'usage-and-byte-estimate';
+  };
 };
 export interface Provider {
   models?: { strategist: string; fitter: string };
@@ -28,16 +40,21 @@ const responseSchema = z.object({
       }),
     )
     .length(1),
-  usage: z.record(z.unknown()).optional(),
+  usage: z
+    .object({
+      prompt_tokens: z.number().int().nonnegative().optional(),
+      completion_tokens: z.number().int().nonnegative().optional(),
+      cost: z.number().finite().nonnegative().nullable().optional(),
+      total_cost: z.number().finite().nonnegative().nullable().optional(),
+    })
+    .passthrough()
+    .optional(),
 });
-/** Estimates are explicitly supplied per model; unknown cost fails closed for budget accounting. */
+/** Reported usage cost wins; otherwise charge labelled per-token estimates. */
 export function openRouter(
   env: Record<string, string | undefined> = process.env,
   send: typeof fetch = fetch,
-  estimates: Record<
-    string,
-    { inputPerMillion: number; outputPerMillion: number }
-  > = {},
+  estimates: Record<string, TokenRates> = {},
 ): Provider {
   return {
     id: 'openrouter',
@@ -81,6 +98,7 @@ export function openRouter(
                 response_format: { type: 'json_object' },
                 provider: { require_parameters: true },
                 reasoning: { effort: 'low', exclude: true },
+                usage: { include: true },
               }),
               signal: AbortSignal.timeout(20000),
             },
@@ -97,17 +115,27 @@ export function openRouter(
           const result = responseSchema.parse(await response.json()),
             usage = result.usage ?? {};
           const cost = usage.cost ?? usage.total_cost;
-          const rate = estimates[result.model];
-          const estimated = rate
-            ? (Number(usage.prompt_tokens ?? 0) * rate.inputPerMillion +
-                Number(usage.completion_tokens ?? 0) * rate.outputPerMillion) /
-              1e6
-            : undefined;
-          // Unknown cost conservatively consumes the default daily budget, never silently free.
-          const costUsdEst =
-            typeof cost === 'number' && Number.isFinite(cost) && cost >= 0
-              ? cost
-              : (estimated ?? 1);
+          const custom = estimates[result.model],
+            known = modelRates[result.model];
+          const rate = z
+            .object({
+              inputPerMillion: z.number().finite().nonnegative(),
+              outputPerMillion: z.number().finite().nonnegative(),
+            })
+            .parse(custom ?? known ?? defaultTokenRates);
+          // Missing token counts use a conservative one-token-per-UTF-8-byte bound,
+          // plus message framing; absent usage never becomes a free completion.
+          const inputTokens =
+            usage.prompt_tokens ??
+            Buffer.byteLength(request.system + request.input) + 128;
+          const outputTokens =
+            usage.completion_tokens ??
+            Buffer.byteLength(result.choices[0].message.content);
+          const estimated =
+            (inputTokens * rate.inputPerMillion +
+              outputTokens * rate.outputPerMillion) /
+            1e6;
+          const costUsdEst = cost ?? estimated;
           return {
             provider: 'openrouter',
             model: result.model,
@@ -116,11 +144,27 @@ export function openRouter(
             usage,
             costUsdEst,
             costSource:
-              typeof cost === 'number'
-                ? 'openrouter usage.cost'
-                : rate
-                  ? `per-model estimate: ${result.model}`
-                  : `unknown model cost: ${result.model}; conservative $1 reserve`,
+              cost === undefined || cost === null ? 'estimate' : 'openrouter',
+            ...(cost === undefined || cost === null
+              ? {
+                  costEstimate: {
+                    ...rate,
+                    rateSource: custom
+                      ? ('custom' as const)
+                      : known
+                        ? ('model' as const)
+                        : ('default' as const),
+                    model: result.model,
+                    inputTokens,
+                    outputTokens,
+                    tokenSource:
+                      usage.prompt_tokens !== undefined &&
+                      usage.completion_tokens !== undefined
+                        ? ('usage' as const)
+                        : ('usage-and-byte-estimate' as const),
+                  },
+                }
+              : {}),
           };
         } catch (e) {
           if (

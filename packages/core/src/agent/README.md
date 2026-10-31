@@ -64,10 +64,14 @@ wallet nonce before clearing it. There is no automatic resend.
 
 Budget accounting persists every model completion. The hourly wake window is
 rolling; the USD budget resets at the UTC day boundary. All fit/repair calls
-consume budget. OpenRouter-reported usage cost takes priority; a configured
-per-model token estimate is labelled. An unknown model price reserves $1
-conservatively and is labelled as unknown, never treated as free. Models with
-unknown prices should have explicit rates configured before unattended use.
+consume budget. OpenRouter usage accounting is requested on every call. Returned cost takes priority
+(`costSource: openrouter`); otherwise the per-model configuration in
+`config/model-rates.ts` supplies USD per million input/output tokens
+(`costSource: estimate`). Unknown models use a labelled conservative $1/$3 per
+million input/output tokens, not a flat per-call charge. Missing token counts use
+a conservative UTF-8-byte estimate plus message framing. Journal entries retain
+the selected rates, token counts and whether a model, custom or default rate was
+used. The injected rate override remains available for other models.
 
 ## Policy and receipt commitments
 

@@ -90,7 +90,7 @@ export function mockProvider(
         latencyMs: 1,
         usage: { prompt_tokens: 10, completion_tokens: 10 },
         costUsdEst: 0.01,
-        costSource: 'mock',
+        costSource: 'estimate',
       };
     },
   };

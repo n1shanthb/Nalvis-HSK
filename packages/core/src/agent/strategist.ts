@@ -80,6 +80,9 @@ export async function completeValidated<T>(args: {
         usage: completion?.usage ?? {},
         costUsdEst: completion?.costUsdEst ?? 0,
         costSource: completion?.costSource ?? 'transport failed',
+        ...(completion?.costEstimate
+          ? { costEstimate: completion.costEstimate }
+          : {}),
         schema: args.promptVersion,
         ...(rawOutputArtifact ? { rawOutputArtifact } : {}),
         ...(error ? { validationError: error } : {}),
