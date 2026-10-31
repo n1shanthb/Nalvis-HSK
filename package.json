@@ -9,7 +9,8 @@
     "lint": "pnpm -r lint && tsc -b --noEmit",
     "dev": "pnpm --filter @nalvis/dashboard dev",
     "keeper": "node packages/keeper/dist/keeper/src/cli.js",
-    "verify": "node packages/verifier/dist/verifier/src/cli.js"
+    "verify": "node packages/verifier/dist/verifier/src/cli.js",
+    "nalvis": "node packages/core/dist/desk/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
