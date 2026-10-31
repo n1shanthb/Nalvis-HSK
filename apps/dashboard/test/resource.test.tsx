@@ -1,3 +1,5 @@
+import { MandateWizard } from '../src/owner/MandateWizard.js';
+import { snapshot, vault } from './ux-fixtures.js';
 import {
   act,
   fireEvent,
@@ -15,28 +17,32 @@ test('failed poll keeps owner flow mounted at current step', async () => {
   vi.useFakeTimers();
   const loader = vi
     .fn()
-    .mockResolvedValueOnce('vault')
+    .mockResolvedValueOnce(snapshot)
     .mockRejectedValue(Error('timeout'));
   function View() {
     const r = useResource(loader);
     return (
       <>
-        {r.data && <input aria-label="wizard step" defaultValue="Connect" />}
+        {r.data && (
+          <MandateWizard
+            chain={133}
+            vault={vault}
+            snapshot={snapshot}
+            previewOnly
+          />
+        )}
         {r.error && <p>stale, retrying</p>}
       </>
     );
   }
   render(<View />);
   await act(async () => {});
-  fireEvent.change(screen.getByLabelText('wizard step'), {
-    target: { value: 'Review' },
-  });
+  fireEvent.click(screen.getByText('Choose a preset'));
+  fireEvent.click(screen.getByRole('button', { name: /Balanced/ }));
   await act(async () => {
     await vi.advanceTimersByTimeAsync(30000);
   });
-  expect((screen.getByLabelText('wizard step') as HTMLInputElement).value).toBe(
-    'Review',
-  );
+  expect(screen.getByText('Compare current and proposed')).toBeTruthy();
   expect(screen.getByText('stale, retrying')).toBeTruthy();
 });
 test.each([

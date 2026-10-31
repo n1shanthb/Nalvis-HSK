@@ -74,9 +74,11 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
               event.preventDefault();
               const next = !history;
               setHistory(next);
-              event.currentTarget
-                .querySelectorAll<HTMLButtonElement>('[role="tab"]')
-                [next ? 1 : 0]?.focus();
+              const tabs =
+                event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  '[role="tab"]',
+                );
+              tabs[next ? 1 : 0]?.focus();
             }
           }}
           role="tablist"
@@ -84,6 +86,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
         >
           <button
             role="tab"
+            tabIndex={history ? -1 : 0}
             id="active-watches-tab"
             aria-controls="active-watches-panel"
             aria-selected={!history}
@@ -93,6 +96,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
           </button>
           <button
             role="tab"
+            tabIndex={history ? 0 : -1}
             id="watch-history-tab"
             aria-controls="watch-history-panel"
             aria-selected={history}
@@ -103,6 +107,13 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
         </div>
         <div
           role="tabpanel"
+          hidden
+          id={history ? 'active-watches-panel' : 'watch-history-panel'}
+          aria-labelledby={history ? 'active-watches-tab' : 'watch-history-tab'}
+        />
+        <div
+          role="tabpanel"
+          tabIndex={0}
           id={history ? 'watch-history-panel' : 'active-watches-panel'}
           aria-labelledby={history ? 'watch-history-tab' : 'active-watches-tab'}
         >

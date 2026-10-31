@@ -10,11 +10,16 @@ export function useResource<T>(load: () => Promise<T>, interval = 30000) {
   const reload = useCallback(() => refresh.current(), []);
   useEffect(() => {
     let active = true,
-      inFlight = false;
+      inFlight = false,
+      rerun = false;
     let timer: ReturnType<typeof setTimeout>;
     setState({ loading: true });
     async function poll() {
-      if (!active || inFlight) return;
+      if (!active) return;
+      if (inFlight) {
+        rerun = true;
+        return;
+      }
       clearTimeout(timer);
       inFlight = true;
       try {
@@ -30,7 +35,10 @@ export function useResource<T>(load: () => Promise<T>, interval = 30000) {
           }));
       } finally {
         inFlight = false;
-        if (active) timer = setTimeout(poll, Math.max(interval, 30000));
+        if (active && rerun) {
+          rerun = false;
+          void poll();
+        } else if (active) timer = setTimeout(poll, Math.max(interval, 30000));
       }
     }
     refresh.current = poll;

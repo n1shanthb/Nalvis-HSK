@@ -51,7 +51,7 @@ const address = z
 const deploymentSchema = z.object({
   vault: address,
   router: address,
-  block: z.coerce.bigint().nonnegative(),
+  block: z.coerce.bigint().nonnegative().optional(),
   owner: address,
   agent: address,
   deployer: address,

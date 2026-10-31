@@ -255,7 +255,11 @@ export function OwnerActions({
           <p>Chain 133 · To vault {vault} · Value 0 HSK</p>
           {review.action === 'withdraw' && (
             <p>
-              {amount} {token.toUpperCase()} to {to}
+              {amount}{' '}
+              {snapshot.tokenMismatch
+                ? tokens?.[token === 'whsk' ? 0 : 1]
+                : token.toUpperCase()}{' '}
+              to {to}
             </p>
           )}
           <p>{BLIND_SIGNING_WARNING}</p>
