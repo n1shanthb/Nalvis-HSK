@@ -110,7 +110,7 @@ test('diff highlights only changed fields', () => {
     1,
   );
   expect(view.container.querySelector('.changed')?.textContent).toContain(
-    'maxSlippageBps',
+    'Slippage (bps)',
   );
 });
 test.each(['pause', 'unpause', 'revoke'] as const)(
