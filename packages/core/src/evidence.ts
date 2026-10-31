@@ -430,7 +430,7 @@ export async function collectEvidence({
     }
   }
   e.now = clock();
-  e.validUntil = e.now + decisionTtlSec;
+  if(execBlock) {e.decisionTime=Number(execBlock.timestamp);e.validUntil=e.decisionTime+decisionTtlSec;}
   if (e.apro) e.apro.ageSec = e.now - e.apro.updatedAt;
   return evidenceSchema.parse(e);
 }

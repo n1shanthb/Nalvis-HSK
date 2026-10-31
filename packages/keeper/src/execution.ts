@@ -355,8 +355,7 @@ export async function connectExecution(
     await guardSigning(client, chainId);
     if (
       sendingValidUntil !== undefined &&
-      ((chainId === 133 && Math.floor(Date.now() / 1000) > sendingValidUntil) ||
-        Number((await client.getBlock()).timestamp) > sendingValidUntil)
+      Number((await client.getBlock()).timestamp) > sendingValidUntil
     )
       throw new Error('Stale decision dropped before signature');
     return wallet.sendTransaction({ to, data, nonce, account, chain });

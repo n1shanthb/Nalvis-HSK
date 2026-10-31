@@ -28,9 +28,9 @@ export function recordedReader(input: unknown): ChainReader {
   return {
     async timestamp(block) {
       const r = b.receipts.find((r) => r.blockNumber === block);
-      if (!r || typeof r.blockTimestamp !== 'number')
+      if (!r || !(typeof r.blockTimestamp === 'number' || typeof r.blockTimestamp === 'string'))
         throw Error('Recorded block timestamp unavailable');
-      return r.blockTimestamp;
+      return Number(r.blockTimestamp);
     },
     async chainId() {
       return b.chainId;

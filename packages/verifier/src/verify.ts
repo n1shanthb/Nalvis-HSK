@@ -23,8 +23,8 @@ import {
   engineStateSchema,
   parseEvidenceJSON,
   decide,
+  decideLegacy,
   addresses,
-  type ReceiptBody,
 } from '../../core/src/index.js';
 import {
   vaultAbi,
@@ -32,6 +32,7 @@ import {
   receiptEvent,
   erc20Abi,
 } from '../../core/src/abi/index.js';
+import { legacyReceiptHashes } from './legacy.js';
 import { canonicalCheck } from './canonical-check.js';
 
 const hex = z
@@ -52,7 +53,7 @@ const trace = z.array(
 );
 export const receiptSchema = z
   .object({
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     chainId: z.union([z.literal(133), z.literal(31337)]),
     marketDataChainId: z.literal(177),
     executionChainId: z.union([z.literal(133), z.literal(31337)]),
@@ -73,7 +74,8 @@ export const receiptSchema = z
         validUntil: z.number().int().nonnegative().optional(),
         riskCheck: z
           .object({
-            samples: z.number().int().positive(),
+            method: z.literal('sigma-worst-case-v1'),
+            samples: z.literal(2),
             sigma: z.number().finite().nonnegative(),
             worstCostBps: z.number().finite(),
             accepted: z.boolean(),
@@ -107,7 +109,22 @@ export const receiptSchema = z
       .strict(),
     settlement: z.object({ transactionHash: hex }).passthrough().optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((r, ctx) => {
+    if (r.version !== 2) return;
+    if (
+      r.evidence.decisionTime === undefined ||
+      r.evidence.validUntil === undefined ||
+      !r.evidence.riskInput ||
+      r.tx.validUntil === undefined ||
+      r.decision.validUntil === undefined ||
+      (['TRADE', 'RESIZE'].includes(r.decision.kind) && !r.decision.riskCheck)
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'v2 requires decision time, expiry and volatility/risk fields',
+      });
+  });
 export type StoredReceipt = z.infer<typeof receiptSchema>;
 const logSchema = z
   .object({
@@ -327,6 +344,17 @@ export async function verify(
         r.evidence.executionChainId === r.executionChainId &&
         r.evidence.marketDataChainId === 177,
     );
+    if (r.version === 2)
+      check(
+        'required_v2_fields',
+        r.tx.validUntil !== undefined &&
+          r.decision.validUntil !== undefined &&
+          typeof r.evidence.decisionTime === 'number' &&
+          r.evidence.validUntil !== undefined &&
+          r.evidence.riskInput !== undefined &&
+          (!['TRADE', 'RESIZE'].includes(r.decision.kind) ||
+            r.decision.riskCheck !== undefined),
+      );
     current = 'canonical_evidence';
     check(current, canonical(r.evidence) === canonicalCheck(r.evidence));
     check('evidenceHash', evidenceHash(r.evidence) === r.evidenceHash);
@@ -355,12 +383,19 @@ export async function verify(
           : {}),
       },
     };
-    const coreHash = receiptHash(r as unknown as ReceiptBody);
+    const coreHash = receiptHash({
+      ...r,
+      evidence: parseEvidenceJSON(canonical(r.evidence)),
+    });
     check(
       'canonical_receipt',
       coreHash === keccak256(toBytes(canonicalCheck(independent))),
     );
     check('receiptHash', coreHash === r.receiptHash);
+    check(
+      'receipt_version',
+      r.version === 2 || legacyReceiptHashes.has(r.receiptHash),
+    );
     current = 'replay_snapshot';
     const evidence = parseEvidenceJSON(canonical(r.evidence));
     const raw = z
@@ -380,18 +415,25 @@ export async function verify(
         mandate.policyHash === r.policyHash,
     );
     if (
+      r.version === 2 ||
       evidence.validUntil !== undefined ||
       r.tx.validUntil !== undefined ||
       r.decision.validUntil !== undefined
     )
       check(
         'decision_expiry',
-        evidence.validUntil === evidence.now + (policy.decisionTtlSec ?? 120) &&
+        evidence.validUntil ===
+          evidence.decisionTime! + (policy.decisionTtlSec ?? 120) &&
           r.tx.validUntil === evidence.validUntil &&
           r.decision.validUntil === evidence.validUntil &&
           r.tx.deadline <= evidence.validUntil!,
       );
-    const replay = decide(evidence, policy, mandate, state);
+    const replay = (r.version === 1 ? decideLegacy : decide)(
+      evidence,
+      policy,
+      mandate,
+      state,
+    );
     check(
       'decision_replay',
       canonical(replay) === canonical(r.decision) &&
@@ -425,7 +467,9 @@ export async function verify(
         : undefined;
       check(
         'mined_before_expiry',
-        at !== undefined && at >= evidence.now && at <= r.tx.validUntil,
+        at !== undefined &&
+          at >= evidence.decisionTime! &&
+          at <= r.tx.validUntil,
       );
     }
     current = 'mined_transaction';

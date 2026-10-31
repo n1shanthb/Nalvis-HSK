@@ -34,6 +34,7 @@ export const evidenceSchema = z
     blockNumber: z.bigint().nonnegative(),
     executionBlockNumber: z.bigint().nonnegative(),
     now: time,
+    decisionTime: time.optional(),
     validUntil: time.optional(),
     riskInput: z
       .object({
@@ -85,6 +86,7 @@ export type Decision = {
   minOut?: bigint;
   validUntil?: number;
   riskCheck?: {
+    method: 'sigma-worst-case-v1';
     samples: number;
     sigma: number;
     worstCostBps: number;

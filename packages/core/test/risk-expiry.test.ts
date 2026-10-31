@@ -12,12 +12,12 @@ const prepare = () => {
   };
   return s;
 };
-it('replays seeded risk deterministically, preserving the requested size ceiling', () => {
+it('replays endpoint worst-case stress deterministically, preserving the requested size ceiling', () => {
   const s = prepare();
   const d = decide(s.e, s.policy, s.mandate, s.state);
   expect(d.kind).toBe('TRADE');
   expect(d.validUntil).toBe(s.e.now + 120);
-  expect(d.riskCheck?.samples).toBe(256);
+  expect(d.riskCheck?.samples).toBe(2);
   expect(decide(s.e, s.policy, s.mandate, s.state)).toEqual(d);
 });
 it('rejects every size when historical sigma consumes the edge', () => {
@@ -52,4 +52,34 @@ it('includes sigma endpoints and never mutates quotes', () => {
   const r = riskCheck(s.e, q, 0);
   expect(r.worstCostBps).toBeGreaterThan(0);
   expect(q).toEqual(before);
+});
+
+it('new decisions cannot omit both expiry and volatility', () => {
+  const s = prepare();
+  delete s.e.validUntil;
+  delete s.e.riskInput;
+  expect(decide(s.e, s.policy, s.mandate, s.state).kind).toBe('REJECT');
+});
+it('stress equals independent endpoint calculation for every quote', () => {
+  const s = prepare();
+  for (const q of s.e.quotes) {
+    const buy = q.direction === 'BUY_A';
+    const fair =
+      (Number(q.amountIn) / 10 ** (buy ? s.e.decimalsB : s.e.decimalsA)) *
+      (buy ? 1 / s.e.dexMid! : s.e.dexMid!);
+    const out =
+      Number(q.quotedOut) / 10 ** (buy ? s.e.decimalsA : s.e.decimalsB);
+    const expected = Math.max(
+      0,
+      ...[-s.e.riskInput!.sigma, s.e.riskInput!.sigma].map(
+        (shock) =>
+          (1 - out / (fair * (buy ? 1 / (1 + shock) : 1 + shock))) * 10000,
+      ),
+    );
+    expect(riskCheck(s.e, q, 0)).toMatchObject({
+      method: 'sigma-worst-case-v1',
+      samples: 2,
+      worstCostBps: expected,
+    });
+  }
 });

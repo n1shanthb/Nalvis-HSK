@@ -7,12 +7,12 @@ import {
   open,
   unlink,
 } from 'node:fs/promises';
-import { hash } from '../../core/src/canonical.js';
 import { join } from 'node:path';
 import { zeroHash, type Address, type Hex } from 'viem';
 import {
   assertWritableChain,
   canonical,
+  hash,
   buildReceipt,
   decide,
   choosePreset,
@@ -138,7 +138,8 @@ export async function tick(
   // Run even for holds: a revoked agent must not submit anything.
   await execution.check(snapshot);
   const evidence = await execution.collect(snapshot);
-  evidence.validUntil = evidence.now + (policy.decisionTtlSec ?? 120);
+  evidence.decisionTime = snapshot.now;
+  evidence.validUntil = snapshot.now + (policy.decisionTtlSec ?? 120);
   const history = JSON.parse(
     await readFile(
       join(repositoryRoot(), 'data/research/market_history.json'),
@@ -152,6 +153,17 @@ export async function tick(
     sigma,
     observations: history.summary.hours_in_window - 1,
     historyHash: hash(history),
+  };
+  evidence.sources.volatilityHistory = {
+    url: 'fixture:data/research/market_history.json',
+    method: 'frozen-2026-10-27-hourly-cex-volatility',
+    fetchedAt: evidence.now,
+    raw: {
+      asOf: history.summary.measured_at_IST,
+      historyHash: hash(history),
+      observations: evidence.riskInput.observations,
+      sigma,
+    },
   };
   evidence.sources.keeperState = {
     address: execution.contract,
@@ -185,9 +197,9 @@ export async function tick(
     raw: { policy, mandate: snapshot.mandate, state },
   };
   const decision = decide(evidence, policy, snapshot.mandate, state);
-  evidence.sources.riskSimulation = {
+  evidence.sources.riskStress = {
     address: execution.contract,
-    method: 'seeded-bounded-price-stress-v1',
+    method: 'sigma-worst-case-v1',
     fetchedAt: evidence.now,
     raw: decision.riskCheck ?? {
       skipped:
@@ -270,11 +282,7 @@ export async function tick(
     // This intent is durable before any signature/broadcast. Uncertain sends never auto-retry.
     await execution.check(snapshot);
     const fresh = await execution.snapshot();
-    if (
-      fresh.now > evidence.validUntil ||
-      (execution.chainId === 133 &&
-        Math.floor(Date.now() / 1000) > evidence.validUntil)
-    )
+    if (fresh.now > evidence.validUntil)
       throw new Error('Stale decision dropped before signing');
     const pending = join(directory, '.pending.json');
     await saveJSON(pending, {

@@ -27,6 +27,7 @@ export function fixtureScenario(
     ),
   );
   evidence.now = now;
+  evidence.decisionTime = now; evidence.validUntil = now + (policy.decisionTtlSec ?? 120); evidence.riskInput={sigma:0,observations:719,historyHash:'0x'+'a'.repeat(64)};
   evidence.lastSwapAt = now;
   for (const c of evidence.cex) c.fetchedAt = now;
   if (evidence.apro) {

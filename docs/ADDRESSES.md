@@ -137,3 +137,17 @@ SwapRouter02/pool/WHSK/USDT on 177, fee 3000, TWAP window 600, oracle zero,
 oracle band/max-age zero. Deployment transaction hash was not captured and is
 UNVERIFIED; the trade hash above is not a deployment hash. The manifest is only
 test provenance. See `packages/verifier/test/fixtures/README.md`.
+
+
+## T8 ephemeral local verifier fixture (31337 only)
+
+Local fork recording, not a network deployment or broadcast destination.
+`packages/keeper/test/anvil.integration.test.ts` deployed the compiled vault,
+verified nonempty code through verifier config reads, executed and verified all
+four outcomes before capturing RPC responses in `packages/verifier/test/fixtures/t8`.
+
+Vault: `0x663f3ad617193148711d28f5334ee4ed07016602`
+
+Recorded first trade: `0xd537f6804668cda70ed14543400358a81590ad831ad925d7684627286b78c55d`.
+Constructor arguments and fork block match the T6 local setup above. No new
+remote contract address is introduced.

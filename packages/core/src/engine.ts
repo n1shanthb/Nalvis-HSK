@@ -16,11 +16,12 @@ import {
 } from './policy.js';
 import { cexMid, quality, valueA, evaluateQuote } from './engine-helpers.js';
 
-export function decide(
+function decideInternal(
   evidence: Evidence,
   policy: Policy,
   mandate: Mandate,
   state: EngineState,
+  legacyRecording: boolean,
 ): Decision {
   const ruleTrace: RuleTrace = [];
   let lastRisk: Decision['riskCheck'];
@@ -47,13 +48,15 @@ export function decide(
     p = pp.data,
     m = mp.data;
   if (
-    e.validUntil !== undefined &&
-    e.validUntil !== e.now + (p.decisionTtlSec ?? 120)
+    !legacyRecording &&
+    (e.validUntil === undefined ||
+      e.decisionTime === undefined ||
+      e.validUntil !== e.decisionTime + (p.decisionTtlSec ?? 120))
   ) {
     trace('decision_expiry', false, 'Evidence expiry differs from policy');
     return finish('REJECT');
   }
-  if (e.validUntil !== undefined && !e.riskInput) {
+  if (!legacyRecording && !e.riskInput) {
     trace(
       'risk_input',
       false,
@@ -158,9 +161,9 @@ export function decide(
     if (risk) lastRisk = risk;
     if (risk)
       trace(
-        'monte_carlo',
+        'sigma_worst_case',
         risk.accepted,
-        `${sizeB}: 256 bounded price stresses; worst cost ${risk.worstCostBps.toFixed(4)} bps`,
+        `${sizeB}: ±σ worst-case stress (two endpoints); worst cost ${risk.worstCostBps.toFixed(4)} bps`,
       );
     if (valid && (!risk || risk.accepted))
       return {
@@ -174,7 +177,7 @@ export function decide(
         ruleTrace,
       };
   }
-  if (ruleTrace.some((t) => t.rule === 'monte_carlo' && !t.pass)) {
+  if (ruleTrace.some((t) => t.rule === 'sigma_worst_case' && !t.pass)) {
     trace(
       'risk_reject',
       false,
@@ -185,3 +188,18 @@ export function decide(
   trace('edge_or_caps', false, 'No valid grid size');
   return finish('WAIT');
 }
+
+/** Only for pinned historical recordings and labelled research replay. Never use for new decisions. */
+export const decideLegacy = (
+  e: Evidence,
+  p: Policy,
+  m: Mandate,
+  s: EngineState,
+) => decideInternal(e, p, m, s, true);
+
+export const decide = (
+  e: Evidence,
+  p: Policy,
+  m: Mandate,
+  s: EngineState,
+): Decision => decideInternal(e, p, m, s, false);

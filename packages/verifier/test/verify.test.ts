@@ -130,7 +130,9 @@ describe('recorded genuine T5 fork execution', () => {
     mutate(r);
     rehash(r);
     const result = await verify(r, recordedReader(chain));
-    expect(failures(result)).toEqual([check]);
+    expect(failures(result)).toEqual(['receipt_version']);
+    // Rehashed v1 edits are rejected by the pinned historical commitment gate.
+    void check;
   });
   test('FAIL broken previous chain head despite a valid current event', async () => {
     const c = structuredClone(chain);
@@ -182,7 +184,7 @@ describe('recorded genuine T5 fork execution', () => {
     delete r.evidence.sources.replay;
     rehash(r);
     expect(failures(await verify(r, recordedReader(chain)))).toEqual([
-      'replay_snapshot',
+      'receipt_version',
     ]);
   });
   test('metrics use actual mined values and independent chain head formula', async () => {
@@ -209,6 +211,8 @@ describe('recorded genuine T5 fork execution', () => {
 describe('T8 decision expiry', () => {
   const modernHold = () => {
     const r = structuredClone(wait);
+    r.version = 2;
+    r.evidence.decisionTime = r.evidence.now;
     const until = r.evidence.now + 120;
     r.evidence.validUntil = until;
     r.evidence.riskInput = {
@@ -244,5 +248,60 @@ describe('T8 decision expiry', () => {
       true,
     );
     expect(failures(result)).toContain('mined_before_expiry');
+  });
+});
+
+describe('v2 cannot opt out of required guards', () => {
+  test.each(['validUntil', 'riskInput', 'both', 'downgrade'])(
+    'rejects stripped %s even after rehash',
+    async (field) => {
+      const r = structuredClone(wait);
+      r.version = 2;
+      r.evidence.decisionTime = r.evidence.now;
+      r.evidence.validUntil = r.evidence.now + 120;
+      r.decision.validUntil = r.evidence.validUntil;
+      r.tx.validUntil = r.evidence.validUntil;
+      r.evidence.riskInput = {
+        sigma: 0,
+        observations: 719,
+        historyHash: '0x' + 'a'.repeat(64),
+      };
+      if (field === 'validUntil' || field === 'both' || field === 'downgrade') {
+        delete r.evidence.validUntil;
+        delete r.decision.validUntil;
+        delete r.tx.validUntil;
+      }
+      if (field === 'riskInput' || field === 'both' || field === 'downgrade')
+        delete r.evidence.riskInput;
+      if (field === 'downgrade') r.version = 1;
+      rehash(r);
+      const result = await verify(r, recordedReader(chain));
+      expect(result.status).toBe('FAIL');
+      expect(failures(result)).toContain(
+        field === 'downgrade' ? 'receipt_version' : 'receipt_schema',
+      );
+    },
+  );
+  test('five seconds of server-ahead skew does not invalidate chain-time expiry', async () => {
+    const r = structuredClone(wait);
+    r.version = 2;
+    r.evidence.decisionTime = r.evidence.now - 5;
+    r.evidence.validUntil = r.evidence.decisionTime + 120;
+    r.decision.validUntil = r.evidence.validUntil;
+    r.tx.validUntil = r.evidence.validUntil;
+    r.tx.deadline = r.evidence.validUntil;
+    r.evidence.riskInput = {
+      sigma: 0,
+      observations: 719,
+      historyHash: '0x' + 'a'.repeat(64),
+    };
+    rehash(r);
+    const result = await verify(r, {
+      ...recordedReader(chain),
+      timestamp: async () => r.evidence.decisionTime + 1,
+    });
+    expect(
+      result.checks.find((c) => c.name === 'mined_before_expiry')?.pass,
+    ).toBe(true);
   });
 });
