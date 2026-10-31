@@ -10,8 +10,8 @@ import {
   type Hex,
   type PublicClient,
 } from 'viem';
-import { vaultAbi, erc20Abi, poolReadAbi, receiptEvent } from '../abi/index.js';
-import { parseAbiItem } from 'viem';
+import { vaultAbi, erc20Abi, poolReadAbi } from '../abi/index.js';
+import { readCachedTurnover } from './turnover.js';
 import { assertWritableChain } from '../addresses.js';
 import { hash } from '../canonical.js';
 import { meanTick, twapOutput } from './twap.js';
@@ -510,40 +510,18 @@ export async function readMandateState(
       oracleOk = false;
     }
   }
-  let lo = 0n,
-    hi = blockNumber;
-  const since = ((Number(b.timestamp) / 1800) | 0) * 1800 - 47 * 1800;
-  while (lo < hi) {
-    const mid = (lo + hi) / 2n;
-    const mb = await client.getBlock({ blockNumber: mid });
-    if (Number(mb.timestamp) < since) lo = mid + 1n;
-    else hi = mid;
-  }
-  const turnover: MandateState['turnover'] = [];
-  for (let from = lo; from <= blockNumber; from += 5000n) {
-    const logs = await client.getLogs({
-      address: vault,
-      event: parseAbiItem(receiptEvent),
-      fromBlock: from,
-      toBlock: from + 4999n > blockNumber ? blockNumber : from + 4999n,
-    });
-    for (const l of logs) {
-      if (l.args.kind === 0 || l.args.kind === 1) {
-        const t = Number(
-          (await client.getBlock({ blockNumber: l.blockNumber })).timestamp,
-        );
-        turnover.push({
-          expiresAt: (Math.floor(t / 1800) + 48) * 1800,
-          amountB:
-            l.args.tokenIn?.toLowerCase() === tokenB.toLowerCase()
-              ? l.args.amountIn!
-              : l.args.refOut!,
-        });
-      }
-    }
-  }
-  if (turnover.reduce((n, t) => n + t.amountB, 0n) !== uint.parse(spentB))
-    throw new Error('Cannot reconstruct rolling turnover');
+  const turnover = await readCachedTurnover(client, {
+    chainId,
+    vault,
+    tokenB,
+    block: {
+      number: blockNumber,
+      timestamp: b.timestamp,
+      hash: b.hash,
+      parentHash: b.parentHash,
+    },
+    spentB: uint.parse(spentB),
+  });
   const sender = agent ?? m[0];
   const [latest, pending] = await Promise.all([
     client.getTransactionCount({ address: sender, blockTag: 'latest' }),

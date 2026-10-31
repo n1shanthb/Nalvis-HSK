@@ -1,3 +1,4 @@
+import { MandateStateReadError } from './turnover.js';
 import { decide } from '../engine.js';
 import { zeroHash, formatUnits, type Hex } from 'viem';
 import { hash } from '../canonical.js';
@@ -70,6 +71,7 @@ export async function createAgent({
     lastPoll?: number;
     state?: string;
     stateAt?: number;
+    stateReason?: string;
     ownerEvents: string[];
     pendingOwnerEvents?: NonNullable<EvidenceLite['ownerEvents']>;
   };
@@ -107,15 +109,29 @@ export async function createAgent({
     if (watches) await store.write('watches.json', watches);
   };
   const state = async (value: string, reason: string, now: number) => {
-    if (runtime.state !== value || now - (runtime.stateAt ?? 0) >= 3600) {
+    if (
+      runtime.state !== value ||
+      runtime.stateReason !== reason ||
+      now - (runtime.stateAt ?? 0) >= 3600
+    ) {
       await journal.append(
         'STATE',
         { state: value, reason, mode: config.mode },
         now,
       );
       runtime.state = value;
+      runtime.stateReason = reason;
       runtime.stateAt = now;
       await save();
+    }
+  };
+  const readState = async (now: number) => {
+    try {
+      return await clients.readState();
+    } catch (e) {
+      if (e instanceof MandateStateReadError)
+        await state('NEEDS_OWNER', e.message, now);
+      throw e;
     }
   };
   const left = (now: number) =>
@@ -213,7 +229,7 @@ export async function createAgent({
       },
       now,
     );
-    let s = await clients.readState();
+    let s = await readState(now);
     assertWritableChain(s.chainId);
     let local: Hex;
     try {
@@ -456,7 +472,7 @@ export async function createAgent({
       return;
     }
     // Refresh ALL execution state after model calls; no cached authorization.
-    s = await clients.readState();
+    s = await readState(now);
     assertWritableChain(s.chainId);
     if (s.mandate.policyHash !== local || needsOwner(s)) {
       await state('NEEDS_OWNER', 'Mandate changed during wake', now);
@@ -550,7 +566,7 @@ export async function createAgent({
       simulation,
     });
     // Refresh immediately before durable intent/send; changes require a new wake.
-    const guardState = await clients.readState();
+    const guardState = await readState(now);
     assertWritableChain(guardState.chainId);
     const guardQuote =
       action.type === 'HOLD'

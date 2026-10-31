@@ -1,3 +1,4 @@
+import { MandateStateReadError } from '../../src/agent/turnover.js';
 import {
   modelRates,
   defaultTokenRates,
@@ -673,4 +674,26 @@ it('agent requests use only their dedicated key and never enable desk AI', async
   );
   expect(example).toMatch(/^DESK_AI_ENABLED=false$/m);
   expect(example).toMatch(/^AGENT_OPENROUTER_API_KEY=$/m);
+});
+
+it('turnover mismatch is journaled clearly and cannot call a model or send', async () => {
+  const h = await harness([]);
+  h.clients.readState = async () => {
+    throw new MandateStateReadError(
+      'TURNOVER_MISMATCH',
+      'Block 1: reconstructed 20 tokenB units, on-chain 30; refusing execution',
+    );
+  };
+  await h.agent.tick(100000);
+  await expect(h.agent.tick(104000)).rejects.toMatchObject({
+    code: 'TURNOVER_MISMATCH',
+  });
+  expect(h.provider.calls).toHaveLength(0);
+  expect(h.send).not.toHaveBeenCalled();
+  expect(h.agent.journal.entries.at(-1)?.data).toMatchObject({
+    state: 'NEEDS_OWNER',
+    reason: expect.stringContaining(
+      'TURNOVER_MISMATCH: Block 1: reconstructed 20 tokenB units, on-chain 30',
+    ),
+  });
 });

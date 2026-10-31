@@ -40,7 +40,11 @@ must ensure one writer per store root. Inject these clients:
 - `readState()`: use `readMandateState(publicClient,vault,block?,agent?)`. Reads
   are block-pinned, with live pending transaction checks. The private rolling
   turnover buckets are reconstructed from Receipt events in <=5,000-block chunks
-  and checked against `dailyNotionalB()`. This is a rolling 48 x 30-minute window,
+  and checked against `dailyNotionalB()`. Per-client/vault caches retain block
+  timestamps and a verified scan cursor; subsequent reads fetch only newer logs.
+  Reorgs or historical reads rebuild the cache. A turnover mismatch clears the
+  cache and fails closed with a `TURNOVER_MISMATCH` reason journaled as NEEDS_OWNER.
+  This is a rolling 48 x 30-minute window,
   **not** the historical calendar-day alias in older docs. Missing history fails
   closed. Retain archive RPC access for verification.
 - `quote(action,state)`: use `amountFor` then obtain an execution-chain quote at
