@@ -2,14 +2,11 @@ import { readDeskMandate } from '../../../../packages/core/src/desk/live.js';
 import { canonical } from '../../../../packages/core/src/canonical.js';
 import { parseEvidenceJSON } from '../../../../packages/core/src/serialization.js';
 import { policySchema } from '../../../../packages/core/src/policy.js';
-import type { DeskContext } from '../../../../packages/core/src/desk/index.js';
 import { verify, rpcReader } from '../../../../packages/verifier/src/verify.js';
 import { pnl } from '../../../../packages/verifier/src/pnl.js';
 import { localReceipts } from './receipts.js';
 import { clientFor, loadDeployment, type DashboardChain } from './clients.js';
-export async function liveDeskContext(
-  chain: DashboardChain,
-): Promise<DeskContext> {
+export async function liveDeskContext(chain: DashboardChain) {
   const receipts = (await localReceipts())
     .filter((r) => r.executionChainId === chain)
     .sort((a, b) => (a.seq < b.seq ? -1 : 1));
@@ -31,6 +28,7 @@ export async function liveDeskContext(
   const policy = policySchema.parse(raw.policy);
   const base = {
     receipts,
+    results,
     portfolio: pnl(results),
     evidence,
     policy,

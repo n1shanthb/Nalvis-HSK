@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { lazy, Suspense, useCallback } from 'react';
+const VaultChart = lazy(() => import('../components/charts/VaultChart.js'));
 import { liveDeskContext } from '../lib/desk-context.js';
 import { useResource } from '../lib/useResource.js';
 import type { DashboardChain } from '../lib/clients.js';
@@ -21,6 +22,9 @@ export function Portfolio({ chain }: { chain: DashboardChain }) {
   const p = r.data.portfolio;
   return (
     <>
+      <Suspense fallback={<p>Loading vault history…</p>}>
+        <VaultChart results={r.data.results} />
+      </Suspense>
       <div className="metrics">
         <article>
           <span>P&L vs hold · after gas</span>
