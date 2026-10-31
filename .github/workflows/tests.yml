@@ -25,4 +25,8 @@ jobs:
       - run: forge build --sizes
         working-directory: contracts
       - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+        env:
+          VITE_ENABLE_OWNER: "true"
+          VITE_DEMO_MODE: "false"
       - run: pnpm test

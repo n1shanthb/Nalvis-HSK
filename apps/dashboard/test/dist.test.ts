@@ -3,11 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test } from 'vitest';
 test('built dashboard contains no env files or key markers', () => {
   const root = resolve(import.meta.dirname, '../dist');
-  // Acceptance workflow builds before tests. Fail clearly if that order is missed.
-  expect(
-    existsSync(root),
-    'Run pnpm -r build before the production-asset scan',
-  ).toBe(true);
+  if (!existsSync(root)) throw Error('Missing production assets: run pnpm -r build first');
   // Match key prefixes at token boundaries: CSS desk-* and React mask-type are not keys.
   const scan = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
