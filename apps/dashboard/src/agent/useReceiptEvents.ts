@@ -96,9 +96,14 @@ export function useReceiptEvents(chain: DashboardChain, enabled = true) {
       const key = `${chain}:${deployment.vault}:${deployment.block}`;
       if (cache.current?.key !== key)
         cache.current = { key, scan: createReceiptScanner(client, deployment) };
-      const page = await cache.current.scan(older.current);
+      const fetchingOlder = older.current;
       older.current = false;
-      return page;
+      try {
+        return await cache.current.scan(fetchingOlder);
+      } catch (error) {
+        if (fetchingOlder) older.current = true;
+        throw error;
+      }
     }, [chain, enabled]),
   );
   return {
