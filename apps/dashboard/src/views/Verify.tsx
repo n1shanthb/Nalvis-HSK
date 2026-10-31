@@ -18,7 +18,10 @@ export function VerifyView({
   chain: DashboardChain;
   runRecorded?: (input: unknown) => Promise<Verification>;
 }) {
-  const [hash, setHash] = useState(''),
+  const [hash, setHash] = useState(
+      () =>
+        new URLSearchParams(window.location.hash.split('?')[1]).get('tx') ?? '',
+    ),
     [json, setJSON] = useState(''),
     [result, setResult] = useState<Verification>(),
     [error, setError] = useState(''),

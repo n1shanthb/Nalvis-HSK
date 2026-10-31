@@ -1,3 +1,4 @@
+import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
 import { AgentView } from './views/Agent.js';
 import { MandateWizard } from './owner/MandateWizard.js';
@@ -61,6 +62,13 @@ export function App({
   const [deskOpen, setDeskOpen] = useState(false);
   const [route, setRoute] = useState<AppRoute>(initialRoute ?? readRoute);
   useEffect(() => {
+    if (route === 'desk') {
+      setDeskOpen(true);
+      setRoute('agent');
+      window.history.replaceState(null, '', `${window.location.search}#/agent`);
+    }
+  }, [route]);
+  useEffect(() => {
     const change = () => setRoute(readRoute());
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
@@ -113,6 +121,10 @@ export function App({
                   : undefined
               }
             />
+          ) : route === 'verify' ? (
+            <VerifyView chain={demo ? 31337 : chain} />
+          ) : demo && route === 'mandate' ? (
+            <DemoMandate />
           ) : demo ? (
             <DemoConsole route={route} />
           ) : (
@@ -150,13 +162,33 @@ export function App({
               )}{' '}
               {route === 'evidence' && <EvidenceView />}
               {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
-              {route === 'verify' && <VerifyView chain={chain} />}
             </>
           )}
         </Suspense>
       </main>
       {deskOpen && (
-        <div className="desk-backdrop">
+        <div
+          className="desk-backdrop"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setDeskOpen(false);
+            if (event.key === 'Tab') {
+              const dialog =
+                event.currentTarget.querySelector('[role="dialog"]');
+              const controls = dialog?.querySelectorAll<HTMLElement>(
+                'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary',
+              );
+              const first = controls?.[0],
+                last = controls?.[controls.length - 1];
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+              } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+              }
+            }
+          }}
+        >
           <aside
             className="desk-drawer"
             role="dialog"

@@ -175,7 +175,7 @@ export function Landing() {
             Accounted for.
           </h2>
           <a className="button ember" href="#/agent">
-            Enter the recorded demo ↗
+            Open live console ↗
           </a>
           <p>Local Anvil prices are not real. No proven trading edge.</p>
         </section>

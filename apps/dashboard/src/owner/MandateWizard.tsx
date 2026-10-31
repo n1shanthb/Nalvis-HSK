@@ -13,7 +13,12 @@ import {
   connectLedger,
   sendOwnerAction,
 } from './ledger.js';
-import { clientFor, explorerLink, type VaultSnapshot } from '../lib/clients.js';
+import {
+  displayTime,
+  clientFor,
+  explorerLink,
+  type VaultSnapshot,
+} from '../lib/clients.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 export function wizardCalldata(fields: MandateFields, snapshot: VaultSnapshot) {
   return encodeFunctionData({
@@ -21,6 +26,24 @@ export function wizardCalldata(fields: MandateFields, snapshot: VaultSnapshot) {
     functionName: 'setMandate',
     args: [validateMandate(fields, snapshot)],
   });
+}
+const diffLabels: Record<keyof MandateFields, string> = {
+  agent: 'Agent address',
+  expiry: 'Expiry (IST)',
+  maxTradeInA: 'WHSK per trade',
+  maxTradeInB: 'USDT per trade',
+  maxDailyInB: 'USDT per UTC day',
+  maxExposureBps: 'Exposure (%)',
+  maxSlippageBps: 'Slippage (bps)',
+  maxDrawdownBps: 'Drawdown (%)',
+  minIntervalSec: 'Minimum interval (seconds)',
+  policyHash: 'Policy hash',
+};
+function diffValue(key: keyof MandateFields, value: string) {
+  if (key === 'expiry') return displayTime(Number(value));
+  if (key === 'maxExposureBps' || key === 'maxDrawdownBps')
+    return `${Number(value) / 100}%`;
+  return value;
 }
 export function MandateDiff({
   current,
@@ -47,9 +70,9 @@ export function MandateDiff({
               className={current[key] !== proposed[key] ? 'changed' : undefined}
               data-changed={current[key] !== proposed[key]}
             >
-              <th>{key}</th>
-              <td>{current[key]}</td>
-              <td>{proposed[key]}</td>
+              <th>{diffLabels[key]}</th>
+              <td>{diffValue(key, current[key])}</td>
+              <td>{diffValue(key, proposed[key])}</td>
             </tr>
           ))}
         </tbody>
@@ -287,9 +310,9 @@ export function MandateWizard({
         <>
           <p>{BLIND_SIGNING_WARNING}</p>
           <p>
-            Verify the destination {vault}, chain 133, value 0 HSK, agent,
-            expiry and every cap. Reject if your device cannot show the calldata
-            hash.
+            {previewOnly
+              ? `Recorded local vault ${vault} on 31337. This is a disabled calldata preview, not a testnet deployment.`
+              : `Verify the destination ${vault}, chain 133, value 0 HSK, agent, expiry and every cap. Reject if your device cannot show the calldata hash.`}
           </p>
           <p>
             Calldata hash <code>{keccak256(review.data)}</code>
@@ -305,6 +328,9 @@ export function MandateWizard({
           >
             Review & sign on Ledger
           </button>
+          {previewOnly && (
+            <button onClick={() => setStep(5)}>Preview confirmed state</button>
+          )}
           {review.context !== context && (
             <p>Vault state changed. Build a fresh review.</p>
           )}
@@ -313,10 +339,25 @@ export function MandateWizard({
       {step === 5 && (
         <>
           <h4>Waiting for first agent decision</h4>
-          <p>Polling Receipt events on the vault every 30 seconds.</p>
+          {previewOnly ? (
+            <>
+              <p>Preview only: no mandate was submitted or confirmed.</p>
+              <button onClick={() => setStep(6)}>
+                Preview first receipt state
+              </button>
+            </>
+          ) : (
+            <p>Polling Receipt events on the vault every 30 seconds.</p>
+          )}
         </>
       )}
-      {step === 6 && <p>First agent receipt observed.</p>}
+      {step === 6 && (
+        <p>
+          {previewOnly
+            ? 'Preview only: first decision step. No live receipt observed.'
+            : 'First agent receipt observed.'}
+        </p>
+      )}
       {hash && <a href={explorerLink(133, 'tx', hash)}>Transaction {hash} ↗</a>}
       {step >= 5 && <a href="#/verify">Open Verify</a>}
       {step > 0 && step < 5 && (
