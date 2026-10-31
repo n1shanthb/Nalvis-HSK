@@ -11,7 +11,7 @@ it('current tightened mandate replaces historic caps and paused is not revoked',
   const s = scenario();
   const client = {
     getChainId: async () => 133,
-    getBlockNumber: async () => 9n,
+    getBlockNumber: vi.fn(async () => 9n),
     readContract: vi.fn(async ({ functionName }: { functionName: string }) =>
       functionName === 'paused'
         ? true
@@ -32,6 +32,7 @@ it('current tightened mandate replaces historic caps and paused is not revoked',
     ),
   };
   const live = await readDeskMandate(client as never, agent, 133, s.policy);
+  expect(client.getBlockNumber).toHaveBeenCalledWith({ cacheTime: 0 });
   expect(live.paused).toBe(true);
   expect(live.mandate.revoked).toBe(false);
   expect(

@@ -1,5 +1,6 @@
 import { beforeAll, test, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import {
   readFileSync,
   readdirSync,
@@ -18,28 +19,21 @@ const receipts = join(fixture, 'receipts');
 const path = join(receipts, readdirSync(receipts).sort()[0]);
 const receipt = JSON.parse(readFileSync(path, 'utf8'));
 const executable = join(root, 'packages/verifier/dist/verifier/src/cli.js');
-beforeAll(() => {
-  const core = spawnSync(
-    process.execPath,
-    [
-      join(root, 'node_modules/typescript/bin/tsc'),
-      '-p',
-      join(root, 'packages/core/tsconfig.json'),
-    ],
-    { encoding: 'utf8' },
-  );
-  expect(core.status, core.stdout + core.stderr).toBe(0);
-  const result = spawnSync(
-    process.execPath,
-    [
-      join(root, 'node_modules/typescript/bin/tsc'),
-      '-p',
-      join(root, 'packages/verifier/tsconfig.json'),
-    ],
-    { encoding: 'utf8' },
-  );
-  expect(result.status, result.stdout + result.stderr).toBe(0);
-}, 60000);
+beforeAll(async () => {
+  // Async compilation keeps the Vitest worker responsive during parallel builds.
+  const compile = promisify(execFile);
+  for (const project of ['core', 'verifier'])
+    await compile(
+      process.execPath,
+      [
+        join(root, 'node_modules/typescript/bin/tsc'),
+        '-p',
+        join(root, `packages/${project}/tsconfig.json`),
+      ],
+      { encoding: 'utf8' },
+    );
+}, 120000);
+
 test('compiled CLI prints PASS table and exits 0 on genuine recorded fixture', () => {
   const result = spawnSync(
     process.execPath,
@@ -49,7 +43,7 @@ test('compiled CLI prints PASS table and exits 0 on genuine recorded fixture', (
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain('PASS — recorded RPC replay');
   expect(result.stdout).toContain('Gas ');
-});
+}, 20000);
 test('tx lookup, --receipt and --json produce machine-readable PASS', async () => {
   for (const args of [
     ['--receipt', path],
@@ -172,6 +166,7 @@ test.each(
 
 test.each(["what's the spread now", 'why REJECT #3', 'set cap to 25'])(
   'desk CLI recorded example works: %s',
+  { timeout: 20000 },
   (text) => {
     const result = spawnSync(
       process.execPath,

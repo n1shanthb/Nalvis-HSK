@@ -13,7 +13,7 @@ export async function readDeskMandate(
   assertWritableChain(expectedChain);
   if ((await client.getChainId()) !== expectedChain)
     throw Error('Live vault RPC chain mismatch');
-  const blockNumber = await client.getBlockNumber();
+  const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
   const config = addresses[expectedChain === 133 ? 133 : 177];
   const [raw, p, d] = await Promise.all([
     client.readContract({

@@ -89,7 +89,8 @@ function decideInternal(
     trace('mandate_revoked', false, 'Revoked');
     return finish('REJECT');
   }
-  if (e.now >= m.expiry) {
+  const executionNow = e.decisionTime ?? e.now;
+  if (executionNow >= m.expiry) {
     trace('mandate_expired', false, 'Expired');
     return finish('REJECT');
   }
@@ -98,16 +99,20 @@ function decideInternal(
     return finish('REJECT');
   }
   const spent =
-    state.dailyBucket === Math.floor(e.now / 86400) ? state.dailySpentB : 0n;
+    state.dailyBucket === Math.floor(executionNow / 86400)
+      ? state.dailySpentB
+      : 0n;
   const loss =
-    state.dailyBucket === Math.floor(e.now / 86400) ? state.dailyLossB : 0;
+    state.dailyBucket === Math.floor(executionNow / 86400)
+      ? state.dailyLossB
+      : 0;
   if (spent >= m.maxDailyInB || loss >= p.dailyLossStopB) {
     trace('daily_stop', false, 'Daily budget or loss stop exhausted');
     return finish('REJECT');
   }
   const preset = p.presets[state.preset];
   if (
-    e.now <
+    executionNow <
     state.lastTradeAt + Math.max(m.minIntervalSec, preset.cooldownSec)
   ) {
     trace('cooldown', true, 'Minimum interval not elapsed');

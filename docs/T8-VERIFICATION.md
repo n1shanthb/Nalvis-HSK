@@ -1,7 +1,7 @@
 # T8 implementation and verification
 
-Base: merged Task 9 (`a75b29e`). Branch: `t8-desk-ui`. No Solidity changes, no
-remote writes, and no mainnet signing or broadcasting. Never merge this PR automatically.
+Base: merged Task 9 (`a75b29e`). Branch: `t8-desk-ui`. No trading-contract changes; the Solidity edits are to the read-only helper
+and its parallel test. No remote writes, and no mainnet signing or broadcasting. Never merge this PR automatically.
 
 ## Local preview
 
@@ -20,50 +20,55 @@ The chart uses actual captured observation points only. Legacy fixtures have no
 risk/expiry fields and are labelled accordingly. The owner panel is not loaded
 by the hosted read-only configuration.
 
+## Review fixes
+
+- Replaced redundant 256-draw language and calculation with two-endpoint
+  **±σ worst-case stress**. Frozen Oct 27 volatility is labelled in evidence/UI.
+- New **v2** receipts require chain-based decisionTime, matching expiry fields,
+  volatility input and executable stress results. A v1 allowlist pins exactly
+  the four genuine historical T6 commitments; downgrade/field stripping fails.
+- Desk proposal handoff to the Owner panel commits every mandate field and
+  checks exact calldata hash, target and live baseline before hardware signing
+  and again before broadcast. Added pause. No automatic signing is triggered.
+- CLI and browser proposals use current vault mandate, pause state and decimals,
+  and refuse RPC/policy mismatch. Receipt files sort by numeric sequence.
+- Latest priced snapshot selection, corrected REJECT #3 examples, shared real
+  v2 Anvil demo recordings, dynamic receipt count and computed expiry display.
+- Zero slippage/cap refusals and common Hinglish/unit suffixes covered. Desk
+  tests use public Anvil role accounts and connected execution-capability traps.
+- Solidity calldata helper accepts explicit parameters for parallel tests;
+  unit tests no longer change process-global environment variables.
+
+## Recordings
+
+`packages/verifier/test/fixtures/t8` contains four actual mined local Anvil
+transactions on a fork of mainnet block 29413000, all version 2. Every receipt
+passed live verification before capture. Price scenarios are synthetic; local
+Anvil prices are not real. The T6 recordings remain unchanged and pinned.
+No remote broadcast occurred. See the recording README and addresses provenance.
+
 ## Validation
 
-- Workspace tests: 227 passed, one opt-in live collector test skipped; including 38 desk intent/proposal tests, five risk/expiry
-  tests, stale-before-send keeper coverage and two verifier expiry checks.
-- Genuine local fork integration passed all four outcomes and revoke, and verified
-  each newly generated receipt against the running local RPC. Mainnet was read-only.
-- Solidity suite: 139 passed, 0 failed, 5 skipped (missing optional RPC settings).
-- `scripts/check-rules.sh`: PASS through Git Bash (Windows python3 wrapper).
-- Production build and lint/type checks run from the workspace. Route splitting
-  and Ledger package chunks remove the previous >500 kB chunk warning.
-- Browser check: five demo routes, working desk P&L reply, verifier PASS, no page
-  errors; mobile viewport 390 x 844 had document width 390 (no horizontal overflow).
-- Existing T6 recorded fixtures still verify without modifying any receipt/tx hash.
-- Backtest fixture unchanged; no proven edge.
-
-Local tool runtime: Node 24.22.1, pnpm 9.15.9, npm-distributed Foundry. CI uses
-its existing pinned Node 22 and Foundry versions. Network-dependent tests report
-explicit skips when endpoints/settings are absent.
+Regression coverage includes field stripping/version downgrade, independently
+encoded full mandate calldata, current-state tightening, Ledger-time state
+changes, pause signing, policy mismatch/RPC errors, numeric sequences above 9,
+correct demo CLI examples and server/chain clock separation. Full validation
+results are listed in PR #10 after the checks finish.
 
 ## Screenshots
 
-Before: ![Original mandate view](screenshots/t8-before-overview.png)
-
-After: ![Recorded console overview](screenshots/t8-after-overview.png)
-
-Desk: ![Desk P&L response](screenshots/t8-after-desk.png)
-
-Mobile: ![Mobile overview](screenshots/t8-after-mobile.png)
+![Before](screenshots/t8-before-overview.png)
+![After](screenshots/t8-after-overview.png)
+![Desk](screenshots/t8-after-desk.png)
+![Mobile](screenshots/t8-after-mobile.png)
 
 ## Hosted demo
 
-Production: https://nalvis-hsk-demo.vercel.app
-
-Deployed to `nevan-sonics-projects/nalvis-hsk-demo` after the user completed Vercel
-login. An unauthenticated browser received HTTP 200, rendered the overview with
-four verified decisions and answered the Desk P&L command without page errors.
-The build explicitly disables owner actions and enables recorded demo mode.
-No GitHub auto-deployment integration was added.
+https://nalvis-hsk-demo.vercel.app — read-only, recorded local Anvil prices.
 
 ## External follow-up — UNVERIFIED
 
-Organizer confirmation is outside code implementation. No Telegram message was
-sent and no organizer answer/screenshot is claimed. Suggested question for the
-project owner: “Can you confirm in writing whether a testnet-only deployment is
-eligible for demo selection in Track 1? The DoraHacks page says mainnet is
-required. Our live mainnet market reads are read-only; execution is on chain 133.”
-No recurring team-chat messages were scheduled or sent.
+Organizer confirmation of testnet-only eligibility remains outstanding. No
+Telegram message, reply or screenshot is claimed. Ledger hardware and testnet
+broadcasts remain with the project owner. No mainnet signing/broadcast path was
+introduced and nothing has been merged into main.

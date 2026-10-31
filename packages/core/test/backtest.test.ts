@@ -30,4 +30,4 @@ it('replay deterministic and fixed measured curve only', () => {
   expect(a.label).toContain('no proven edge');
   expect(measuredCost(25, c)).toBeGreaterThan(measuredCost(10, c));
   expect(() => measuredCost(1, c)).toThrow();
-});
+}, 20000);

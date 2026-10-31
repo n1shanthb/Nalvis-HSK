@@ -209,7 +209,7 @@ export async function sendOwnerAction({
           proposal.target.vault.toLowerCase() !== vault.toLowerCase()
         )
           throw Error('Desk proposal target mismatch');
-        const blockNumber = await client.getBlockNumber();
+        const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
         const [m, paused] = await Promise.all([
           client.readContract({
             address: vault,

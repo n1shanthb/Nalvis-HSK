@@ -102,37 +102,35 @@ describe('recorded genuine T5 fork execution', () => {
       (r: typeof trade) => {
         r.decision.kind = 'WAIT';
       },
-      'decision_replay',
+      'receipt_version',
     ],
     [
       'policy',
       (r: typeof trade) => {
         r.evidence.sources.replay.raw.policy.dailyLossStopB += 1;
       },
-      'policyHash',
+      'receipt_version',
     ],
     [
       'minOut',
       (r: typeof trade) => {
         r.tx.minOut = String(BigInt(r.tx.minOut) + 1n);
       },
-      'event_receiptHash',
+      'receipt_version',
     ],
     [
       'prevHead',
       (r: typeof trade) => {
         r.prevHead = hash('changed');
       },
-      'event_receiptHash',
+      'receipt_version',
     ],
   ] as const)('FAIL rehashed %s', async (_name, mutate, check) => {
     const r = structuredClone(trade);
     mutate(r);
     rehash(r);
     const result = await verify(r, recordedReader(chain));
-    expect(failures(result)).toEqual(['receipt_version']);
-    // Rehashed v1 edits are rejected by the pinned historical commitment gate.
-    void check;
+    expect(failures(result)).toEqual([check]);
   });
   test('FAIL broken previous chain head despite a valid current event', async () => {
     const c = structuredClone(chain);

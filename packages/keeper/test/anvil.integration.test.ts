@@ -269,18 +269,21 @@ it.skipIf(!!reason)(
         ] as const) {
           if (scenario === 'resize') {
             await mandate(50);
-            const { pathToFileURL } = await import('node:url');
-            const { runDesk } = await import(
-              pathToFileURL(join(root, 'scripts/nalvis.mjs')).href
+            const cli = spawnSync(
+              process.execPath,
+              [
+                join(root, 'scripts/nalvis.mjs'),
+                'desk',
+                'set cap to 75',
+                '--receipts',
+                join(directory, '31337'),
+                '--rpc',
+                chain.rpcUrls.default.http[0],
+              ],
+              { encoding: 'utf8' },
             );
-            const reply = await runDesk([
-              'desk',
-              'set cap to 75',
-              '--receipts',
-              join(directory, '31337'),
-              '--rpc',
-              chain.rpcUrls.default.http[0],
-            ]);
+            expect(cli.status, cli.stderr).toBe(0);
+            const reply = JSON.parse(cli.stdout);
             expect(reply.diff).toBeUndefined();
             expect(reply.message).toContain(
               'requires new Ledger-signed mandate',

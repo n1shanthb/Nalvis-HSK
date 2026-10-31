@@ -83,3 +83,11 @@ it('stress equals independent endpoint calculation for every quote', () => {
     });
   }
 });
+
+it('server-ahead skew does not expire a live chain-clock mandate', () => {
+  const s = prepare();
+  s.mandate.expiry = s.e.decisionTime! + 3;
+  s.e.now += 5;
+  s.e.apro!.ageSec = 5;
+  expect(decide(s.e, s.policy, s.mandate, s.state).kind).toBe('TRADE');
+});

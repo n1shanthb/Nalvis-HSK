@@ -1,3 +1,7 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { vi } from 'vitest';
+import * as contextModule from '../src/lib/desk-context.js';
+import { DeskView } from '../src/views/Desk.js';
 import { encodeFunctionData, keccak256, parseAbi, type Hex } from 'viem';
 import { it, expect } from 'vitest';
 import { demoContext } from '../src/lib/demo.js';
@@ -33,4 +37,31 @@ it('builds an exact unsigned cap proposal using the verified recording agent', a
     ),
   );
   expect(reply.message).toContain('Proposal only');
+});
+
+it('hands the exact desk proposal to the owner review callback without signing', async () => {
+  const context = await demoContext();
+  vi.spyOn(contextModule, 'liveDeskContext').mockResolvedValue({
+    ...context,
+    target: { vault: context.receipts.at(-1)!.contract, chainId: 133 },
+  });
+  const onProposal = vi.fn();
+  render(<DeskView chain={133} onProposal={onProposal} />);
+  fireEvent.change(screen.getByLabelText('Ask Nalvis'), {
+    target: { value: 'pause' },
+  });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole('button', { name: 'Ask desk' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Ask desk' }));
+  fireEvent.click(await screen.findByText('Review exact proposal with Ledger'));
+  expect(onProposal).toHaveBeenCalledOnce();
+  expect(onProposal.mock.calls[0][0]).toMatchObject({
+    action: 'pause',
+    diff: { paused: true },
+    target: { chainId: 133 },
+  });
 });
