@@ -84,30 +84,19 @@ export default function PriceChart({
         ? 'Inside band'
         : 'Outside band';
   const markers = decisionMarkers(actions);
-  const lines = latest
-    ? [
-        {
-          value: latest.cex * (1 - preset.bandBps / 10000),
-          title: 'Lower price reference',
-        },
-        {
-          value: latest.cex * (1 + preset.bandBps / 10000),
-          title: 'Upper price reference',
-        },
-        ...(evidence?.apro
-          ? [{ value: evidence.apro.price, title: 'APRO reference' }]
-          : []),
-      ]
+  const lines = evidence?.apro
+    ? [{ value: evidence.apro.price, title: 'APRO reference' }]
     : [];
+  const weightBand = `Weight A ${weight === undefined ? 'unavailable' : `${(weight / 100).toFixed(2)}%`} vs target ${(preset.targetWeightA * 100).toFixed(2)}% ± ${(preset.bandBps / 100).toFixed(2)} percentage points`;
   const prices = rows.flatMap((r) => [r.dex, r.cex]);
   return (
     <ChartFrame
-      title="Live price vs mandate band"
+      title="Live price · portfolio weight band"
       source={
         demo ? sources.demo : live.length ? sources.market : sources.recorded
       }
       at={latest?.time}
-      summary={`DEX ${latest?.dex ?? 'unavailable'}, CEX ${latest?.cex ?? 'unavailable'} USDT. Min ${prices.length ? Math.min(...prices) : 'unavailable'}, max ${prices.length ? Math.max(...prices) : 'unavailable'}. ${state}. Basis ${latest?.basis.toFixed(2)}%.`}
+      summary={`DEX ${latest?.dex ?? 'unavailable'}, CEX ${latest?.cex ?? 'unavailable'} USDT. Min ${prices.length ? Math.min(...prices) : 'unavailable'}, max ${prices.length ? Math.max(...prices) : 'unavailable'}. ${state}. ${weightBand}. Basis ${latest?.basis.toFixed(2)}%.`}
       headers={['Time (IST)', 'DEX / USDT', 'CEX / USDT', 'Basis %']}
       rows={rows.map((r) => [displayTime(r.time), r.dex, r.cex, r.basis])}
     >
@@ -133,14 +122,13 @@ export default function PriceChart({
         </select>
       </label>
       <p>
-        {state} · basis {latest?.basis.toFixed(2) ?? '—'}%
+        {state} · {weightBand} · basis {latest?.basis.toFixed(2) ?? '—'}%
       </p>
       <p className="muted">
         {recordedState?.success
           ? `Recorded engine preset: ${recordedState.data.state.preset}.`
           : 'Active keeper preset unavailable.'}{' '}
-        Engine band uses portfolio weight; dashed price references show ±
-        {preset.bandBps} bps around CEX mid.
+        Engine band uses portfolio weight, not price.
       </p>
       <Suspense fallback={<p>Loading price chart…</p>}>
         <TimeSeries

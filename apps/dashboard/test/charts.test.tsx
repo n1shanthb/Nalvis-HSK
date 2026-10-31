@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PriceChart from '../src/components/charts/PriceChart.js';
 import BasisChart from '../src/components/charts/BasisChart.js';
 import VaultChart from '../src/components/charts/VaultChart.js';
@@ -8,12 +8,15 @@ import { LimitChart } from '../src/components/charts/LimitChart.js';
 import { CostChart } from '../src/components/charts/CostChart.js';
 import { demoEvidence, demoContext } from '../src/lib/demo.js';
 import { sources } from '../src/lib/chart-data.js';
+import { units } from '../../../packages/core/src/policy.js';
 import type { AgentFeed } from '../src/agent/feed-types.js';
 const api = vi.hoisted(() => ({
   setData: vi.fn(),
   update: vi.fn(),
   setMarkers: vi.fn(),
-  createPriceLine: vi.fn(() => ({})),
+  createPriceLine: vi.fn<(line: { title: string; price: number }) => object>(
+    () => ({}),
+  ),
   removePriceLine: vi.fn(),
   remove: vi.fn(),
   applyOptions: vi.fn(),
@@ -91,25 +94,108 @@ describe('honest accessible charts', () => {
         expect.objectContaining({ time: first.now + 30 }),
       ),
     );
-    expect(api.createPriceLine.mock.calls.length).toBeGreaterThanOrEqual(2);
-    const scaleOptions = api.applyOptions.mock.calls.find(
-      ([options]) => options.autoscaleInfoProvider,
-    )?.[0];
-    const range = scaleOptions.autoscaleInfoProvider(() => ({
-      priceRange: { minValue: 0.09, maxValue: 0.091 },
-    })).priceRange;
-    const mid =
-      (first.cex[0].bid +
-        first.cex[0].ask +
-        first.cex[1].bid +
-        first.cex[1].ask) /
-      4;
-    expect(range.minValue).toBeLessThanOrEqual(mid * 0.95);
-    expect(range.maxValue).toBeGreaterThanOrEqual(mid * 1.05);
+    expect(
+      api.createPriceLine.mock.calls.every(
+        ([line]) => line.title === 'APRO reference',
+      ),
+    ).toBe(true);
+    expect(api.createPriceLine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        price: first.apro!.price,
+        title: 'APRO reference',
+      }),
+    );
 
     view.unmount();
     expect(api.remove).toHaveBeenCalledOnce();
   });
+  it.each([true, false])(
+    'uses weight-band text and never draws price bands (APRO present: %s)',
+    async (aproPresent) => {
+      const c = await demoContext();
+      const first = demoEvidence.find((e) => e.dexMid && e.cex.length === 2)!;
+      const point = {
+        ...first,
+        apro: aproPresent ? first.apro : undefined,
+        vault: {
+          balanceA: 0n,
+          balanceB: 100n,
+          decimalsA: first.decimalsA,
+          decimalsB: first.decimalsB,
+          mandate: c.mandate,
+        },
+      };
+      const view = render(<PriceChart points={[point]} demo />);
+      await waitFor(() => expect(api.setData).toHaveBeenCalled());
+      expect(
+        screen.getByText(
+          /Outside band · Weight A 0.00% vs target 50.00% ± 5.00 percentage points/,
+        ),
+      ).toBeTruthy();
+      expect(screen.getByRole('img').getAttribute('aria-label')).toContain(
+        'Weight A 0.00% vs target 50.00% ± 5.00 percentage points',
+      );
+      expect(
+        screen.getAllByRole('columnheader').map((h) => h.textContent),
+      ).toEqual(['Time (IST)', 'DEX / USDT', 'CEX / USDT', 'Basis %']);
+      fireEvent.change(screen.getByLabelText('Policy reference preset'), {
+        target: { value: 'conservative' },
+      });
+      expect(
+        screen.getByText(
+          /Outside band · Weight A 0.00% vs target 40.00% ± 7.50 percentage points/,
+        ),
+      ).toBeTruthy();
+      fireEvent.change(screen.getByLabelText('Policy reference preset'), {
+        target: { value: 'balanced' },
+      });
+      view.rerender(
+        <PriceChart
+          points={[
+            {
+              ...point,
+              vault: {
+                ...point.vault,
+                balanceA: 10n ** BigInt(first.decimalsA),
+                balanceB: units(first.dexMid!, first.decimalsB),
+              },
+            },
+          ]}
+          demo
+        />,
+      );
+      expect(
+        screen.getByText(
+          /Inside band · Weight A 50.00% vs target 50.00% ± 5.00 percentage points/,
+        ),
+      ).toBeTruthy();
+      view.rerender(
+        <PriceChart
+          points={[
+            { ...point, vault: { ...point.vault, balanceA: 0n, balanceB: 0n } },
+          ]}
+          demo
+        />,
+      );
+      expect(
+        screen.getByText(
+          /Engine band state unavailable · Weight A unavailable/,
+        ),
+      ).toBeTruthy();
+      if (aproPresent)
+        expect(
+          api.createPriceLine.mock.calls.every(
+            ([line]) => line.title === 'APRO reference',
+          ),
+        ).toBe(true);
+      else expect(api.createPriceLine).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText(
+          /Lower price reference|Upper price reference|around CEX mid/,
+        ),
+      ).toBeNull();
+    },
+  );
   it('preserves a missing interval when observations arrive after the recorded seed', () => {
     const view = render(
       <TimeSeries

@@ -2,13 +2,17 @@
 
 Base: `8c4632f` (`main`, T12B merged; T13 was not merged when this branch started).
 
+## PR #14 review fix
+
+Removed the misleading CEX mid ± `bandBps` price lines from C1. The engine weight rule is unchanged. Updated regression tests, the accessible summary, chart/data-table title, and the four agent screenshots (live/demo at 1440 px and 390 px). Other charts are unchanged.
+
 ## Checks
 
 - `pnpm lint`: PASS (workspace ESLint and root TypeScript project check).
 - `pnpm -r build`: PASS.
-- `pnpm test`: PASS: 414 tests; four pre-existing integration skips (no anvil/fork setup).
-- New dashboard chart tests: 14 passing; keeper feed projection: one passing.
-- Existing test files and expectations are unchanged. No snapshot/class updates.
+- `pnpm test`: PASS: 416 tests; four pre-existing integration skips (no anvil/fork setup).
+- New dashboard chart tests: 16 passing; keeper feed projection: one passing.
+- Original pre-chart test files and expectations remain unchanged; C1 chart regressions were updated for this review fix. No snapshot/class updates.
 - `forge test`: not run; forge/anvil binaries are unavailable. Contracts were not changed.
 - Charts use public reads and recorded fixtures. No application API keys, signing, transactions, or mainnet writes.
 
@@ -16,8 +20,8 @@ Base: `8c4632f` (`main`, T12B merged; T13 was not merged when this branch starte
 
 | Measurement | Before | After | Increase | Limit |
 | --- | ---: | ---: | ---: | ---: |
-| Initial landing entry and its modulepreloads | 415.79 | 423.29 | 7.50 | 15.00 |
-| All JavaScript chunks | 434.98 | 492.95 | 57.97 | 60.00 |
+| Initial landing entry and its modulepreloads | 415.79 | 423.28 | 7.49 | 15.00 |
+| All JavaScript chunks | 434.98 | 492.92 | 57.94 | 60.00 |
 
 The canvas library remains a React.lazy chunk. Shared chart views reduce duplicate chunk overhead. The frozen mainnet history is one validated, cached same-origin JSON asset, not JavaScript; its additional gzip size is 16.26 kB and is excluded from the JavaScript figures above. No new market-data host is used.
 
@@ -58,26 +62,26 @@ dist/receipts/demo/31337/2-0xccbf1e23e1a1568ee2feec8086705fe7252d50f38c411deb5a9
 dist/receipts/31337/0-0xc139451c312735428d725ce3c513c6b0aafaff870e152406968a8cd316d9fca9.json         5.41 kB │ gzip:   1.67 kB
 dist/assets/market_history-fH4T4A_u.json                                                             90.34 kB │ gzip:  16.35 kB
 dist/assets/index-CzPeZXa7.css                                                                       39.88 kB │ gzip:   9.70 kB
-dist/assets/LandingPreview-CjsCqhs2.js                                                                2.71 kB │ gzip:   1.10 kB
-dist/assets/Receipts-BAIGwKTJ.js                                                                      3.70 kB │ gzip:   1.47 kB
-dist/assets/Mandate-DLnDhPG4.js                                                                       4.58 kB │ gzip:   1.99 kB
-dist/assets/Desk-R1_OPuu7.js                                                                          6.40 kB │ gzip:   2.81 kB
-dist/assets/Console-lR1R79Zk.js                                                                       9.09 kB │ gzip:   3.03 kB
+dist/assets/LandingPreview-B2vGFkYz.js                                                                2.71 kB │ gzip:   1.09 kB
+dist/assets/Receipts-CF5jLw8Y.js                                                                      3.70 kB │ gzip:   1.47 kB
+dist/assets/Mandate-C1yhOOxr.js                                                                       4.58 kB │ gzip:   1.99 kB
+dist/assets/Desk-VEkKYUq5.js                                                                          6.40 kB │ gzip:   2.81 kB
+dist/assets/Console-BkiBXCXB.js                                                                       9.09 kB │ gzip:   3.03 kB
 dist/assets/ledger-streams-U9X4ypUY.js                                                               27.77 kB │ gzip:   8.48 kB
 dist/assets/ledger-transport-QmNX_acP.js                                                             28.78 kB │ gzip:   8.71 kB
-dist/assets/Verify-Cs4QPdp6.js                                                                       30.18 kB │ gzip:   6.03 kB
-dist/assets/TimeSeriesChart-BJ_y3nfY.js                                                             166.22 kB │ gzip:  53.23 kB
+dist/assets/Verify-C7PPbWaq.js                                                                       30.18 kB │ gzip:   6.02 kB
+dist/assets/TimeSeriesChart-B9NIJEDh.js                                                             166.22 kB │ gzip:  53.23 kB
 dist/assets/ledger-device-BE-YRHtZ.js                                                               257.32 kB │ gzip:  69.27 kB
-dist/assets/index-DG12BQuS.js                                                                       329.72 kB │ gzip:  96.18 kB
+dist/assets/index-KEEMUt7Y.js                                                                       329.72 kB │ gzip:  96.18 kB
 dist/assets/ledger-ethereum-CKAlsWBU.js                                                             394.87 kB │ gzip: 102.26 kB
-dist/assets/chart-views-Iep3TEVg.js                                                                 445.86 kB │ gzip: 138.39 kB
+dist/assets/chart-views-Dovtr2Ew.js                                                                 445.86 kB │ gzip: 138.38 kB
 ```
 
 ## Data and fallbacks
 
 | Chart | Data source | Fallback | Test file |
 | --- | --- | --- | --- |
-| C1 price / mandate reference | Existing Evidence history, both CEX mids; feed/on-chain receipt markers | Last 48 h frozen mainnet history; explicit unavailability | `apps/dashboard/test/chart-data.test.ts`, `charts.test.tsx` |
+| C1 price / portfolio weight band | Existing Evidence history, both CEX mids; feed/on-chain receipt markers | Last 48 h frozen mainnet history; explicit unavailability | `apps/dashboard/test/chart-data.test.ts`, `charts.test.tsx` |
 | C2 basis | All 720 frozen hourly mainnet rows + existing session observations | RECORDED, never an implicit demo | Same dashboard tests |
 | C3 limits | Evidence vault balances, mandate caps, pinned public risk reads, existing receipts | Missing observations unavailable; undeployed 133 notice; recorded demo inputs | Same dashboard tests |
 | C4 model budget | Feed state; optional seven IST days via `withSpendByDay(feed, journal.entries, now)` | Today-only bar; disconnected live feed visibly unavailable | Same dashboard tests; `packages/keeper/test/feed.test.ts` |
@@ -89,7 +93,7 @@ The final production routes were checked at 1440 px and 390 px. C1 canvas is vis
 
 ## Interpretation and unverified checks
 
-`bandBps` is a portfolio-weight rebalance band in the actual engine. The chart labels the dashed CEX price bands as reference levels, and its Inside/Outside chip uses the engine weight comparison. A live keeper preset is not exposed by the current feed hook, so the selector is explicitly a policy reference; recorded fixtures identify their recorded preset.
+`bandBps` is a portfolio-weight rebalance band in the actual engine. C1 draws no CEX-centered price-band lines. Its Inside/Outside chip still uses the engine weight comparison; adjacent text and the accessible summary show current weight A versus target ± band in percentage points. The APRO price reference remains when present. The data table contains observed prices and basis only, with no price-band columns. A live keeper preset is not exposed by the current feed hook, so the selector is explicitly a policy reference; recorded fixtures identify their recorded preset.
 
 The repository's live feed hook currently returns no live keeper feed. The cost chart therefore renders a disconnected state in live mode, and the read-only keeper feed adapter supplies `spendByDay` when a real feed is connected. No provider costs or actions are fabricated.
 
