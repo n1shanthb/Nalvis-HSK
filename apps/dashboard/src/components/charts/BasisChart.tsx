@@ -37,11 +37,7 @@ export default function BasisChart({
     <ChartFrame
       title="Basis history"
       source={
-        demo
-          ? sources.demo
-          : live.length && !unavailable
-            ? sources.market
-            : sources.recorded
+        demo ? sources.demo : live.length ? sources.market : sources.recorded
       }
       at={rows.at(-1)?.time}
       summary={`Latest basis ${values.at(-1)?.toFixed(2) ?? 'unavailable'}%. Min ${values.length ? Math.min(...values) : 'unavailable'}%, max ${values.length ? Math.max(...values) : 'unavailable'}%. Thresholds ±${policy.presets.balanced.edgeBufferBps / 100}% and ±${policy.dataQuality.maxQuoteVsMidBps / 100}%.`}

@@ -104,11 +104,7 @@ export default function PriceChart({
     <ChartFrame
       title="Live price vs mandate band"
       source={
-        demo
-          ? sources.demo
-          : live.length && !unavailable
-            ? sources.market
-            : sources.recorded
+        demo ? sources.demo : live.length ? sources.market : sources.recorded
       }
       at={latest?.time}
       summary={`DEX ${latest?.dex ?? 'unavailable'}, CEX ${latest?.cex ?? 'unavailable'} USDT. Min ${prices.length ? Math.min(...prices) : 'unavailable'}, max ${prices.length ? Math.max(...prices) : 'unavailable'}. ${state}. Basis ${latest?.basis.toFixed(2)}%.`}

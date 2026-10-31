@@ -41,7 +41,9 @@ describe('honest accessible charts', () => {
         <BasisChart unavailable />
       </>,
     );
-    expect(screen.getAllByText(/Live data unavailable/)).toHaveLength(2);
+    expect(
+      screen.getAllByText(/Live data unavailable/, { selector: 'p' }),
+    ).toHaveLength(2);
     expect(screen.getAllByText(sources.recorded).length).toBeGreaterThan(1);
     expect(screen.queryByText(sources.demo)).toBeNull();
     expect(
@@ -171,6 +173,8 @@ describe('honest accessible charts', () => {
       </>,
     );
     expect(screen.queryByText(sources.demo)).toBeNull();
-    expect(screen.getAllByText(/Live data unavailable/)).toHaveLength(2);
+    expect(
+      screen.getAllByText(/Live data unavailable/, { selector: 'p' }),
+    ).toHaveLength(2);
   });
 });
