@@ -93,6 +93,31 @@ describe('honest accessible charts', () => {
     view.unmount();
     expect(api.remove).toHaveBeenCalledOnce();
   });
+  it('preserves a missing interval when observations arrive after the recorded seed', () => {
+    const view = render(
+      <TimeSeries
+        series={[
+          { name: 'DEX', color: 'blue', points: [{ time: 100, value: 1 }] },
+        ]}
+      />,
+    );
+    view.rerender(
+      <TimeSeries
+        series={[
+          {
+            name: 'DEX',
+            color: 'blue',
+            points: [
+              { time: 100, value: 1 },
+              { time: 10000, value: 2 },
+            ],
+          },
+        ]}
+      />,
+    );
+    expect(api.update).toHaveBeenCalledWith({ time: 101 });
+    expect(api.update).toHaveBeenCalledWith({ time: 10000, value: 2 });
+  });
   it('cleans up ResizeObserver and chart on unmount', () => {
     const disconnect = vi.fn(),
       observe = vi.fn();

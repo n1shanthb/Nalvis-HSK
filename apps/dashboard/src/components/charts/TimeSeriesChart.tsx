@@ -85,9 +85,12 @@ export default function TimeSeriesChart({
             p.time === s.points[j].time && p.value === s.points[j].value,
         );
       if (append)
-        s.points
-          .slice(prev.length)
-          .forEach((p) => api.update({ ...p, time: p.time as UTCTimestamp }));
+        s.points.slice(prev.length).forEach((p, j) => {
+          const before = s.points[prev.length + j - 1];
+          if (before && p.time - before.time > 5400)
+            api.update({ time: (before.time + 1) as UTCTimestamp });
+          api.update({ ...p, time: p.time as UTCTimestamp });
+        });
       else
         api.setData(
           s.points.flatMap((p, j) => [
