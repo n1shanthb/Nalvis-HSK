@@ -11,18 +11,17 @@ test.each([
   vi.spyOn(console, 'debug').mockImplementation(() => {});
   expect(humanError({ cause: { statusCode } })).toContain(message);
 });
-test.each(['Unauthorized', 'InvalidMandate', 'Inactive'])(
-  'nested %s contract revert is explained',
-  (errorName) => {
-    vi.spyOn(console, 'debug').mockImplementation(() => {});
-    expect(humanError({ cause: { data: { errorName } } })).not.toContain(
-      'undefined',
-    );
-    expect(humanError({ cause: { data: { errorName } } })).not.toContain(
-      'Details:',
-    );
-  },
-);
+test.each([
+  ['Unauthorized', 'current vault owner'],
+  ['InvalidMandate', 'mandate is invalid'],
+  ['Inactive', 'paused, revoked or expired'],
+])('nested %s contract revert is explained', (errorName, explanation) => {
+  vi.spyOn(console, 'debug').mockImplementation(() => {});
+  expect(humanError({ cause: { data: { errorName } } })).toContain(explanation);
+  expect(humanError({ cause: { data: { errorName } } })).not.toContain(
+    'Details:',
+  );
+});
 test('short viem errors and browser failures stay one line', () => {
   vi.spyOn(console, 'debug').mockImplementation(() => {});
   expect(
