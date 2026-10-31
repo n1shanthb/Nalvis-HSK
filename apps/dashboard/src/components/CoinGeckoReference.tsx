@@ -20,7 +20,11 @@ export function CoinGeckoReference() {
   return (
     <article className="reference-tile">
       <span>CoinGecko · display reference only</span>
-      <strong>{data.data ? `$${data.data}` : 'Reference unavailable'}</strong>
+      <strong>
+        {data.data
+          ? `${data.data.toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} USD`
+          : 'Reference unavailable'}
+      </strong>
       <small>Excluded from agent decisions</small>
     </article>
   );

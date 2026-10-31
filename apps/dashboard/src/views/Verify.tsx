@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type Hex } from 'viem';
 import {
   verify,
@@ -18,10 +18,13 @@ export function VerifyView({
   chain: DashboardChain;
   runRecorded?: (input: unknown) => Promise<Verification>;
 }) {
-  const [hash, setHash] = useState(
-      () =>
-        new URLSearchParams(window.location.hash.split('?')[1]).get('tx') ?? '',
-    ),
+  const autoRun = useRef(false);
+  const initialTx = useRef(
+    new URLSearchParams(
+      window.location.hash.split('?')[1] ?? window.location.search,
+    ).get('tx'),
+  );
+  const [hash, setHash] = useState(() => initialTx.current ?? ''),
     [json, setJSON] = useState(''),
     [result, setResult] = useState<Verification>(),
     [error, setError] = useState(''),
@@ -62,6 +65,12 @@ export function VerifyView({
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (initialTx.current && !autoRun.current) {
+      autoRun.current = true;
+      void run(false);
+    }
+  }, []);
   return (
     <section>
       <p className="eyebrow">04 / INDEPENDENT REPLAY</p>

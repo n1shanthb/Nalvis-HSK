@@ -164,8 +164,8 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
             {a.txHash && (
               <a href={explorerLink(chain, 'tx', a.txHash)}>Transaction ↗</a>
             )}
-            {a.receiptHash && (
-              <a href={`#/verify?receipt=${a.receiptHash}`}>Verify receipt</a>
+            {a.receiptHash && a.txHash && (
+              <a href={`#/verify?tx=${a.txHash}`}>Verify receipt</a>
             )}
           </div>
         ))}

@@ -7,6 +7,9 @@
   "functions": {
     "api/desk.ts": {
       "maxDuration": 20
+    },
+    "api/market.ts": {
+      "maxDuration": 10
     }
   }
 }
