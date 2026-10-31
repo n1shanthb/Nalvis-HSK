@@ -1,3 +1,10 @@
+import { verifyV3 } from './v3/verify.js';
+import {
+  readMandateState,
+  type MandateState,
+} from '../../core/src/agent/mandate-check.js';
+import type { Store } from '../../core/src/agent/store.js';
+import type { ReceiptV3 } from '../../core/src/agent/receipt.js';
 import { z } from 'zod';
 import {
   createPublicClient,
@@ -166,6 +173,11 @@ const transactionSchema = z
   .passthrough();
 export type Transaction = z.infer<typeof transactionSchema>;
 export interface ChainReader {
+  agentState?(
+    vault: Address,
+    block: bigint,
+    agent: Address,
+  ): Promise<MandateState>;
   timestamp?(block: bigint): Promise<number>;
   chainId(): Promise<number>;
   receipt(hash: Hex): Promise<unknown>;
@@ -220,6 +232,7 @@ export type Verification = {
   headAfter?: Hex;
   metrics?: Metrics;
   receipt?: StoredReceipt;
+  receiptV3?: ReceiptV3;
 };
 class Failed extends Error {}
 /** Read-only RPC adapter. Never constructs a wallet or broadcasts. */
@@ -228,6 +241,8 @@ export function rpcReader(url: string): ChainReader {
     transport: http(url, { retryCount: 0, timeout: 15000 }),
   });
   return {
+    agentState: (vault, block, agent) =>
+      readMandateState(client, vault, block, agent),
     timestamp: async (blockNumber) =>
       Number((await client.getBlock({ blockNumber })).timestamp),
     chainId: () => client.getChainId(),
@@ -318,8 +333,15 @@ function restoreFields(value: unknown, keys: string[]) {
 export async function verify(
   input: unknown,
   reader: ChainReader,
-  options: { txHash?: Hex; chain?: number } = {},
+  options: { txHash?: Hex; chain?: number; agentStore?: Store } = {},
 ): Promise<Verification> {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'version' in input &&
+    input.version === 3
+  )
+    return verifyV3(input, reader, options.agentStore, options);
   const result: Verification = {
     status: 'FAIL',
     checks: [],

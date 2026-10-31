@@ -49,6 +49,7 @@ export async function main(
             '--pnl',
             '--receipts',
             '--recorded',
+            '--agent-root',
           ].includes(a) ||
           flags[a] !== undefined ||
           !argv[i + 1] ||
@@ -103,9 +104,16 @@ export async function main(
         }
       } else paths.push(flags['--receipt'] ?? target);
     }
+    const agentStore = flags['--agent-root']
+      ? (await import('../../core/src/agent/store.js')).jsonFileStore(
+          flags['--agent-root'],
+        )
+      : undefined;
     const results: Verification[] = [];
     for (const path of paths)
-      results.push(await verify(await load(path), reader, { txHash, chain }));
+      results.push(
+        await verify(await load(path), reader, { txHash, chain, agentStore }),
+      );
     const pass =
       results.length > 0 && results.every((r) => r.status === 'PASS');
     const profit = flags['--pnl'] && pass ? pnl(results) : undefined;

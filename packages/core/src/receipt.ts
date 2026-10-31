@@ -110,3 +110,11 @@ export function receiptHash(receipt: ReceiptBody) {
     },
   });
 }
+
+// v3 is a separate body/hash contract; legacy v1/v2 enumeration above is unchanged.
+export {
+  buildReceiptV3,
+  receiptHashV3,
+  receiptV3Schema,
+} from './agent/receipt.js';
+export type { ReceiptV3, ReceiptV3Body } from './agent/receipt.js';
