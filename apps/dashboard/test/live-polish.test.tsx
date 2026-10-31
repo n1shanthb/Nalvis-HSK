@@ -11,11 +11,9 @@ test('a transaction deep link starts verification without a submit click', async
     `/#/verify?tx=${recordedTrade.settlement.transactionHash}`,
   );
   render(<VerifyView chain={133} />);
-  expect(
-    await screen.findByText(
-      'Matching receipt JSON unavailable. Paste the keeper receipt below.',
-    ),
-  ).toBeTruthy();
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    'Matching receipt JSON unavailable. Paste the keeper receipt below.',
+  );
   expect(lookup).toHaveBeenCalledOnce();
   window.history.replaceState(null, '', '/');
 });
