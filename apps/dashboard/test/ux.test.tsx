@@ -159,7 +159,7 @@ describe('market proxy', () => {
       new Request('https://example.test/api/market?venue=mexc');
     expect((await handler(request())).status).toBe(200);
     expect(await (await handler(request())).json()).toHaveProperty('gate');
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     time = 5001;
     fetcher.mockRejectedValue(Error('offline'));
     expect((await handler(request())).status).toBe(502);
