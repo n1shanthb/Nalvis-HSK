@@ -128,6 +128,15 @@ export async function fitToMandate(args: {
         reason: action.reason,
         violations,
         headroom: args.initial.headroom,
+        units: { tokenADecimals: s.decimalsA, tokenBDecimals: s.decimalsB },
+        headroomHuman: {
+          maxNowA: formatUnits(args.initial.headroom.maxNowA, s.decimalsA),
+          maxNowB: formatUnits(args.initial.headroom.maxNowB, s.decimalsB),
+          dailyRemainingB: formatUnits(
+            args.initial.headroom.dailyRemainingB,
+            s.decimalsB,
+          ),
+        },
         cooldownSec: String(s.mandate.minIntervalSec),
         rollingResetTimes: s.turnover,
         executionPrice: formatUnits(

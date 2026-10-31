@@ -55,7 +55,8 @@ export async function localVault() {
   });
   const accounts = await wallet.getAddresses();
   const owner = accounts[0],
-    agent = accounts[1];
+    agent = accounts[1],
+    deployer = accounts[2];
   const artifact = async (name: string) =>
     JSON.parse(
       await readFile(`${root}contracts/out/${name}.sol/${name}.json`, 'utf8'),
@@ -63,7 +64,7 @@ export async function localVault() {
   const deploy = async (name: string, args: unknown[] = []) => {
     const a = await artifact(name);
     const tx = await wallet.deployContract({
-      account: owner,
+      account: deployer,
       abi: a.abi,
       bytecode: a.bytecode.object,
       args,
