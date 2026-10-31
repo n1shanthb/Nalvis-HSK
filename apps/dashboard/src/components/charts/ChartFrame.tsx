@@ -27,9 +27,15 @@ export function ChartFrame({
       <p className="muted">
         As of {at === undefined ? 'unavailable' : displayTime(at)}
       </p>
-      <div role="img" aria-label={summary} tabIndex={0}>
-        {children}
+      <div
+        className="chart-summary"
+        role="img"
+        aria-label={summary}
+        tabIndex={0}
+      >
+        {summary}
       </div>
+      {children}
       <details>
         <summary>Show data · {title}</summary>
         <div className="chart-table">

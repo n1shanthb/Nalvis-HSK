@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { units } from '../../../../packages/core/src/policy.js';
 import type { Evidence } from '../../../../packages/core/src/types.js';
 import type { ActionView } from '../agent/feed-types.js';
 import type { Verification } from '../../../../packages/verifier/src/verify.js';
@@ -107,9 +108,11 @@ export function exposure(
   decimalsB: number,
   price: number,
 ) {
-  const a = (Number(balanceA) / 10 ** decimalsA) * price,
-    b = Number(balanceB) / 10 ** decimalsB;
-  return a + b > 0 ? (a / (a + b)) * 10000 : undefined;
+  const a =
+    (balanceA * units(price, 18) * 10n ** BigInt(decimalsB)) /
+    (10n ** BigInt(decimalsA) * 10n ** 18n);
+  const total = a + balanceB;
+  return total > 0n ? (Number(a) / Number(total)) * 10000 : undefined;
 }
 export const istDay = (at: number) =>
   new Date((at + 19800) * 1000).toISOString().slice(0, 10);

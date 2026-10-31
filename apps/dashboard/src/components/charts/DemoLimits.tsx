@@ -9,11 +9,35 @@ export function DemoLimits() {
     e = c?.evidence;
   // These are recorded pre-decision engine inputs, not estimates of today's usage.
   const state = e?.sources.replay?.raw as
-    { state?: { dailySpentB?: string; lastTradeAt?: number } } | undefined;
+    | {
+        state?: {
+          dailySpentB?: string;
+          lastTradeAt?: number;
+          balanceA?: string;
+          balanceB?: string;
+        };
+      }
+    | undefined;
   return (
     <LimitChart
       mandate={c?.mandate}
-      evidence={e}
+      evidence={
+        e &&
+        c &&
+        state?.state?.balanceA !== undefined &&
+        state.state.balanceB !== undefined
+          ? {
+              ...e,
+              vault: {
+                balanceA: BigInt(state.state.balanceA),
+                balanceB: BigInt(state.state.balanceB),
+                decimalsA: e.decimalsA,
+                decimalsB: e.decimalsB,
+                mandate: c.mandate,
+              },
+            }
+          : e
+      }
       source={sources.demo}
       at={e?.now}
       dailySpentB={
@@ -22,6 +46,15 @@ export function DemoLimits() {
           : undefined
       }
       lastTradeAt={state?.state?.lastTradeAt}
+      lastTradeB={
+        c?.receipts
+          .filter(
+            (r) =>
+              Number(r.evidence.now) < (e?.now ?? 0) &&
+              (r.decision.kind === 'TRADE' || r.decision.kind === 'RESIZE'),
+          )
+          .at(-1)?.decision.sizeB
+      }
     />
   );
 }

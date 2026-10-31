@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createChart,
   LineStyle,
@@ -28,12 +28,17 @@ export default function TimeSeriesChart({
   markers?: Marker[];
   liveFrom?: number;
 }) {
+  const [selected, setSelected] = useState<Marker>();
+  const markerRef = useRef(markers);
+  markerRef.current = markers;
+  const divider = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | undefined>(undefined);
   const handles = useRef<ISeriesApi<'Line'>[]>([]);
   const previous = useRef<Point[][]>([]);
   useEffect(() => {
-    if (!host.current) return;
+    if (!host.current || typeof window.CanvasRenderingContext2D === 'undefined')
+      return;
     const c = createChart(host.current, {
       height: 220,
       width: host.current.clientWidth || 320,
@@ -43,6 +48,12 @@ export default function TimeSeriesChart({
         .matches,
     });
     chart.current = c;
+    c.subscribeClick?.((event) => {
+      const marker = markerRef.current.find(
+        (m) => m.id === event.hoveredObjectId,
+      );
+      setSelected(marker);
+    });
     handles.current = series.map((s) =>
       c.addLineSeries({ color: s.color, title: s.name, lineWidth: 2 }),
     );
@@ -60,7 +71,6 @@ export default function TimeSeriesChart({
       previous.current = [];
     };
     // Series identities are fixed for each chart instance; polls only update observations.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     series.forEach((s, i) => {
@@ -80,10 +90,16 @@ export default function TimeSeriesChart({
           .forEach((p) => api.update({ ...p, time: p.time as UTCTimestamp }));
       else
         api.setData(
-          s.points.map((p) => ({ ...p, time: p.time as UTCTimestamp })),
+          s.points.flatMap((p, j) => [
+            ...(j && p.time - s.points[j - 1].time > 5400
+              ? [{ time: (s.points[j - 1].time + 1) as UTCTimestamp }]
+              : []),
+            { ...p, time: p.time as UTCTimestamp },
+          ]),
         );
     });
-    if (!previous.current.length) chart.current?.timeScale().fitContent();
+    if (previous.current.every((rows) => !rows.length))
+      chart.current?.timeScale().fitContent();
     previous.current = series.map((s) => s.points);
   }, [series]);
   useEffect(() => {
@@ -98,7 +114,9 @@ export default function TimeSeriesChart({
         lineWidth: 1,
       }),
     );
-    return () => added.forEach((l) => api.removePriceLine(l));
+    return () => {
+      if (chart.current) added.forEach((l) => api.removePriceLine(l));
+    };
   }, [lines]);
   useEffect(() => {
     handles.current[0]?.setMarkers(
@@ -120,5 +138,42 @@ export default function TimeSeriesChart({
         .map((m) => ({ ...m, time: m.time as UTCTimestamp })),
     );
   }, [markers, liveFrom]);
-  return <div ref={host} aria-hidden="true" />;
+  useEffect(() => {
+    const scale = chart.current?.timeScale();
+    if (!scale || !liveFrom || !divider.current) return;
+    const position = () => {
+      const x = scale.timeToCoordinate?.(liveFrom as UTCTimestamp);
+      if (divider.current) {
+        divider.current.style.display = x == null ? 'none' : 'block';
+        divider.current.style.left = `${x ?? 0}px`;
+      }
+    };
+    position();
+    scale.subscribeVisibleTimeRangeChange?.(position);
+    return () => {
+      if (chart.current) scale.unsubscribeVisibleTimeRangeChange?.(position);
+    };
+  }, [liveFrom, series]);
+  return (
+    <>
+      <div className="time-series-host">
+        <div ref={host} aria-hidden="true" />
+        {liveFrom && (
+          <div className="live-divider" ref={divider} aria-hidden="true">
+            Live from here
+          </div>
+        )}
+      </div>
+      {selected && (
+        <p role="status">
+          {selected.text} ·{' '}
+          {selected.href ? (
+            <a href={selected.href}>Inspect receipt</a>
+          ) : (
+            'No receipt available'
+          )}
+        </p>
+      )}
+    </>
+  );
 }

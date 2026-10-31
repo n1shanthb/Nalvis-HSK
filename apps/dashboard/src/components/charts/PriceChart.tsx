@@ -1,20 +1,19 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import type { Evidence } from '../../../../../packages/core/src/types.js';
 import policy from '../../../../../policy/default.json';
-import recorded from '../../../../../data/research/market_history.json';
+import { useRecordedHistory } from '../../lib/recorded-history.js';
 import type { ActionView } from '../../agent/feed-types.js';
 import {
   decisionMarkers,
   evidenceRows,
   exposure,
   insideEngineBand,
-  loadHistory,
   sources,
 } from '../../lib/chart-data.js';
 import { displayTime } from '../../lib/clients.js';
 import { ChartFrame } from './ChartFrame.js';
+import { z } from 'zod';
 const TimeSeries = lazy(() => import('./TimeSeriesChart.js'));
-const history = loadHistory(recorded);
 export default function PriceChart({
   points,
   demo = false,
@@ -29,9 +28,10 @@ export default function PriceChart({
   const [presetName, setPreset] =
     useState<keyof typeof policy.presets>('balanced');
   const preset = policy.presets[presetName];
+  const { rows: history, error: recordedError } = useRecordedHistory();
   const live = useMemo(() => evidenceRows(points), [points]);
   const seed = history.filter(
-    (r) => r.hour >= history.at(-1)!.hour - 47 * 3600,
+    (r) => r.hour >= (history.at(-1)?.hour ?? 0) - 47 * 3600,
   );
   const rows = demo
     ? live
@@ -42,11 +42,31 @@ export default function PriceChart({
           cex: r.cex,
           basis: r.basis_pct,
         })),
-        ...live.filter((r) => r.time > history.at(-1)!.hour),
+        ...live.filter((r) => r.time > (history.at(-1)?.hour ?? 0)),
       ];
   const latest = rows.at(-1),
-    evidence = points.at(-1),
-    vault = evidence?.vault;
+    evidence = [...points].reverse().find((e) => e.now === latest?.time),
+    recordedState = demo
+      ? z
+          .object({
+            state: z.object({
+              balanceA: z.string().regex(/^\d+$/),
+              balanceB: z.string().regex(/^\d+$/),
+              preset: z.enum(['balanced', 'conservative', 'patient']),
+            }),
+          })
+          .safeParse(evidence?.sources.replay?.raw)
+      : undefined,
+    vault =
+      evidence?.vault ??
+      (recordedState?.success && evidence
+        ? {
+            balanceA: BigInt(recordedState.data.state.balanceA),
+            balanceB: BigInt(recordedState.data.state.balanceB),
+            decimalsA: evidence.decimalsA,
+            decimalsB: evidence.decimalsB,
+          }
+        : undefined);
   const weight =
     vault && evidence?.dexMid
       ? exposure(
@@ -95,6 +115,7 @@ export default function PriceChart({
       headers={['Time (IST)', 'DEX / USDT', 'CEX / USDT', 'Basis %']}
       rows={rows.map((r) => [displayTime(r.time), r.dex, r.cex, r.basis])}
     >
+      {recordedError && !demo && <p role="status">{recordedError}</p>}
       {!demo && (
         <p>
           <span className="badge">{sources.recorded}</span> · recorded mainnet
@@ -119,8 +140,11 @@ export default function PriceChart({
         {state} · basis {latest?.basis.toFixed(2) ?? '—'}%
       </p>
       <p className="muted">
-        Active keeper preset unavailable. Engine band uses portfolio weight;
-        dashed price references show ±{preset.bandBps} bps around CEX mid.
+        {recordedState?.success
+          ? `Recorded engine preset: ${recordedState.data.state.preset}.`
+          : 'Active keeper preset unavailable.'}{' '}
+        Engine band uses portfolio weight; dashed price references show ±
+        {preset.bandBps} bps around CEX mid.
       </p>
       <Suspense fallback={<p>Loading price chart…</p>}>
         <TimeSeries

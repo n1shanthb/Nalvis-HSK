@@ -1,12 +1,11 @@
 import { lazy, Suspense, useMemo } from 'react';
 import type { Evidence } from '../../../../../packages/core/src/types.js';
 import policy from '../../../../../policy/default.json';
-import recorded from '../../../../../data/research/market_history.json';
-import { evidenceRows, loadHistory, sources } from '../../lib/chart-data.js';
+import { useRecordedHistory } from '../../lib/recorded-history.js';
+import { evidenceRows, sources } from '../../lib/chart-data.js';
 import { displayTime } from '../../lib/clients.js';
 import { ChartFrame } from './ChartFrame.js';
 const TimeSeries = lazy(() => import('./TimeSeriesChart.js'));
-const history = loadHistory(recorded);
 export default function BasisChart({
   points = [],
   demo = false,
@@ -16,12 +15,13 @@ export default function BasisChart({
   demo?: boolean;
   unavailable?: boolean;
 }) {
+  const { rows: history, error: recordedError } = useRecordedHistory();
   const live = useMemo(() => evidenceRows(points), [points]);
   const rows = demo
     ? live
     : [
         ...history.map((r) => ({ time: r.hour, basis: r.basis_pct })),
-        ...live.filter((r) => r.time > history.at(-1)!.hour),
+        ...live.filter((r) => r.time > (history.at(-1)?.hour ?? 0)),
       ];
   const values = rows.map((r) => r.basis);
   const lines = [
@@ -48,6 +48,7 @@ export default function BasisChart({
       headers={['Time (IST)', 'Basis %']}
       rows={rows.map((r) => [displayTime(r.time), r.basis])}
     >
+      {recordedError && !demo && <p role="status">{recordedError}</p>}
       {!demo && (
         <p>
           <span className="badge">{sources.recorded}</span> · Recorded mainnet
