@@ -477,3 +477,13 @@ it('a reverse-direction revision still requires an explicit accepted proposal', 
   expect(result.outcome).toBe('WAIT');
   expect(result.acceptedDirectionChange).toBe(false);
 });
+
+it('a provider outside the signed strategy cannot call a model or execute', async () => {
+  const h = await harness([output()]);
+  h.provider.id = 'other-provider';
+  await h.agent.tick(100000);
+  await h.agent.tick(104000);
+  expect(h.provider.calls).toHaveLength(0);
+  expect(h.send).not.toHaveBeenCalled();
+  expect(h.agent.journal.entries.at(-1)?.data.state).toBe('NEEDS_OWNER');
+});

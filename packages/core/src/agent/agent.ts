@@ -218,6 +218,8 @@ export async function createAgent({
     let local: Hex;
     try {
       local = validateAgentPolicy(config);
+      if (provider.id !== 'openrouter')
+        throw new Error('Provider differs from signed strategy');
       if (provider.models && hash(provider.models) !== hash(config.models))
         throw new Error('Provider models differ from signed strategy');
     } catch {
