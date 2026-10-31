@@ -22,7 +22,7 @@ by the hosted read-only configuration.
 
 ## Validation
 
-- Workspace tests: 224 passed, one opt-in live collector test skipped; including 36 desk intent/proposal tests, five risk/expiry
+- Workspace tests: 225 passed, one opt-in live collector test skipped; including 36 desk intent/proposal tests, five risk/expiry
   tests, stale-before-send keeper coverage and two verifier expiry checks.
 - Genuine local fork integration passed all four outcomes and revoke, and verified
   each newly generated receipt against the running local RPC. Mainnet was read-only.

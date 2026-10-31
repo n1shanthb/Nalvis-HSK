@@ -71,7 +71,16 @@ if (args.length) {
       ]),
     ),
   });
+  const transaction = await reader.transaction(
+    results[0].receipt.settlement.transactionHash,
+  );
+  const agent =
+    typeof transaction.from === 'string' &&
+    /^0x[0-9a-fA-F]{40}$/.test(transaction.from)
+      ? transaction.from
+      : undefined;
   context = {
+    agent,
     receipts: results.map((r) => r.receipt),
     evidence,
     portfolio,

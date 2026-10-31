@@ -1,3 +1,4 @@
+import { getAddress } from 'viem';
 import { canonical } from '../../../../packages/core/src/canonical.js';
 import { parseEvidenceJSON } from '../../../../packages/core/src/serialization.js';
 import {
@@ -39,6 +40,11 @@ export async function demoContext() {
     ),
   });
   return {
+    agent: getAddress(
+      recording.transactions.find(
+        (t) => t.hash === demoReceipts[0].settlement?.transactionHash,
+      )!.from,
+    ),
     results,
     portfolio: pnl(results),
     receipts: demoReceipts,
