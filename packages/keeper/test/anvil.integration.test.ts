@@ -188,7 +188,14 @@ it.skipIf(!!reason)(
         transactions: unknown[];
         heads: Record<string, string>;
         configs: Record<string, unknown>;
-      } = { receipts: [], transactions: [], heads: {}, configs: {} };
+        blocks: Record<string, number>;
+      } = {
+        receipts: [],
+        transactions: [],
+        heads: {},
+        configs: {},
+        blocks: {},
+      };
       // Transfer fork-only test funds from the pool by impersonation; never any remote writes.
       const local = createWalletClient({
         chain,
@@ -398,7 +405,12 @@ it.skipIf(!!reason)(
             const mined = await client.getTransactionReceipt({
               hash: r.settlement.transactionHash,
             });
-            recording.receipts.push(mined);
+            const snapshotBlock = BigInt(r.evidence.executionBlockNumber);
+            recording.blocks[String(snapshotBlock)] =
+              await reader.timestamp!(snapshotBlock);
+            const blockTimestamp = await reader.timestamp!(mined.blockNumber);
+            recording.blocks[String(mined.blockNumber)] = blockTimestamp;
+            recording.receipts.push({ ...mined, blockTimestamp });
             recording.transactions.push(
               await client.getTransaction({ hash: mined.transactionHash }),
             );

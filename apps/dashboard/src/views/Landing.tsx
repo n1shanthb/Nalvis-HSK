@@ -15,6 +15,9 @@ export function Landing() {
           <button onClick={() => scroll('workflow')}>How it works</button>
           <a href="#/verify">Audit trail ↗</a>
         </nav>
+        <a className="live-console-link" href="?demo=0#/mandate">
+          Live console / Connect Ledger
+        </a>
         <a className="button ember small" href="#/agent">
           Open live console <span>↗</span>
         </a>

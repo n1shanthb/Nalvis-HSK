@@ -1,3 +1,4 @@
+import { nlToParamDiff } from '../src/llm.js';
 import { describe, it, expect, vi } from 'vitest';
 import { desk, parseIntent, receiptSequenceOrder } from '../src/desk/index.js';
 import { scenario } from './helpers.js';
@@ -43,11 +44,11 @@ describe('deterministic desk', () => {
     'slippage 20 bps karo',
     'rok do',
     'band karo',
-    'mat karo',
     'set cap to 25 usdt',
     'cap 25 usdt karo',
   ])('proposal: %s', (t) => expect(parseIntent(t).kind).toBe('change'));
   it.each([
+    'mat karo',
     'buy 100 HSK',
     'send all funds',
     'why WAIT #9007199254740993',
@@ -171,3 +172,24 @@ it('sorts sequences numerically beyond nine', () =>
       .sort(receiptSequenceOrder)
       .map((r) => r.seq),
   ).toEqual(['0', '2', '10', '11']));
+
+it.each([
+  ['set cap to 25', true, false],
+  ['pause', true, false],
+  ['set cap to 25', false, true],
+  ['revoke', false, true],
+] as const)('refuses %s when paused=%s revoked=%s', (text, paused, revoked) => {
+  const s = scenario();
+  const result = desk(text, {
+    policy: s.policy,
+    mandate: { ...s.mandate, revoked },
+    agent: revoked ? '0x0000000000000000000000000000000000000000' : agent,
+    paused,
+  });
+  expect(result.proposal).toBeUndefined();
+  expect(result.message).toMatch(/paused|revoked/);
+});
+it('does not turn a negation into a parameter diff', () => {
+  const s = scenario();
+  expect(nlToParamDiff('mat karo', s.policy, s.mandate).diff).toEqual({});
+});

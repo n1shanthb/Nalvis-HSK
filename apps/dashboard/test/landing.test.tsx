@@ -13,6 +13,11 @@ it('opens the recorded console explicitly and keeps product claims grounded', ()
       .getByRole('link', { name: /Watch recorded demo/ })
       .getAttribute('href'),
   ).toBe('?demo=1#/agent');
+  expect(
+    screen
+      .getByRole('link', { name: /Live console \/ Connect Ledger/ })
+      .getAttribute('href'),
+  ).toBe('?demo=0#/mandate');
   expect(screen.getAllByText(/No proven trading edge/i).length).toBeGreaterThan(
     0,
   );

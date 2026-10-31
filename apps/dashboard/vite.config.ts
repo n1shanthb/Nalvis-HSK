@@ -89,6 +89,7 @@ export default defineConfig({
                   ? { body: Buffer.concat(chunks).toString('utf8') }
                   : {}),
               }),
+              req.socket.remoteAddress,
             );
             res.statusCode = response.status;
             response.headers.forEach((value, key) => res.setHeader(key, value));
