@@ -100,6 +100,29 @@ export async function verifyV3(
       to > from);
     const range = entries.slice(from + 1, to + 1);
     require('v3_journal_head', range.at(-1)?.entryHash === r.journalHead);
+    const priorAction = entries
+      .slice(0, to + 1)
+      .filter(
+        (e) =>
+          e.type === 'ACTION' &&
+          e.data.txHash &&
+          e.data.receiptHash !== zeroHash,
+      )
+      .at(-1);
+    if (priorAction) {
+      const previous = receiptV3Schema.parse(
+        await store!.read(`receipts/${priorAction.data.receiptHash}.json`),
+      );
+      require('v3_previous_anchor', receiptHashV3(previous) ===
+        previous.receiptHash &&
+        previous.receiptHash === priorAction.data.receiptHash &&
+        previous.journalHead === r.journalFrom &&
+        previous.seq + 1n === r.seq &&
+        previous.contract.toLowerCase() === r.contract.toLowerCase() &&
+        chainHead(previous.prevHead, previous.receiptHash, previous.seq) ===
+          r.prevHead);
+    } else require('v3_first_anchor', r.journalFrom === zeroHash);
+
     const artifact = async (
       kind: 'evidence' | 'prompts' | 'states',
       h: unknown,
