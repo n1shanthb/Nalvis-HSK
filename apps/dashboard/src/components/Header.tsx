@@ -2,9 +2,11 @@ import { ConnectLedger } from '../owner/ConnectLedger.js';
 export function Header({
   demo,
   onDesk,
+  activeRoute,
 }: {
   demo: boolean;
   onDesk: () => void;
+  activeRoute?: string;
 }) {
   return (
     <header className="ux-header">
@@ -13,7 +15,13 @@ export function Header({
       </a>
       <nav aria-label="Dashboard views">
         {['Mandate', 'Agent', 'Verify'].map((label) => (
-          <a key={label} href={`#/${label.toLowerCase()}`}>
+          <a
+            aria-current={
+              activeRoute === label.toLowerCase() ? 'page' : undefined
+            }
+            key={label}
+            href={`#/${label.toLowerCase()}`}
+          >
             {label}
           </a>
         ))}
@@ -24,7 +32,9 @@ export function Header({
       <a href={demo ? '?#/agent' : '?demo=1#/agent'}>
         {demo ? 'Switch to Live' : 'Watch Demo'}
       </a>
-      <button onClick={onDesk}>AI desk</button>
+      <button data-desk-trigger onClick={onDesk}>
+        AI desk
+      </button>
       {!demo && <ConnectLedger />}
     </header>
   );

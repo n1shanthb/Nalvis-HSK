@@ -68,9 +68,24 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
         )}
       </article>
       <article className="agent-card">
-        <div role="tablist" aria-label="Agent watches">
+        <div
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+              event.preventDefault();
+              const next = !history;
+              setHistory(next);
+              event.currentTarget
+                .querySelectorAll<HTMLButtonElement>('[role="tab"]')
+                [next ? 1 : 0]?.focus();
+            }
+          }}
+          role="tablist"
+          aria-label="Agent watches"
+        >
           <button
             role="tab"
+            id="active-watches-tab"
+            aria-controls="active-watches-panel"
             aria-selected={!history}
             onClick={() => setHistory(false)}
           >
@@ -78,43 +93,51 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
           </button>
           <button
             role="tab"
+            id="watch-history-tab"
+            aria-controls="watch-history-panel"
             aria-selected={history}
             onClick={() => setHistory(true)}
           >
             Watch history
           </button>
         </div>
-        {!feed ? (
-          <p>Agent feed not connected yet</p>
-        ) : history ? (
-          [...feed.history]
-            .sort((a, b) => b.at - a.at)
-            .map((w, i) => (
-              <div key={i}>
-                <h4>
-                  {w.op}: {w.label}
-                </h4>
+        <div
+          role="tabpanel"
+          id={history ? 'watch-history-panel' : 'active-watches-panel'}
+          aria-labelledby={history ? 'watch-history-tab' : 'active-watches-tab'}
+        >
+          {!feed ? (
+            <p>Agent feed not connected yet</p>
+          ) : history ? (
+            [...feed.history]
+              .sort((a, b) => b.at - a.at)
+              .map((w, i) => (
+                <div key={i}>
+                  <h4>
+                    {w.op}: {w.label}
+                  </h4>
+                  <p>
+                    {w.reason} · {w.by} · {at(w.at)} ·{' '}
+                    {w.accepted ? 'Accepted' : w.rejectReason}
+                  </p>
+                </div>
+              ))
+          ) : (
+            feed.watches.map((w) => (
+              <div key={w.id}>
+                <h4>{w.label}</h4>
                 <p>
-                  {w.reason} · {w.by} · {at(w.at)} ·{' '}
-                  {w.accepted ? 'Accepted' : w.rejectReason}
+                  Set by {w.createdBy} · {w.note}
+                </p>
+                <p>
+                  Created {at(w.createdAt)} · Last fired{' '}
+                  {w.lastFiredAt ? at(w.lastFiredAt) : 'Never'} · {w.fireCount}{' '}
+                  fires · Expires {at(w.expiresAt)}
                 </p>
               </div>
             ))
-        ) : (
-          feed.watches.map((w) => (
-            <div key={w.id}>
-              <h4>{w.label}</h4>
-              <p>
-                Set by {w.createdBy} · {w.note}
-              </p>
-              <p>
-                Created {at(w.createdAt)} · Last fired{' '}
-                {w.lastFiredAt ? at(w.lastFiredAt) : 'Never'} · {w.fireCount}{' '}
-                fires · Expires {at(w.expiresAt)}
-              </p>
-            </div>
-          ))
-        )}
+          )}
+        </div>
       </article>
       <article className="agent-card">
         <h3>Decisions & negotiation trail</h3>

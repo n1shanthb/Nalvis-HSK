@@ -1,7 +1,13 @@
 import { humanError } from '../lib/errors.js';
 import { LedgerContext } from './LedgerContext.js';
 import { useContext, useEffect, useState } from 'react';
-import { encodeFunctionData, keccak256, type Address, type Hex } from 'viem';
+import {
+  encodeFunctionData,
+  keccak256,
+  isAddress,
+  type Address,
+  type Hex,
+} from 'viem';
 import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
 import {
   fieldsFor,
@@ -121,6 +127,15 @@ export function MandateWizard({
     [hash, setHash] = useState<Hex>(),
     [confirmedBlock, setConfirmedBlock] = useState<bigint>();
   const account = shared ? shared.address : localAccount;
+  const agentError = !isAddress(fields.agent)
+    ? 'Enter a valid agent address.'
+    : fields.agent.toLowerCase() === snapshot.owner.toLowerCase() ||
+        /^0x0{40}$/i.test(fields.agent)
+      ? 'Agent must differ from the owner and zero address.'
+      : undefined;
+  const policyError = /^0x[0-9a-f]{64}$/.test(fields.policyHash)
+    ? undefined
+    : 'Enter a 32-byte lowercase hexadecimal policy hash.';
   const context = JSON.stringify(
     { chain, vault, owner: snapshot.owner, mandate: snapshot.mandate },
     (_, v) => (typeof v === 'bigint' ? String(v) : v),
@@ -251,10 +266,17 @@ export function MandateWizard({
           <label>
             Agent address
             <input
+              aria-invalid={!!agentError}
+              aria-describedby={agentError ? 'agent-error' : undefined}
               value={fields.agent}
               onChange={(e) => setFields({ ...fields, agent: e.target.value })}
             />
           </label>
+          {agentError && (
+            <p id="agent-error" role="alert">
+              {agentError}
+            </p>
+          )}
           {controls.map(([key, label, min, max, increment, scale]) => (
             <label key={key}>
               {label}
@@ -319,13 +341,23 @@ export function MandateWizard({
           <label>
             Policy hash
             <input
+              aria-invalid={!!policyError}
+              aria-describedby={policyError ? 'policy-error' : undefined}
               value={fields.policyHash}
               onChange={(e) =>
                 setFields({ ...fields, policyHash: e.target.value })
               }
             />
           </label>
-          <button onClick={() => setStep(3)}>
+          {policyError && (
+            <p id="policy-error" role="alert">
+              {policyError}
+            </p>
+          )}
+          <button
+            disabled={!!agentError || !!policyError}
+            onClick={() => setStep(3)}
+          >
             Compare current and proposed
           </button>
         </>

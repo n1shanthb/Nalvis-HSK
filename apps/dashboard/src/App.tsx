@@ -1,3 +1,4 @@
+import { DeskDrawer } from './components/DeskDrawer.js';
 import { LedgerProvider } from './owner/LedgerContext.js';
 import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
@@ -77,131 +78,43 @@ function AppContent({
   if (route === 'home') return <Landing />;
   return (
     <div className="shell ux-shell">
-      <Header demo={demo} onDesk={() => setDeskOpen(true)} />
-      {demo && (
-        <div className="banner" role="note">
-          DEMO · local anvil — prices not real · offline recorded receipts
-        </div>
-      )}
-      {!demo && chain === 133 && (
-        <div className="banner" role="note">
-          Testnet — pool prices are not real
-        </div>
-      )}
-      {!demo && chain === 31337 && (
-        <div className="banner" role="note">
-          local anvil — prices not real
-        </div>
-      )}
-      {!demo && chain === 177 && (
-        <div className="banner" role="note">
-          Mainnet 177 — read-only
-        </div>
-      )}
-      <main key={`${chain}-${route}-${demo}`}>
-        <Suspense
-          fallback={
-            <div className="skeleton" role="status">
-              Loading console…
-            </div>
-          }
-        >
-          {route === 'agent' ? (
-            <AgentView chain={chain} />
-          ) : route === 'desk' ? (
-            <DeskView
-              demo={demo}
-              chain={chain}
-              onProposal={
-                enableOwner && !demo && chain === 133
-                  ? (p) => {
-                      setProposal(p);
-                      window.location.hash = '#/mandate';
-                      setRoute('mandate');
-                    }
-                  : undefined
-              }
-            />
-          ) : route === 'verify' ? (
-            <VerifyView chain={demo ? 31337 : chain} />
-          ) : demo && route === 'mandate' ? (
-            <DemoMandate />
-          ) : demo ? (
-            <DemoConsole route={route} />
-          ) : (
-            <>
-              {route === 'mandate' && (
-                <MandateView
-                  chain={chain}
-                  onOwner={
-                    enableOwner
-                      ? (d, s, reload) => (
-                          <Suspense fallback={<p>Loading owner panel…</p>}>
-                            <MandateWizard
-                              chain={chain}
-                              vault={d.vault}
-                              snapshot={s}
-                              onConfirmed={reload}
-                            />
-                            <OwnerActions
-                              chain={chain}
-                              vault={d.vault}
-                              snapshot={s}
-                              onConfirmed={reload}
-                            />
-                            {proposal && (
-                              <OwnerPanel
-                                chain={chain}
-                                vault={d.vault}
-                                snapshot={s}
-                                proposal={proposal}
-                              />
-                            )}
-                          </Suspense>
-                        )
-                      : undefined
-                  }
-                />
-              )}{' '}
-              {route === 'evidence' && <EvidenceView />}
-              {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
-            </>
-          )}
-        </Suspense>
-      </main>
-      {deskOpen && (
-        <div
-          className="desk-backdrop"
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setDeskOpen(false);
-            if (event.key === 'Tab') {
-              const dialog =
-                event.currentTarget.querySelector('[role="dialog"]');
-              const controls = dialog?.querySelectorAll<HTMLElement>(
-                'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary',
-              );
-              const first = controls?.[0],
-                last = controls?.[controls.length - 1];
-              if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last?.focus();
-              } else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first?.focus();
-              }
+      <div inert={deskOpen || undefined}>
+        <Header
+          activeRoute={route}
+          demo={demo}
+          onDesk={() => setDeskOpen(true)}
+        />
+        {demo && (
+          <div className="banner" role="note">
+            DEMO · local anvil — prices not real · offline recorded receipts
+          </div>
+        )}
+        {!demo && chain === 133 && (
+          <div className="banner" role="note">
+            Testnet — pool prices are not real
+          </div>
+        )}
+        {!demo && chain === 31337 && (
+          <div className="banner" role="note">
+            local anvil — prices not real
+          </div>
+        )}
+        {!demo && chain === 177 && (
+          <div className="banner" role="note">
+            Mainnet 177 — read-only
+          </div>
+        )}
+        <main key={`${chain}-${route}-${demo}`}>
+          <Suspense
+            fallback={
+              <div className="skeleton" role="status">
+                Loading console…
+              </div>
             }
-          }}
-        >
-          <aside
-            className="desk-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="AI desk"
           >
-            <button autoFocus onClick={() => setDeskOpen(false)}>
-              Close desk
-            </button>
-            <Suspense fallback={<p>Loading desk…</p>}>
+            {route === 'agent' ? (
+              <AgentView chain={chain} />
+            ) : route === 'desk' ? (
               <DeskView
                 demo={demo}
                 chain={chain}
@@ -211,16 +124,80 @@ function AppContent({
                         setProposal(p);
                         window.location.hash = '#/mandate';
                         setRoute('mandate');
-                        setDeskOpen(false);
                       }
                     : undefined
                 }
               />
-            </Suspense>
-          </aside>
-        </div>
+            ) : route === 'verify' ? (
+              <VerifyView chain={demo ? 31337 : chain} />
+            ) : demo && route === 'mandate' ? (
+              <DemoMandate />
+            ) : demo ? (
+              <DemoConsole route={route} />
+            ) : (
+              <>
+                {route === 'mandate' && (
+                  <MandateView
+                    chain={chain}
+                    onOwner={
+                      enableOwner
+                        ? (d, s, reload) => (
+                            <Suspense fallback={<p>Loading owner panel…</p>}>
+                              <MandateWizard
+                                chain={chain}
+                                vault={d.vault}
+                                snapshot={s}
+                                onConfirmed={reload}
+                              />
+                              <OwnerActions
+                                chain={chain}
+                                vault={d.vault}
+                                snapshot={s}
+                                onConfirmed={reload}
+                              />
+                              {proposal && (
+                                <OwnerPanel
+                                  chain={chain}
+                                  vault={d.vault}
+                                  snapshot={s}
+                                  proposal={proposal}
+                                />
+                              )}
+                            </Suspense>
+                          )
+                        : undefined
+                    }
+                  />
+                )}{' '}
+                {route === 'evidence' && <EvidenceView />}
+                {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
+              </>
+            )}
+          </Suspense>
+        </main>
+      </div>
+      {deskOpen && (
+        <DeskDrawer onClose={() => setDeskOpen(false)}>
+          <button onClick={() => setDeskOpen(false)}>Close desk</button>
+          <Suspense fallback={<p>Loading desk…</p>}>
+            <DeskView
+              demo={demo}
+              chain={chain}
+              onProposal={
+                enableOwner && !demo && chain === 133
+                  ? (p) => {
+                      setProposal(p);
+                      window.location.hash = '#/mandate';
+                      setRoute('mandate');
+                      setDeskOpen(false);
+                    }
+                  : undefined
+              }
+            />
+          </Suspense>
+        </DeskDrawer>
       )}
-      <footer>
+      <footer inert={deskOpen || undefined}>
         <span>Market evidence · mainnet 177 · read-only</span>
         <span>No proven edge. Bounded, provable execution.</span>
       </footer>
