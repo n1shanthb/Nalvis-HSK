@@ -1,3 +1,4 @@
+const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
 import { lazy, Suspense, useState } from 'react';
 const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
@@ -36,6 +37,9 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
         <>
           <Suspense fallback={<p>Loading recorded chart…</p>}>
             <PriceChart points={demoEvidence} demo actions={feed.actions} />
+          </Suspense>
+          <Suspense fallback={<p>Loading basis history…</p>}>
+            <BasisChart points={demoEvidence} demo />
           </Suspense>
           <EvidenceDetails e={demoEvidence[0]} compact />
           <RecordedVaultValue />

@@ -1,3 +1,4 @@
+const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
 import { lazy, Suspense } from 'react';
@@ -193,6 +194,9 @@ export function EvidenceView({
             !!resource.error || (!resource.loading && !resource.data)
           }
         />
+      </Suspense>
+      <Suspense fallback={<p>Loading basis history…</p>}>
+        <BasisChart points={history} unavailable={!!resource.error} />
       </Suspense>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
       <h2>Live market evidence</h2>
