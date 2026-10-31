@@ -53,12 +53,17 @@ it('OpenRouter uses JSON mode, configured model, headers and actual returned mod
     {
       AGENT_OPENROUTER_API_KEY: 'test-only-placeholder',
       STRATEGIST_MODEL: 'configured',
+      FITTER_MODEL: '',
       OPENROUTER_APP_URL: 'https://example.org',
       OPENROUTER_APP_NAME: 'test',
     },
     send,
   );
   expect(provider.isConfigured()).toBe(true);
+  expect(provider.models).toEqual({
+    strategist: 'configured',
+    fitter: 'configured',
+  });
   expect(
     openRouter({ STRATEGIST_MODEL: 'configured' }, send).isConfigured(),
   ).toBe(false);

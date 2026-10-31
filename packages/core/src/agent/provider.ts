@@ -60,7 +60,7 @@ export function openRouter(
     id: 'openrouter',
     models: {
       strategist: env.STRATEGIST_MODEL ?? '',
-      fitter: env.FITTER_MODEL ?? env.STRATEGIST_MODEL ?? '',
+      fitter: env.FITTER_MODEL || env.STRATEGIST_MODEL || '',
     },
     isConfigured: () =>
       Boolean(
