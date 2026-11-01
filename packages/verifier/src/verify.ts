@@ -91,6 +91,7 @@ export const receiptSchema = z
           .transform((v) => v as Hex),
         minOut: integer,
         deadline: z.number().int().nonnegative(),
+        validUntil: z.number().int().nonnegative().optional(),
         nonce: integer,
       })
       .strict(),
@@ -334,6 +335,9 @@ export async function verify(
       tx: {
         to: r.tx.to,
         minOut: r.tx.minOut,
+        ...(r.tx.validUntil === undefined
+          ? {}
+          : { validUntil: r.tx.validUntil }),
         deadline: r.tx.deadline,
         nonce: r.tx.nonce,
       },
@@ -481,6 +485,7 @@ export async function verify(
         receiptHash?: Hex;
         prevHead?: Hex;
         deadline?: bigint;
+        validUntil?: bigint;
         nonce?: bigint;
         kind?: number;
       };
@@ -496,16 +501,24 @@ export async function verify(
           same(p.receiptHash, r.receiptHash) &&
             same(p.prevHead, r.prevHead) &&
             p.deadline === BigInt(r.tx.deadline) &&
+            p.validUntil === BigInt(r.tx.validUntil ?? r.tx.deadline) &&
             p.nonce === r.tx.nonce &&
             p.kind === ev.kind,
         );
       else {
-        const deadline =
-          (call.args!.length > 4 ? call.args![4] : call.args![3]) as bigint;
+        const validUntil = (
+          call.args!.length > 4
+            ? call.args![3]
+            : (r.tx.validUntil ?? r.tx.deadline)
+        ) as bigint;
+        const deadline = (
+          call.args!.length > 4 ? call.args![4] : call.args![3]
+        ) as bigint;
         check(
           'calldata_commitment',
           same(call.args![0], r.receiptHash) &&
             same(call.args![1], r.prevHead) &&
+            validUntil === BigInt(r.tx.validUntil ?? r.tx.deadline) &&
             deadline === BigInt(r.tx.deadline) &&
             ev.kind === 0,
         );

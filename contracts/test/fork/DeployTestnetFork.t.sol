@@ -131,6 +131,88 @@ contract DeployTestnetForkTest is Test {
         _sellWithHelper(deployed, deployedAgent);
     }
 
+    /// @notice Exercise a RESIZE receipt against the HSK Testnet fork.
+    function testResizeReceiptOnTestnetFork() public {
+        testDeployAndRealTestnetTrade();
+        vm.warp(block.timestamp + 300);
+
+        uint32[] memory times = new uint32[](2);
+        times[0] = 600;
+        (int56[] memory cumulatives,) = IUniswapV3Pool(Addresses.PRIMARYPOOL_133).observe(times);
+        int56 delta = cumulatives[1] - cumulatives[0];
+        int24 tick = int24(delta / 600);
+        if (delta < 0 && delta % 600 != 0) --tick;
+        uint160 sqrt = TickMath.getSqrtRatioAtTick(tick);
+        uint256 amountIn = 0.01 ether;
+        uint256 refOut = FullMath.mulDiv(1 << 192, amountIn, uint256(sqrt) * sqrt);
+        bytes32 hash = keccak256("T9 testnet-fork RESIZE receipt");
+        EdgewiseVault.TradeParams memory p = EdgewiseVault.TradeParams({
+            tokenIn: Addresses.WHSK_133,
+            amountIn: amountIn,
+            minOut: refOut * 99 / 100,
+            deadline: block.timestamp + 300,
+            validUntil: block.timestamp + 60,
+            nonce: deployed.nextNonce(),
+            receiptHash: hash,
+            prevHead: deployed.head(),
+            kind: ReceiptChain.Kind.RESIZE
+        });
+
+        vm.recordLogs();
+        vm.prank(deployedAgent);
+        uint256 out = deployed.trade(p);
+        assertGe(out, p.minOut);
+        assertEq(deployed.seq(), 2);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool foundResize;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter == address(deployed) && logs[i].topics[2] == hash) {
+                (,, uint8 kind,,,,,) =
+                    abi.decode(logs[i].data, (bytes32, bytes32, uint8, address, uint256, uint256, uint256, uint256));
+                foundResize = kind == uint8(ReceiptChain.Kind.RESIZE);
+            }
+        }
+        assertTrue(foundResize, "RESIZE Receipt missing");
+    }
+
+    /// @notice Exercise WAIT/REJECT receipts and pause/revoke trade reverts on the HSK Testnet fork.
+    function testHoldReceiptsAndPauseRevokeOnTestnetFork() public {
+        testDeployAndRealTestnetTrade();
+
+        vm.startPrank(deployedAgent);
+        deployed.commitHold(keccak256("T9 testnet-fork WAIT"), deployed.head(), ReceiptChain.Kind.WAIT);
+        deployed.commitHold(keccak256("T9 testnet-fork REJECT"), deployed.head(), ReceiptChain.Kind.REJECT);
+        vm.stopPrank();
+        assertEq(deployed.seq(), 3);
+
+        EdgewiseVault.TradeParams memory p = EdgewiseVault.TradeParams({
+            tokenIn: Addresses.USDT_133,
+            amountIn: 1 ether,
+            minOut: 1,
+            deadline: block.timestamp + 300,
+            validUntil: block.timestamp + 60,
+            nonce: deployed.nextNonce(),
+            receiptHash: keccak256("T9 paused attempt"),
+            prevHead: deployed.head(),
+            kind: ReceiptChain.Kind.TRADE
+        });
+        vm.prank(INITIAL_OWNER);
+        deployed.pause();
+        vm.prank(deployedAgent);
+        vm.expectRevert(EdgewiseVault.Inactive.selector);
+        deployed.trade(p);
+
+        vm.prank(INITIAL_OWNER);
+        deployed.unpause();
+        vm.prank(INITIAL_OWNER);
+        deployed.revoke();
+        vm.prank(deployedAgent);
+        vm.expectRevert(EdgewiseVault.Unauthorized.selector);
+        deployed.trade(p);
+        assertEq(deployed.seq(), 3);
+    }
+
     function _sellWithHelper(EdgewiseVault v, address agent) internal {
         vm.warp(block.timestamp + 300);
         vm.setEnv("VAULT_ADDRESS", vm.toString(address(v)));

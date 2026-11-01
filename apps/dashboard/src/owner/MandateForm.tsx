@@ -67,6 +67,9 @@ export function validateMandate(
   if (expiry <= BigInt(now)) throw Error('Expiry must be in the future');
   const exposure = uint(fields.maxExposureBps);
   if (exposure > 10000n) throw Error('Exposure must be at most 10000 bps');
+  const drawdown = uint(fields.maxDrawdownBps ?? '0');
+  if (drawdown > 10000n)
+    throw Error('Drawdown must be at most 10000 bps');
   if (!/^0x[0-9a-fA-F]{64}$/.test(fields.policyHash))
     throw Error('Policy hash must be 32 bytes');
   return {
@@ -77,7 +80,7 @@ export function validateMandate(
     maxDailyInB: exactUnits(fields.maxDailyInB, snapshot.decimalsB),
     maxExposureBps: Number(exposure),
     maxSlippageBps: clampSlippage(Number(fields.maxSlippageBps)),
-    maxDrawdownBps: Number(uint(fields.maxDrawdownBps ?? '0')),
+    maxDrawdownBps: Number(drawdown),
     minIntervalSec: uint(fields.minIntervalSec),
     policyHash: fields.policyHash as Hex,
   };
@@ -87,7 +90,7 @@ const labels: Record<keyof VaultMandate, string> = {
   expiry: 'Expiry (UTC unix seconds)',
   maxTradeInA: 'WHSK per trade',
   maxTradeInB: 'USDT per trade',
-  maxDailyInB: 'USDT per UTC day',
+  maxDailyInB: 'USDT rolling 24-hour cap',
   maxExposureBps: 'Exposure cap (bps)',
   maxSlippageBps: 'Slippage cap (bps)',
   maxDrawdownBps: 'Drawdown cap (bps)',

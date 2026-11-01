@@ -96,6 +96,11 @@ contract VaultInvariantTest is StdInvariant, Test {
         assertFalse(handler.ghost_tradeSucceededWhileInactive(), "Trade executed under inactive mandate");
     }
 
+    /// @notice Invariant: A decision cannot execute after its validUntil timestamp.
+    function invariant_expiredDecisionNeverTrades() public view {
+        assertFalse(handler.ghost_tradeSucceededWithExpiredDecision(), "Expired decision executed");
+    }
+
     /// @notice Invariant 6: Per-trade caps are never bypassed
     function invariant_perTradeCapNeverBypassed() public view {
         assertFalse(handler.ghost_tradeExceededPerTradeCap(), "Per trade cap exceeded");

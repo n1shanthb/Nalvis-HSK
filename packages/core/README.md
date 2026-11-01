@@ -15,11 +15,12 @@ silently changing a signed policy. TokenA caps require a current price and are
 checked against the actual integer quote input by `decide`.
 
 `decide(evidence, policy, mandate, state)` performs no IO or clock reads. Supply
-UTC unix seconds in evidence, explicit balances and day-bucket state. Invalid
-schemas/sources, stale DEX (>6h by default), missing/old/wide/divergent CEX books,
+UTC unix seconds in evidence, explicit balances and day-bucket loss state.
+`dailySpentB` is rolling 24-hour turnover and is never reset at UTC midnight.
+Invalid schemas/sources, stale DEX (>6h by default), missing/old/wide/divergent CEX books,
 fresh APRO disagreement, invalid LLM selection, revoked/expired mandates, a policy
-hash mismatch and exhausted daily/loss limits reject. Expiry is inclusive, as in
-the vault. Stale APRO is recorded as `apro_stale_ignored` and does not itself
+hash mismatch and exhausted rolling-turnover/daily-loss limits reject. Expiry
+is inclusive, as in the vault. Stale APRO is recorded as `apro_stale_ignored` and does not itself
 reject. Data checks precede mandate checks, then cooldown, target band, direction
 and size selection. Quotes are sorted by policy size descending. Costs come from
 each size's quoted output versus spot mid; no execution costs/prices are embedded
@@ -73,11 +74,14 @@ The eight `data/research/` inputs are verbatim frozen user attachments.
   `executionChainId`, `contract`, `seq`, `prevHead`;
 - `policyHash`, `evidenceHash`, `evidence`, `decision`, `ruleTrace`;
 - `llm: {explanation, model?, promptHash?, outputHash?}`;
-- `tx: {to, data, minOut, deadline, nonce}`;
+- `tx: {to, data, minOut, validUntil, deadline, nonce}`;
 - `receiptHash`.
 
 `receiptHash` is keccak256 of UTF-8 canonical JSON of exactly the above fields
 **excluding `receiptHash` and `tx.data`**. All other tx fields are committed.
+New keeper receipts include `validUntil`; it is optional only when reading
+pre-expiry v1 receipts, for which the verifier uses the committed deadline as
+the historical expiry.
 Calldata embeds receiptHash and therefore cannot be included without a circular
 commitment. Rule traces appear inside `decision` and as the required top-level
 field. Omitted optional LLM fields are absent, never undefined. `seq`, nonce and

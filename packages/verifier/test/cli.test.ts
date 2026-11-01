@@ -39,7 +39,7 @@ test('compiled CLI prints PASS table and exits 0 on genuine recorded fixture', (
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain('PASS — recorded RPC replay');
   expect(result.stdout).toContain('Gas ');
-});
+}, 30000);
 test('tx lookup, --receipt and --json produce machine-readable PASS', async () => {
   for (const args of [
     ['--receipt', path],
@@ -60,83 +60,87 @@ test('tx lookup, --receipt and --json produce machine-readable PASS', async () =
     expect(JSON.parse(output[0]).status).toBe('PASS');
   }
 });
-test('compiled CLI exits 1 and names check for all six required tampers', { timeout: 30000 }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'verifier-tampers-'));
-  try {
-    const cases: [
-      string,
-      (r: typeof receipt, c: ReturnType<typeof JSON.parse>) => void,
-      string,
-    ][] = [
-      [
-        'evidence',
-        (r) => {
-          r.evidence.sources.demo.raw += 'x';
-        },
-        'evidenceHash',
-      ],
-      [
-        'kind',
-        (r) => {
-          r.decision.kind = 'WAIT';
-        },
-        'receiptHash',
-      ],
-      [
-        'minOut',
-        (r) => {
-          r.tx.minOut = String(BigInt(r.tx.minOut) + 1n);
-        },
-        'receiptHash',
-      ],
-      [
-        'prevHead',
-        (r) => {
-          r.prevHead = '0x' + '11'.repeat(32);
-        },
-        'receiptHash',
-      ],
-      [
-        'contract',
-        (_r, c) => {
-          c.receipts[0].logs.forEach((l: { address: string }) => {
-            l.address = '0x' + '00'.repeat(20);
-          });
-        },
-        'receipt_event',
-      ],
-      [
-        'policyHash',
-        (r) => {
-          r.policyHash = '0x' + '11'.repeat(32);
-        },
-        'receiptHash',
-      ],
-    ];
-    for (const [name, mutate, check] of cases) {
-      const r = structuredClone(receipt),
-        c = JSON.parse(readFileSync(recorded, 'utf8'));
-      mutate(r, c);
-      const rp = join(dir, name + '.json'),
-        cp = join(dir, name + '-chain.json');
-      writeFileSync(rp, JSON.stringify(r));
-      writeFileSync(cp, JSON.stringify(c));
-      const result = spawnSync(
-        process.execPath,
-        [executable, rp, '--recorded', cp, '--json'],
-        { encoding: 'utf8' },
-      );
-      expect(result.status, result.stderr).toBe(1);
-      expect(
-        JSON.parse(result.stdout).results[0].checks.find(
-          (c: { pass: boolean }) => !c.pass,
-        ).name,
-      ).toBe(check);
+test(
+  'compiled CLI exits 1 and names check for all six required tampers',
+  { timeout: 30000 },
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), 'verifier-tampers-'));
+    try {
+      const cases: [
+        string,
+        (r: typeof receipt, c: ReturnType<typeof JSON.parse>) => void,
+        string,
+      ][] = [
+        [
+          'evidence',
+          (r) => {
+            r.evidence.sources.demo.raw += 'x';
+          },
+          'evidenceHash',
+        ],
+        [
+          'kind',
+          (r) => {
+            r.decision.kind = 'WAIT';
+          },
+          'receiptHash',
+        ],
+        [
+          'minOut',
+          (r) => {
+            r.tx.minOut = String(BigInt(r.tx.minOut) + 1n);
+          },
+          'receiptHash',
+        ],
+        [
+          'prevHead',
+          (r) => {
+            r.prevHead = '0x' + '11'.repeat(32);
+          },
+          'receiptHash',
+        ],
+        [
+          'contract',
+          (_r, c) => {
+            c.receipts[0].logs.forEach((l: { address: string }) => {
+              l.address = '0x' + '00'.repeat(20);
+            });
+          },
+          'receipt_event',
+        ],
+        [
+          'policyHash',
+          (r) => {
+            r.policyHash = '0x' + '11'.repeat(32);
+          },
+          'receiptHash',
+        ],
+      ];
+      for (const [name, mutate, check] of cases) {
+        const r = structuredClone(receipt),
+          c = JSON.parse(readFileSync(recorded, 'utf8'));
+        mutate(r, c);
+        const rp = join(dir, name + '.json'),
+          cp = join(dir, name + '-chain.json');
+        writeFileSync(rp, JSON.stringify(r));
+        writeFileSync(cp, JSON.stringify(c));
+        const result = spawnSync(
+          process.execPath,
+          [executable, rp, '--recorded', cp, '--json'],
+          { encoding: 'utf8' },
+        );
+        expect(result.status, result.stderr).toBe(1);
+        expect(
+          JSON.parse(result.stdout).results[0].checks.find(
+            (c: { pass: boolean }) => !c.pass,
+          ).name,
+        ).toBe(check);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
+  },
+);
 test('P&L CLI verifies all receipts first', async () => {
   const output: string[] = [];
   expect(

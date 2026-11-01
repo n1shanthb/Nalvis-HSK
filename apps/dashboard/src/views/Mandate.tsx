@@ -33,16 +33,24 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
     <dl>
       {Object.entries({
         Owner: snapshot.owner,
+        'Vault pending owner': snapshot.pendingOwner,
+        'Router owner': snapshot.routerOwner,
+        'Router pending owner': snapshot.routerPendingOwner,
         Agent: m.agent,
         Expiry: displayTime(m.expiry),
         'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
         'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
-        'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
+        'USDT rolling 24-hour cap': formatUnits(
+          m.maxDailyInB,
+          snapshot.decimalsB,
+        ),
         'Exposure cap (bps)': m.maxExposureBps,
         'Slippage cap (bps)': m.maxSlippageBps,
         'Drawdown cap (bps)': m.maxDrawdownBps,
         'Minimum interval (s)': String(m.minIntervalSec),
         'Policy hash': m.policyHash,
+        'Router policy hash': snapshot.routerPolicyHash,
+        'Vault/router policy match': snapshot.policiesMatch ? 'Yes' : 'NO',
         Paused: String(snapshot.paused),
         'Read block': String(snapshot.blockNumber),
       }).map(([k, v]) => (
@@ -64,7 +72,14 @@ export function MandateView({
   const resource = useResource(
     useCallback(async () => {
       const deployment = await loadDeployment(chain);
-      return { deployment, snapshot: await readVault(chain, deployment.vault) };
+      return {
+        deployment,
+        snapshot: await readVault(
+          chain,
+          deployment.vault,
+          deployment.router,
+        ),
+      };
     }, [chain]),
   );
   const cfg = addresses[chain === 133 ? 133 : 177];

@@ -6,6 +6,7 @@ export const receiptEvent =
 export const vaultAbi = parseAbi([
   receiptEvent,
   'function owner() view returns (address)',
+  'function pendingOwner() view returns (address)',
   'function tokenA() view returns (address)',
   'function tokenB() view returns (address)',
   'function router() view returns (address)',
@@ -18,6 +19,7 @@ export const vaultAbi = parseAbi([
   'function lastTradeAt() view returns (uint256)',
   'function dailyBucket() view returns (uint256)',
   'function dailyNotionalB() view returns (uint256)',
+  'function getRolling24hTurnover() view returns (uint256)',
   'function highWaterMark() view returns (uint256)',
   'function paused() view returns (bool)',
   'function mandate() view returns (address agent,uint256 expiry,uint256 maxTradeInA,uint256 maxTradeInB,uint256 maxDailyInB,uint16 maxExposureBps,uint16 maxSlippageBps,uint16 maxDrawdownBps,uint256 minIntervalSec,bytes32 policyHash)',
@@ -29,6 +31,7 @@ export const vaultAbi = parseAbi([
 export const proofRouterAbi = parseAbi([
   receiptEvent,
   'function owner() view returns (address)',
+  'function pendingOwner() view returns (address)',
   'function router() view returns (address)',
   'function policyHash() view returns (bytes32)',
   'function seq(address caller) view returns (uint64)',

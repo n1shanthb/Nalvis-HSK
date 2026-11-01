@@ -12,7 +12,11 @@ import {
   hskMainnet,
   hskTestnet,
 } from '../../../../packages/core/src/chains.js';
-import { vaultAbi, erc20Abi } from '../../../../packages/core/src/abi/index.js';
+import {
+  vaultAbi,
+  proofRouterAbi,
+  erc20Abi,
+} from '../../../../packages/core/src/abi/index.js';
 import addressBook from '../../../../docs/ADDRESSES.md?raw';
 
 export type DashboardChain = 133 | 177 | 31337;
@@ -99,6 +103,11 @@ export type VaultMandate = {
 export type VaultSnapshot = {
   mandate: VaultMandate;
   owner: Address;
+  pendingOwner: Address;
+  routerOwner: Address;
+  routerPendingOwner: Address;
+  routerPolicyHash: `0x${string}`;
+  policiesMatch: boolean;
   paused: boolean;
   decimalsA: number;
   decimalsB: number;
@@ -107,21 +116,44 @@ export type VaultSnapshot = {
 export async function readVault(
   chain: DashboardChain,
   vault: Address,
+  router: Address,
   client: PublicClient<Transport, Chain> = clientFor(chain),
 ): Promise<VaultSnapshot> {
   if ((await client.getChainId()) !== chain) throw Error('RPC chain mismatch');
   const blockNumber = await client.getBlockNumber();
-  const read = <F extends 'owner' | 'paused' | 'mandate'>(functionName: F) =>
+  const read = <
+    F extends 'owner' | 'pendingOwner' | 'paused' | 'mandate',
+  >(functionName: F) =>
     client.readContract({
       address: vault,
       abi: vaultAbi,
       functionName,
       blockNumber,
     });
-  const [owner, paused, raw] = await Promise.all([
+  const [owner, pendingOwner, paused, raw, routerOwner, routerPendingOwner, routerPolicyHash] =
+    await Promise.all([
     read('owner'),
+    read('pendingOwner'),
     read('paused'),
     read('mandate'),
+    client.readContract({
+      address: router,
+      abi: proofRouterAbi,
+      functionName: 'owner',
+      blockNumber,
+    }),
+    client.readContract({
+      address: router,
+      abi: proofRouterAbi,
+      functionName: 'pendingOwner',
+      blockNumber,
+    }),
+    client.readContract({
+      address: router,
+      abi: proofRouterAbi,
+      functionName: 'policyHash',
+      blockNumber,
+    }),
   ]);
   const cfg = addresses[chain === 133 ? 133 : 177];
   const [decimalsA, decimalsB] = await Promise.all(
@@ -159,6 +191,11 @@ export async function readVault(
   ];
   return {
     owner: owner as Address,
+    pendingOwner: pendingOwner as Address,
+    routerOwner: routerOwner as Address,
+    routerPendingOwner: routerPendingOwner as Address,
+    routerPolicyHash,
+    policiesMatch: policyHash.toLowerCase() === routerPolicyHash.toLowerCase(),
     paused: paused as boolean,
     mandate: {
       agent,

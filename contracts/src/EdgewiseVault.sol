@@ -59,7 +59,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
 
     struct TurnoverSlot {
         uint32 epochBucket;
-        uint224 notionalB;
+        uint256 notionalB;
     }
     TurnoverSlot[48] private _turnoverSlots;
     uint256 public highWaterMark;
@@ -393,10 +393,10 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 slotIdx = currentBucket % 48;
         TurnoverSlot storage s = _turnoverSlots[slotIdx];
         if (s.epochBucket == currentBucket) {
-            s.notionalB += uint224(notionalB);
+            s.notionalB += notionalB;
         } else {
             s.epochBucket = currentBucket;
-            s.notionalB = uint224(notionalB);
+            s.notionalB = notionalB;
         }
     }
 

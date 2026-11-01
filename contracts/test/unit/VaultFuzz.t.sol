@@ -151,6 +151,48 @@ contract VaultFuzzTest is Test {
         }
     }
 
+    /// @notice Fuzz test: rolling turnover cannot be bypassed by crossing UTC midnight.
+    function testFuzz_RollingTurnoverCapAcrossMidnight(uint256 amountIn) public {
+        amountIn = bound(amountIn, 1, 100e18);
+        EdgewiseVault.Mandate memory m = vault.getMandate();
+        m.maxDailyInB = amountIn;
+        m.minIntervalSec = 1;
+        vault.setMandate(m);
+        vm.warp(block.timestamp + 23 hours);
+
+        EdgewiseVault.TradeParams memory first = EdgewiseVault.TradeParams({
+            tokenIn: address(b),
+            amountIn: amountIn,
+            minOut: amountIn * 99 / 100,
+            deadline: block.timestamp + 300,
+            validUntil: block.timestamp + 60,
+            nonce: vault.nextNonce(),
+            receiptHash: keccak256(abi.encodePacked("rolling_cap_first", amountIn)),
+            prevHead: vault.head(),
+            kind: ReceiptChain.Kind.TRADE
+        });
+        vm.prank(agent);
+        vault.trade(first);
+        assertEq(vault.getRolling24hTurnover(), amountIn);
+
+        uint256 nextDay = (block.timestamp / 1 days + 1) * 1 days;
+        vm.warp(nextDay);
+        EdgewiseVault.TradeParams memory second = EdgewiseVault.TradeParams({
+            tokenIn: address(b),
+            amountIn: 1,
+            minOut: 1,
+            deadline: block.timestamp + 300,
+            validUntil: block.timestamp + 60,
+            nonce: vault.nextNonce(),
+            receiptHash: keccak256(abi.encodePacked("rolling_cap_second", amountIn)),
+            prevHead: vault.head(),
+            kind: ReceiptChain.Kind.TRADE
+        });
+        vm.prank(agent);
+        vm.expectRevert(EdgewiseVault.DailyCap.selector);
+        vault.trade(second);
+    }
+
     /// @notice Fuzz test: min interval enforcement
     function testFuzz_MinInterval(uint256 intervalDelta) public {
         intervalDelta = bound(intervalDelta, 0, 120);

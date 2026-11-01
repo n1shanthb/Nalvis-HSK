@@ -58,12 +58,12 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
 - **Constructor** takes `(owner, router, pool, tokenA=WHSK, tokenB=USDT, fee, twapWindowSec, oracle /*may be 0*/, oracleBandBps, oracleMaxAge)`. Router, pool, tokens, fee, TWAP and oracle configuration are immutable; ownership can be handed over with the two-step owner nomination/acceptance flow.
 - **No initializer** and no first-caller setup functions.
 - **Owner-only**:
-  - `setMandate(Mandate)` with fields `{agent, expiry, maxTradeInA, maxTradeInB, maxDailyInB, maxExposureBps, maxSlippageBps, minIntervalSec, policyHash}`.
+  - `setMandate(Mandate)` with fields `{agent, expiry, maxTradeInA, maxTradeInB, maxDailyInB, maxExposureBps, maxSlippageBps, maxDrawdownBps, minIntervalSec, policyHash}`.
     - `maxSlippageBps <= MAX_SLIPPAGE_CAP_BPS` (a constant of 100), `expiry > now`, and `agent != owner`.
     - Every change emits `MandateSet`.
   - `revoke()`, which zeroes the agent immediately.
   - `withdraw(token, amount, to)`, `pause()` and `unpause()`.
-- **Agent-only `trade(TradeParams)`** with fields `{tokenIn, amountIn, minOut, deadline, nonce, receiptHash, prevHead, kind}`. It checks:
+- **Agent-only `trade(TradeParams)`** with fields `{tokenIn, amountIn, minOut, deadline, validUntil, nonce, receiptHash, prevHead, kind}`. It checks:
   - not paused, the mandate is live, and `block.timestamp <= deadline`;
   - `nonce == nextNonce`;
   - `now >= lastTradeAt + minIntervalSec`;
@@ -193,8 +193,8 @@ Fork tests need network access to the RPCs (see `docs/CODEX_ENV.md`). If the net
   `oracle = address(0)`, as required by the T2 review follow-up. APRO remains
   off-chain keeper/verifier evidence only. MockAggregator tests cover age,
   incomplete rounds, future timestamps, invalid answers, and price bands.
-- Daily notional uses UTC calendar-day buckets (`block.timestamp / 1 days`),
-  not a sliding window. Mandate updates/revocation do not reset spend or nonces.
+- Turnover uses a conservative rolling 24-hour ring of 48 half-hour buckets;
+  mandate updates/revocation do not reset spend or nonces.
 - Exposure means the proportion of total pair value held in tokenA, with both
   balances valued in tokenB at the same TWAP tick. TokenB is assumed to track USD
   when comparing the optional tokenA/USD oracle; that peg is UNVERIFIED.

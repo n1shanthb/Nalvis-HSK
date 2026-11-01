@@ -205,6 +205,7 @@ cast receipt "$TX_HASH" --rpc-url "$HSK_TESTNET_RPC" --json > work/trade-receipt
 cast call "$VAULT_ADDRESS" 'seq()(uint64)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$VAULT_ADDRESS" 'head()(bytes32)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$VAULT_ADDRESS" 'highWaterMark()(uint256)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$VAULT_ADDRESS" 'getRolling24hTurnover()(uint256)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$WHSK" 'allowance(address,address)(uint256)' "$VAULT_ADDRESS" "$SWAP_ROUTER" \
   --rpc-url "$HSK_TESTNET_RPC"
 RECEIPT_DATA=$(jq -er --arg vault "${VAULT_ADDRESS,,}" '

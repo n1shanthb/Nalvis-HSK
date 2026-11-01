@@ -230,6 +230,7 @@ export async function tick(
       data: '0x',
       minOut,
       deadline: snapshot.now + 120,
+      validUntil: snapshot.now + 120,
       nonce: snapshot.nonce,
     },
   });

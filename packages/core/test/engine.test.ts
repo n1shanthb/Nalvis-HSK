@@ -169,10 +169,19 @@ const cases: Case[] = [
     rule: 'daily_stop',
   },
   {
-    name: 'UTC day reset',
+    name: 'UTC loss reset does not reset rolling turnover',
     change: (s) => {
       s.state.dailyLossB = 25;
       s.state.dailySpentB = s.mandate.maxDailyInB;
+      s.state.dailyBucket--;
+    },
+    kind: 'REJECT',
+    rule: 'daily_stop',
+  },
+  {
+    name: 'UTC daily loss reset',
+    change: (s) => {
+      s.state.dailyLossB = 25;
       s.state.dailyBucket--;
     },
     kind: 'TRADE',

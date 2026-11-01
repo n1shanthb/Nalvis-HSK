@@ -135,9 +135,11 @@ Both constructors used owner
 pool `0xc076FB478b77633736738579c7f48D2539604a50`, WHSK
 `0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6`, test-USDT
 `0x98B6173A8B7DFc52ce8bc88f1184a918A1CCaa4F`, fee 3000, TWAP window 600,
-and zero oracle configuration. The configured agent is not yet set in the
-vault mandate; the router policy hash is zero. Full receipt and state details
-are recorded in [`contracts/deployments/133.json`](../contracts/deployments/133.json).
+and zero oracle configuration. The vault mandate agent is
+`0x6845a4caCcEaCd6eE5407C9E217610c26964ba2a`; the router policy hash matches
+the configured mandate policy. Both were confirmed at block `35176631`.
+Full receipt and state details are recorded in
+[`contracts/deployments/133.json`](../contracts/deployments/133.json).
 
 ## Ephemeral local verifier fixture (chain 31337 only)
 

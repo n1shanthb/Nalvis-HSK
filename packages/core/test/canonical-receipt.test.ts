@@ -20,6 +20,7 @@ export function receiptScenario() {
       data: '0x',
       minOut: 0n,
       deadline: s.e.now + 60,
+      validUntil: s.e.now + 30,
       nonce: 0n,
     },
   });
@@ -71,12 +72,15 @@ it('freeze exact receipt fields and hash in golden file', () => {
     ).trim(),
   );
 });
-it('only calldata is omitted from hash; deadline, nonce and recipient committed', () => {
+it('omits calldata but commits deadline, validUntil, nonce and recipient', () => {
   const r = receiptScenario();
   expect(receiptHash({ ...r, tx: { ...r.tx, data: '0x1234' } })).toBe(
     r.receiptHash,
   );
   expect(
     receiptHash({ ...r, tx: { ...r.tx, deadline: r.tx.deadline + 1 } }),
+  ).not.toBe(r.receiptHash);
+  expect(
+    receiptHash({ ...r, tx: { ...r.tx, validUntil: r.tx.validUntil! + 1 } }),
   ).not.toBe(r.receiptHash);
 });
