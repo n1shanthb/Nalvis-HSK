@@ -1,3 +1,5 @@
+import { demoReceipts } from '../lib/demo.js';
+import demoRecording from '../../../../packages/verifier/test/fixtures/t8/chain.json';
 import { useEffect, useRef, useState } from 'react';
 import { type Hex } from 'viem';
 import {
@@ -13,9 +15,11 @@ import { clientFor, type DashboardChain } from '../lib/clients.js';
 export const recordedTrade = trade;
 export function VerifyView({
   chain,
+  demo = false,
   runRecorded = (input: unknown) => verify(input, recordedReader(recording)),
 }: {
   chain: DashboardChain;
+  demo?: boolean;
   runRecorded?: (input: unknown) => Promise<Verification>;
 }) {
   const autoRun = useRef(false);
@@ -35,7 +39,7 @@ export function VerifyView({
     setError('');
     setResult(undefined);
     setMode(
-      recorded
+      recorded || demo
         ? 'Recorded local anvil — prices not real. Offline RPC replay; not live chain verification.'
         : `Live chain ${chain}`,
     );
@@ -46,7 +50,7 @@ export function VerifyView({
           throw Error('Enter a 32-byte transaction hash');
         const input: unknown = json.trim()
           ? JSON.parse(json)
-          : (await localReceipts()).find(
+          : (demo ? demoReceipts : await localReceipts()).find(
               (r) =>
                 r.executionChainId === chain &&
                 r.settlement?.transactionHash.toLowerCase() ===
@@ -57,7 +61,13 @@ export function VerifyView({
             'Matching receipt JSON unavailable. Paste the keeper receipt below.',
           );
         const url = clientFor(chain).chain.rpcUrls.default.http[0];
-        setResult(await verify(input, rpcReader(url), { txHash: hash as Hex }));
+        setResult(
+          await verify(
+            input,
+            demo ? recordedReader(demoRecording) : rpcReader(url),
+            { txHash: hash as Hex },
+          ),
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed');
@@ -72,9 +82,9 @@ export function VerifyView({
     }
   }, []);
   return (
-    <section>
+    <section className="verify-view">
       <p className="eyebrow">04 / INDEPENDENT REPLAY</p>
-      <h2>Verify a receipt</h2>
+      <h1>Verify a receipt</h1>
       <p>
         Re-hash evidence, replay the deterministic engine, then match calldata,
         Receipt events and chain links.
@@ -94,35 +104,53 @@ export function VerifyView({
             required
           />
         </label>
-        <label>
-          Keeper receipt JSON (optional if served locally)
-          <textarea value={json} onChange={(e) => setJSON(e.target.value)} />
-        </label>
+        <details className="receipt-input">
+          <summary>Add keeper receipt JSON</summary>
+          <label>
+            Keeper receipt JSON (optional if served locally)
+            <textarea value={json} onChange={(e) => setJSON(e.target.value)} />
+          </label>
+        </details>
         <button disabled={busy} type="submit">
-          {busy ? 'Verifying…' : 'Verify on selected chain'}
+          {busy
+            ? 'Verifying…'
+            : demo
+              ? 'Verify recorded receipt'
+              : 'Verify on selected chain'}
         </button>
       </form>
-      <button
-        className="secondary"
-        disabled={busy}
-        onClick={() => void run(true)}
-      >
-        Replay recorded Anvil trade
-      </button>
-      <p>{mode}</p>
+      <aside className="recorded-replay">
+        <h3>Try an independent replay</h3>
+        <p>
+          Use the recorded local Anvil trade to explore verification. Offline
+          replay; prices are not real.
+        </p>
+        <button
+          className="secondary"
+          disabled={busy}
+          onClick={() => void run(true)}
+        >
+          Replay recorded Anvil trade
+        </button>
+      </aside>
+      <p role="status">{mode}</p>
       {error && <p role="alert">FAIL — {error}</p>}
       {result && (
         <div aria-live="polite">
           <h3>{result.status}</h3>
           <p>{result.label}</p>
-          <ul>
+          <p>
+            Checks run in order and stop at the first failure. Later checks are
+            not run.
+          </p>
+          <ol className="verification-checks">
             {result.checks.map((c, i) => (
               <li key={i}>
                 <b>{c.pass ? 'PASS' : 'FAIL'}</b> · {c.name}
                 {c.detail ? ` — ${c.detail}` : ''}
               </li>
             ))}
-          </ul>
+          </ol>
           {result.metrics && (
             <dl>
               {Object.entries(result.metrics).map(([key, value]) => (

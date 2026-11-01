@@ -6,6 +6,11 @@ const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 export default function LandingPreview() {
   const r = useResource(useCallback(demoContext, []));
   const last = demoReceipts.at(-1)!;
+  const rawReason = last.ruleTrace.find((t) => !t.pass)?.detail;
+  const reason =
+    rawReason === 'cex_missing'
+      ? 'CEX evidence was unavailable. Execution was rejected.'
+      : (rawReason ?? 'Inspect the recorded rule trace.');
   return (
     <div className="landing-preview">
       <div className="preview-mini-nav">
@@ -53,11 +58,12 @@ export default function LandingPreview() {
         <span className={`badge ${last.decision.kind}`}>
           {last.decision.kind}
         </span>
-        <h4>Safe to do nothing.</h4>
-        <p>
-          {last.ruleTrace.find((t) => !t.pass)?.detail ??
-            'Inspect the recorded rule trace.'}
-        </p>
+        <h4>
+          {last.decision.kind === 'REJECT'
+            ? 'Execution blocked.'
+            : 'Decision recorded.'}
+        </h4>
+        <p>{reason}</p>
         <div className="receipt-link-line" />
         <span className="micro-label">COMMITMENT</span>
         <code>{last.receiptHash.slice(0, 18)}…</code>

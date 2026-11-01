@@ -1,3 +1,4 @@
+import { ConnectLedger } from '../owner/ConnectLedger.js';
 import { LimitChart } from '../components/charts/LimitChart.js';
 import { Portfolio } from './Portfolio.js';
 import { useCallback, useEffect, useState } from 'react';
@@ -66,36 +67,76 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
           WHSK/USDT pair. Check the deployment before proceeding.
         </p>
       )}
-      <dl>
-        {Object.entries({
-          Owner: snapshot.owner,
-          Agent: m.agent,
-          Expiry: displayTime(m.expiry),
-          'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
-          'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
-          'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
-          'Exposure cap (bps)': m.maxExposureBps,
-          'Slippage cap (bps)': m.maxSlippageBps,
-          'Drawdown cap (bps)': m.maxDrawdownBps,
-          'Minimum interval (s)': String(m.minIntervalSec),
-          'Policy hash': m.policyHash,
-          Paused: String(snapshot.paused),
-          'Read block': String(snapshot.blockNumber),
-        }).map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v}</dd>
-          </div>
+      <div className="mandate-groups">
+        {[
+          {
+            title: 'Authority & expiry',
+            values: {
+              Owner: snapshot.owner,
+              Agent: m.agent,
+              Expiry: displayTime(m.expiry),
+            },
+          },
+          {
+            title: 'Trade & daily limits',
+            values: {
+              'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
+              'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
+              'USDT per UTC day': formatUnits(
+                m.maxDailyInB,
+                snapshot.decimalsB,
+              ),
+            },
+          },
+          {
+            title: 'Execution controls',
+            values: {
+              'Exposure cap (bps)': m.maxExposureBps,
+              'Slippage cap (bps)': m.maxSlippageBps,
+              'Drawdown cap (bps)': m.maxDrawdownBps,
+              'Minimum interval (s)': String(m.minIntervalSec),
+              Paused: String(snapshot.paused),
+            },
+          },
+        ].map((group) => (
+          <article className="agent-card" key={group.title}>
+            <h3>{group.title}</h3>
+            <dl>
+              {Object.entries(group.values).map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
         ))}
-      </dl>
+      </div>
+      <details className="technical-details">
+        <summary>Policy commitment & read block</summary>
+        <dl>
+          <div>
+            <dt>Policy hash</dt>
+            <dd>
+              <code>{m.policyHash}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Read block</dt>
+            <dd>{String(snapshot.blockNumber)}</dd>
+          </div>
+        </dl>
+      </details>
     </>
   );
 }
 export function MandateView({
   chain,
+  setup = false,
   onOwner,
 }: {
   chain: DashboardChain;
+  setup?: boolean;
   onOwner?: (
     d: Deployment,
     s: VaultSnapshot,
@@ -118,12 +159,35 @@ export function MandateView({
   const cfg = addresses[chain === 133 ? 133 : 177];
   return (
     <section>
-      <p className="eyebrow">01 / AUTHORITY</p>
-      <h2>The signed mandate</h2>
+      <p className="eyebrow">{setup ? 'SET MANDATE' : 'MANDATE'}</p>
+      <h1>
+        {setup ? 'Define your execution boundaries' : 'The signed mandate'}
+      </h1>
       <p>
         Execution limits set by the owner. Every trade stays within this
         envelope.
       </p>
+      {setup && !resource.data && (
+        <ol className="wizard-steps" aria-label="Mandate setup stages">
+          {[
+            'Connect',
+            'Preset',
+            'Tune limits',
+            'Compare',
+            'Review & sign',
+            'First decision',
+            'Verify',
+          ].map((label, i) => (
+            <li key={label} aria-current={i === 0 ? 'step' : undefined}>
+              {String(i + 1).padStart(2, '0')} {label}
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mandate-connection">
+        <ConnectLedger />
+        <span className="micro-label">Testnet 133 · Ledger blind signing</span>
+      </div>
       {resource.loading && (
         <p className="skeleton" role="status">
           Reading deployment and mandate…
@@ -209,24 +273,26 @@ export function MandateView({
         lastTradeAt={resource.data?.risk?.lastTradeAt}
       />
       <Portfolio chain={chain} />
-      <h3>Verified network contracts</h3>
-      <dl>
-        {Object.entries(cfg)
-          .filter(([key]) =>
-            ['primaryPool', 'quoterV2', 'whsk', 'usdt'].includes(key),
-          )
-          .map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>
-                <ContractLink
-                  chain={chain === 31337 ? 177 : chain}
-                  value={value.address}
-                />
-              </dd>
-            </div>
-          ))}
-      </dl>
+      <details className="technical-details">
+        <summary>Verified network contracts</summary>
+        <dl>
+          {Object.entries(cfg)
+            .filter(([key]) =>
+              ['primaryPool', 'quoterV2', 'whsk', 'usdt'].includes(key),
+            )
+            .map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>
+                  <ContractLink
+                    chain={chain === 31337 ? 177 : chain}
+                    value={value.address}
+                  />
+                </dd>
+              </div>
+            ))}
+        </dl>
+      </details>
     </section>
   );
 }

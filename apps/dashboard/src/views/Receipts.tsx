@@ -27,10 +27,27 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
   );
   const data = resource.data;
   const [selected, setSelected] = useState('');
+  const [verdict, setVerdict] = useState('All');
   return (
     <section>
       <p className="eyebrow">03 / AUDIT TRAIL</p>
       <h2>Decisions & receipts</h2>
+      <div
+        className="activity-filters"
+        role="group"
+        aria-label="Filter decisions"
+      >
+        {['All', ...kinds].map((kind) => (
+          <button
+            className="text-action"
+            key={kind}
+            aria-pressed={verdict === kind}
+            onClick={() => setVerdict(kind)}
+          >
+            {kind}
+          </button>
+        ))}
+      </div>
       <p>
         On-chain Receipt events joined by contract, transaction and receipt hash
         to locally served keeper records.
@@ -56,7 +73,11 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
       {data && (
         <div className="timeline">
           {data.local
-            .filter((r) => r.executionChainId === chain)
+            .filter(
+              (r) =>
+                r.executionChainId === chain &&
+                (verdict === 'All' || r.decision.kind === verdict),
+            )
             .map((r) => (
               <button
                 key={r.receiptHash}
@@ -76,49 +97,57 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
             ))}
         </div>
       )}
-      {data?.logs.map((log) => {
-        const local = data.local.find(
-          (r) =>
-            r.executionChainId === chain &&
-            r.contract.toLowerCase() === log.address.toLowerCase() &&
-            r.receiptHash === log.args.receiptHash &&
-            r.settlement?.transactionHash === log.transactionHash,
-        );
-        const href = explorerLink(chain, 'tx', log.transactionHash);
-        return (
-          <article
-            className="receipt"
-            id={local?.receiptHash}
-            key={`${log.transactionHash}-${log.logIndex}`}
-          >
-            <span className={`badge ${kinds[log.args.kind]}`}>
-              {kinds[log.args.kind]}
-            </span>
-            <h3>Receipt #{String(log.args.seq)}</h3>
-            <p>{local?.llm.explanation ?? 'Local explanation unavailable'}</p>
-            {local?.ruleTrace.map((r, i) => (
-              <p key={i}>
-                {r.pass ? 'PASS' : 'FAIL'} · {r.rule}: {r.detail}
-              </p>
-            ))}
-            <code>{log.args.receiptHash}</code>
-            <p>
-              {href ? (
-                <a href={href} target="_blank" rel="noreferrer">
-                  Transaction ↗
+      {data?.logs
+        .filter((log) => verdict === 'All' || kinds[log.args.kind] === verdict)
+        .map((log) => {
+          const local = data.local.find(
+            (r) =>
+              r.executionChainId === chain &&
+              r.contract.toLowerCase() === log.address.toLowerCase() &&
+              r.receiptHash === log.args.receiptHash &&
+              r.settlement?.transactionHash === log.transactionHash,
+          );
+          const href = explorerLink(chain, 'tx', log.transactionHash);
+          return (
+            <article
+              className="receipt"
+              id={local?.receiptHash}
+              key={`${log.transactionHash}-${log.logIndex}`}
+            >
+              <span className={`badge ${kinds[log.args.kind]}`}>
+                {kinds[log.args.kind]}
+              </span>
+              <h3>Receipt #{String(log.args.seq)}</h3>
+              <p>{local?.llm.explanation ?? 'Local explanation unavailable'}</p>
+              {local?.ruleTrace.map((r, i) => (
+                <p key={i}>
+                  {r.pass ? 'PASS' : 'FAIL'} · {r.rule}: {r.detail}
+                </p>
+              ))}
+              <code>{log.args.receiptHash}</code>
+              <p>
+                <a href={`#/verify?tx=${log.transactionHash}`}>
+                  Verify receipt →
                 </a>
-              ) : (
-                `Local Anvil transaction ${log.transactionHash}`
-              )}
-            </p>
-          </article>
-        );
-      })}
+              </p>
+              <p>
+                {href ? (
+                  <a href={href} target="_blank" rel="noreferrer">
+                    Transaction ↗
+                  </a>
+                ) : (
+                  `Local Anvil transaction ${log.transactionHash}`
+                )}
+              </p>
+            </article>
+          );
+        })}
       {data &&
         data.local
           .filter(
             (r) =>
               r.executionChainId === chain &&
+              (verdict === 'All' || r.decision.kind === verdict) &&
               !data.logs.some(
                 (l) =>
                   l.transactionHash === r.settlement?.transactionHash &&

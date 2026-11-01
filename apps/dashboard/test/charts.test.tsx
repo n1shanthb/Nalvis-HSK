@@ -28,6 +28,7 @@ vi.mock('lightweight-charts', () => ({
   createChart: () => ({
     ...api,
     addLineSeries: () => api,
+    addAreaSeries: () => api,
     timeScale: () => ({ fitContent: api.fitContent }),
   }),
 }));
