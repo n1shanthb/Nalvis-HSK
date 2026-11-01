@@ -174,6 +174,22 @@ Recorded first trade: `0xd537f6804668cda70ed14543400358a81590ad831ad925d76846272
 Constructor arguments and fork block match the T6 local setup above. No new
 remote contract address is introduced.
 
+## Nalvis mainnet deployment (177)
+
+User-signed deployments from reviewed source commit
+`7b48c95467d7be8c160e67fd0fd24481c1970aab`; both receipts have status 1.
+
+| Contract | Address | Deployment transaction |
+| --- | --- | --- |
+| EdgewiseVault | `0x8E5043edCD2710503C351b77f27958F531E0C521` | `0x6de18ac3fd8c23b5af438510007a72d0ea2490d76699ab2f5086cbb55aee7e00` |
+| ProofTradeRouter | `0x73934f4E2f51bD6191e32B1BbC2E59cA6527b88a` | `0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9` |
+
+Read-only RPC confirmed both owners equal the supplied Ledger address
+`0xE0B9226b1488E6293D4A8FD4E1720d35eaf80419`, vault router/pool match
+the registry, and initial vault receipt sequence is zero. Manifest:
+`contracts/deployments/177.json`. Both contracts verified as `exact_match` on
+Sourcify (chain 177). Agent activation and mandate remain pending.
+
 ## Display-only reference (T11)
 
 CoinGecko `hashkey-ecopoints`: `https://api.coingecko.com/api/v3/simple/price?ids=hashkey-ecopoints&vs_currencies=usd`. Public GET returned HTTP 200 with a numeric USD price on 31 Oct 2026. Display only, excluded from evidence hashes and decisions; availability, rate limits and terms remain UNVERIFIED.
