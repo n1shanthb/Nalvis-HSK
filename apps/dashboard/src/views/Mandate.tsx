@@ -66,28 +66,66 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
           WHSK/USDT pair. Check the deployment before proceeding.
         </p>
       )}
-      <dl>
-        {Object.entries({
-          Owner: snapshot.owner,
-          Agent: m.agent,
-          Expiry: displayTime(m.expiry),
-          'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
-          'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
-          'USDT per UTC day': formatUnits(m.maxDailyInB, snapshot.decimalsB),
-          'Exposure cap (bps)': m.maxExposureBps,
-          'Slippage cap (bps)': m.maxSlippageBps,
-          'Drawdown cap (bps)': m.maxDrawdownBps,
-          'Minimum interval (s)': String(m.minIntervalSec),
-          'Policy hash': m.policyHash,
-          Paused: String(snapshot.paused),
-          'Read block': String(snapshot.blockNumber),
-        }).map(([k, v]) => (
-          <div key={k}>
-            <dt>{k}</dt>
-            <dd>{v}</dd>
-          </div>
+      <div className="mandate-groups">
+        {[
+          {
+            title: 'Authority & expiry',
+            values: {
+              Owner: snapshot.owner,
+              Agent: m.agent,
+              Expiry: displayTime(m.expiry),
+            },
+          },
+          {
+            title: 'Trade & daily limits',
+            values: {
+              'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
+              'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
+              'USDT per UTC day': formatUnits(
+                m.maxDailyInB,
+                snapshot.decimalsB,
+              ),
+            },
+          },
+          {
+            title: 'Execution controls',
+            values: {
+              'Exposure cap (bps)': m.maxExposureBps,
+              'Slippage cap (bps)': m.maxSlippageBps,
+              'Drawdown cap (bps)': m.maxDrawdownBps,
+              'Minimum interval (s)': String(m.minIntervalSec),
+              Paused: String(snapshot.paused),
+            },
+          },
+        ].map((group) => (
+          <article className="agent-card" key={group.title}>
+            <h3>{group.title}</h3>
+            <dl>
+              {Object.entries(group.values).map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
         ))}
-      </dl>
+      </div>
+      <details className="technical-details">
+        <summary>Policy commitment & read block</summary>
+        <dl>
+          <div>
+            <dt>Policy hash</dt>
+            <dd>
+              <code>{m.policyHash}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Read block</dt>
+            <dd>{String(snapshot.blockNumber)}</dd>
+          </div>
+        </dl>
+      </details>
     </>
   );
 }
@@ -209,24 +247,26 @@ export function MandateView({
         lastTradeAt={resource.data?.risk?.lastTradeAt}
       />
       <Portfolio chain={chain} />
-      <h3>Verified network contracts</h3>
-      <dl>
-        {Object.entries(cfg)
-          .filter(([key]) =>
-            ['primaryPool', 'quoterV2', 'whsk', 'usdt'].includes(key),
-          )
-          .map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>
-                <ContractLink
-                  chain={chain === 31337 ? 177 : chain}
-                  value={value.address}
-                />
-              </dd>
-            </div>
-          ))}
-      </dl>
+      <details className="technical-details">
+        <summary>Verified network contracts</summary>
+        <dl>
+          {Object.entries(cfg)
+            .filter(([key]) =>
+              ['primaryPool', 'quoterV2', 'whsk', 'usdt'].includes(key),
+            )
+            .map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>
+                  <ContractLink
+                    chain={chain === 31337 ? 177 : chain}
+                    value={value.address}
+                  />
+                </dd>
+              </div>
+            ))}
+        </dl>
+      </details>
     </section>
   );
 }

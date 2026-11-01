@@ -112,7 +112,11 @@ function AppContent({
             Mainnet 177 — read-only
           </div>
         )}
-        <main key={`${chain}-${route}-${demo}`}>
+        <main
+          id="workspace-main"
+          tabIndex={-1}
+          key={`${chain}-${route}-${demo}`}
+        >
           <Suspense
             fallback={
               <div className="skeleton" role="status">

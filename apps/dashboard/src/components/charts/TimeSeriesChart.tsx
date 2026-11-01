@@ -50,7 +50,7 @@ export default function TimeSeriesChart({
     const c = createChart(host.current, {
       height: 220,
       width: host.current.clientWidth || 320,
-      layout: { background: { color: 'transparent' }, textColor: '#8b9199' },
+      layout: { background: { color: 'transparent' }, textColor: '#a4ada0' },
       timeScale: {
         timeVisible: true,
         tickMarkFormatter: (time: Time) =>
@@ -155,7 +155,7 @@ export default function TimeSeriesChart({
       api.createPriceLine({
         price: l.value,
         title: l.title,
-        color: '#8b9199',
+        color: '#a4ada0',
         lineStyle: LineStyle.Dashed,
         lineWidth: 1,
       }),
@@ -174,7 +174,7 @@ export default function TimeSeriesChart({
                 time: liveFrom,
                 position: 'belowBar' as const,
                 shape: 'arrowUp' as const,
-                color: '#75baff',
+                color: '#a8c7b3',
                 text: 'Live from here',
               },
             ]

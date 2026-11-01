@@ -1,0 +1,44 @@
+[
+  {
+    "role": "Console text",
+    "foreground": "#f2f1eb",
+    "background": "#202320",
+    "ratio": 14.03
+  },
+  {
+    "role": "Console secondary",
+    "foreground": "#b5bcb1",
+    "background": "#202320",
+    "ratio": 8.16
+  },
+  {
+    "role": "Console accent",
+    "foreground": "#b7cebc",
+    "background": "#202320",
+    "ratio": 9.5
+  },
+  {
+    "role": "Console action label",
+    "foreground": "#232a24",
+    "background": "#b7cebc",
+    "ratio": 8.8
+  },
+  {
+    "role": "Marketing text",
+    "foreground": "#232a24",
+    "background": "#f6f3eb",
+    "ratio": 13.26
+  },
+  {
+    "role": "Marketing secondary",
+    "foreground": "#5b675c",
+    "background": "#f6f3eb",
+    "ratio": 5.35
+  },
+  {
+    "role": "Marketing action label",
+    "foreground": "#ffffff",
+    "background": "#234d3b",
+    "ratio": 9.56
+  }
+]

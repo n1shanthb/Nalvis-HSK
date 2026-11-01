@@ -40,7 +40,7 @@ export function CostChart({ feed }: { feed: AgentFeed | null }) {
                   y={y(r.usd)}
                   width="32"
                   height={135 - y(r.usd)}
-                  fill="#75baff"
+                  fill="#a8c7b3"
                 />
                 <text x={45 + i * 70} y="154" fontSize="10" fill="currentColor">
                   {r.day.slice(5)}

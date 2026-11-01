@@ -72,7 +72,7 @@ export function VerifyView({
     }
   }, []);
   return (
-    <section>
+    <section className="verify-view">
       <p className="eyebrow">04 / INDEPENDENT REPLAY</p>
       <h2>Verify a receipt</h2>
       <p>
@@ -94,35 +94,49 @@ export function VerifyView({
             required
           />
         </label>
-        <label>
-          Keeper receipt JSON (optional if served locally)
-          <textarea value={json} onChange={(e) => setJSON(e.target.value)} />
-        </label>
+        <details className="receipt-input">
+          <summary>Add keeper receipt JSON</summary>
+          <label>
+            Keeper receipt JSON (optional if served locally)
+            <textarea value={json} onChange={(e) => setJSON(e.target.value)} />
+          </label>
+        </details>
         <button disabled={busy} type="submit">
           {busy ? 'Verifying…' : 'Verify on selected chain'}
         </button>
       </form>
-      <button
-        className="secondary"
-        disabled={busy}
-        onClick={() => void run(true)}
-      >
-        Replay recorded Anvil trade
-      </button>
-      <p>{mode}</p>
+      <aside className="recorded-replay">
+        <h3>Try an independent replay</h3>
+        <p>
+          Use the recorded local Anvil trade to explore verification. Offline
+          replay; prices are not real.
+        </p>
+        <button
+          className="secondary"
+          disabled={busy}
+          onClick={() => void run(true)}
+        >
+          Replay recorded Anvil trade
+        </button>
+      </aside>
+      <p role="status">{mode}</p>
       {error && <p role="alert">FAIL — {error}</p>}
       {result && (
         <div aria-live="polite">
           <h3>{result.status}</h3>
           <p>{result.label}</p>
-          <ul>
+          <p>
+            Checks run in order and stop at the first failure. Later checks are
+            not run.
+          </p>
+          <ol className="verification-checks">
             {result.checks.map((c, i) => (
               <li key={i}>
                 <b>{c.pass ? 'PASS' : 'FAIL'}</b> · {c.name}
                 {c.detail ? ` — ${c.detail}` : ''}
               </li>
             ))}
-          </ul>
+          </ol>
           {result.metrics && (
             <dl>
               {Object.entries(result.metrics).map(([key, value]) => (

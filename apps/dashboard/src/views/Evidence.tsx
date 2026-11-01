@@ -199,18 +199,6 @@ export function EvidenceView({
   }, [resource.data]);
   return (
     <section>
-      <Suspense fallback={<p>Loading market chart…</p>}>
-        <PriceChart
-          points={history}
-          actions={actions}
-          unavailable={
-            !!resource.error || (!resource.loading && !resource.data)
-          }
-        />
-      </Suspense>
-      <Suspense fallback={<p>Loading basis history…</p>}>
-        <BasisChart points={history} unavailable={!!resource.error} />
-      </Suspense>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
       <h2>Live market evidence</h2>
       <p>
@@ -253,6 +241,18 @@ export function EvidenceView({
         }
       />
       <VaultValue price={resource.data?.dexMid} />
+      <Suspense fallback={<p>Loading market chart…</p>}>
+        <PriceChart
+          points={history}
+          actions={actions}
+          unavailable={
+            !!resource.error || (!resource.loading && !resource.data)
+          }
+        />
+      </Suspense>
+      <Suspense fallback={<p>Loading basis history…</p>}>
+        <BasisChart points={history} unavailable={!!resource.error} />
+      </Suspense>
       <CoinGeckoReference />
 
       {resource.data && <EvidenceDetails e={resource.data} compact={compact} />}

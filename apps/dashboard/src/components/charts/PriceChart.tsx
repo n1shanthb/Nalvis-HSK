@@ -91,7 +91,7 @@ export default function PriceChart({
   const prices = rows.flatMap((r) => [r.dex, r.cex]);
   return (
     <ChartFrame
-      title="Live price · portfolio weight band"
+      title={`${demo || !live.length ? 'Recorded' : 'Live'} price · portfolio weight band`}
       source={
         demo ? sources.demo : live.length ? sources.market : sources.recorded
       }
@@ -135,7 +135,7 @@ export default function PriceChart({
           series={['dex', 'cex'].map((k, i) => ({
             name: k.toUpperCase(),
             precision: 6,
-            color: i ? '#75baff' : '#47a878',
+            color: i ? '#b6bcae' : '#a8c7b3',
             points: rows.map((r) => ({
               time: r.time,
               value: r[k as 'dex' | 'cex'],

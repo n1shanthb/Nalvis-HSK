@@ -2,7 +2,14 @@ import { lazy, Suspense } from 'react';
 const Preview = lazy(() => import('./LandingPreview.js'));
 export function Landing() {
   const scroll = (id: string) =>
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    document
+      .getElementById(id)
+      ?.scrollIntoView({
+        behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)')
+          .matches
+          ? 'auto'
+          : 'smooth',
+      });
   return (
     <div className="landing">
       <header className="landing-nav">
@@ -24,13 +31,6 @@ export function Landing() {
       </header>
       <main className="landing-main">
         <section className="landing-hero">
-          <div className="orbit-scene" aria-hidden="true">
-            <div className="orbit-halo" />
-            <div className="orbit-edge" />
-            <div className="orbit-planet" />
-            <div className="orbit-star star-one" />
-            <div className="orbit-star star-two" />
-          </div>
           <div className="hero-content">
             <p className="hero-tag">
               <span /> AUTONOMOUS BY DESIGN. BOUNDED BY YOU.
@@ -62,7 +62,6 @@ export function Landing() {
           className="preview-stage"
           aria-label="Recorded console preview"
         >
-          <div className="preview-glow" />
           <div className="preview-window">
             <div className="window-chrome">
               <span className="window-dots">
@@ -100,7 +99,7 @@ export function Landing() {
               Autonomy should come with an envelope. Nalvis separates what an
               agent can suggest from what it is allowed to execute.
             </p>
-            <a className="text-link" href="#/agent">
+            <a className="text-link" href="#/mandate">
               Inspect the signed mandate ↗
             </a>
           </div>
@@ -170,7 +169,6 @@ export function Landing() {
           </div>
         </section>
         <section className="landing-final">
-          <div className="final-glow" />
           <p className="landing-eyebrow">AUTONOMY, WITH A PAPER TRAIL.</p>
           <h2>
             Every decision.
