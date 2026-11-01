@@ -1,5 +1,5 @@
 import { mkdir, readFile, rename, open } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { canonical } from '../canonical.js';
 export interface Store {
@@ -14,7 +14,15 @@ export function jsonFileStore(root: string): Store {
   const base = resolve(root);
   const path = (key: string) => {
     const p = resolve(join(base, key));
-    if (!p.startsWith(base + '/')) throw new Error('Store path escapes root');
+    const rel = relative(base, p);
+    if (
+      !rel ||
+      rel === '..' ||
+      rel.startsWith('../') ||
+      rel.startsWith('..\\') ||
+      isAbsolute(rel)
+    )
+      throw new Error('Store path escapes root');
     return p;
   };
   return {
@@ -45,6 +53,8 @@ export function jsonFileStore(root: string): Store {
         await f.close();
       }
       await rename(tmp, p);
+      // Windows lacks directory fsync; hosted durable execution requires Linux.
+      if (process.platform === 'win32') return;
       const dir = await open(dirname(p), 'r');
       try {
         await dir.sync();

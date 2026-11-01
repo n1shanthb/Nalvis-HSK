@@ -25,19 +25,19 @@ import type { Action } from '../../src/agent/schema.js';
 export const anvilBin = process.env.ANVIL_BIN ?? 'anvil';
 export const hasAnvil = spawnSync(anvilBin, ['--version']).status === 0;
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
-export async function localVault() {
+export async function localVault(chainId: 31337 | 177 = 31337) {
   const server = createServer();
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const port = (server.address() as { port: number }).port;
   await new Promise<void>((r) => server.close(() => r()));
   const proc = spawn(
     anvilBin,
-    ['--port', String(port), '--chain-id', '31337', '--silent'],
+    ['--port', String(port), '--chain-id', String(chainId), '--silent'],
     { stdio: 'ignore' },
   );
   const url = `http://127.0.0.1:${port}`,
     client = createPublicClient({
-      chain: anvil,
+      chain: { ...anvil, id: chainId },
       transport: http(url, { retryCount: 0 }),
       cacheTime: 0,
     });
@@ -50,7 +50,7 @@ export async function localVault() {
     }
   }
   const wallet = createWalletClient({
-    chain: anvil,
+    chain: { ...anvil, id: chainId },
     transport: http(url, { retryCount: 0 }),
   });
   const accounts = await wallet.getAddresses();
@@ -158,7 +158,10 @@ export async function localVault() {
     simulate: (s: MandateState, p: Parameters<typeof simulate>[2], h?: Hex) =>
       simulate(client, s, p, h),
     async send(r: import('../../src/agent/receipt.js').ReceiptV3) {
-      if ((await client.getChainId()) !== 31337)
+      if (
+        (await client.getChainId()) !== chainId ||
+        !url.startsWith('http://127.0.0.1:')
+      )
         throw Error('Local test chain only');
       const data = calldata(r.final, r.receiptHash);
       await client.call({ account: agent, to: vault.address, data });

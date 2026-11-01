@@ -6,7 +6,14 @@ import {
 import { keccak256, encodeFunctionData } from 'viem';
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { createPublicClient, custom, decodeFunctionData, zeroHash } from 'viem';
+import {
+  createPublicClient,
+  custom,
+  decodeFunctionData,
+  toFunctionSelector,
+  zeroAddress,
+  zeroHash,
+} from 'viem';
 import { App } from '../src/App.js';
 import {
   MandateForm,
@@ -14,7 +21,10 @@ import {
   fieldsFor,
 } from '../src/owner/MandateForm.js';
 import { readVault, type VaultSnapshot } from '../src/lib/clients.js';
-import { vaultAbi } from '../../../packages/core/src/abi/index.js';
+import {
+  vaultAbi,
+  proofRouterAbi,
+} from '../../../packages/core/src/abi/index.js';
 import { addresses } from '../../../packages/core/src/addresses.js';
 import { VerifyView, recordedTrade } from '../src/views/Verify.js';
 import { verify } from '../../../packages/verifier/src/verify.js';
@@ -28,6 +38,11 @@ const owner = addresses[133].whsk.address,
   agent = addresses[133].usdt.address;
 export const snapshot: VaultSnapshot = {
   owner,
+  pendingOwner: zeroAddress,
+  routerOwner: owner,
+  routerPendingOwner: zeroAddress,
+  routerPolicyHash: zeroHash,
+  policiesMatch: true,
   paused: false,
   decimalsA: 18,
   decimalsB: 18,
@@ -142,6 +157,12 @@ describe('owner mandate review', () => {
     expect(() =>
       validateMandate({ ...fieldsFor(snapshot), expiry: '1' }, snapshot),
     ).toThrow('future');
+    expect(() =>
+      validateMandate(
+        { ...fieldsFor(snapshot), maxDrawdownBps: '10001' },
+        snapshot,
+      ),
+    ).toThrow('Drawdown');
   });
   test('builds revoke separately and refuses mandate widening through natural language', () => {
     render(<MandateForm chain={133} vault={owner} snapshot={snapshot} />);
@@ -230,20 +251,32 @@ describe('views', () => {
           }
           if (data.startsWith('0x70a08231'))
             return '0x' + (10n ** 18n).toString(16).padStart(64, '0');
-          if (data === '0x8da5cb5b')
+          if (data.slice(0, 10) === toFunctionSelector('owner()'))
             return encodeFunctionResult({
               abi: vaultAbi,
               functionName: 'owner',
               result: owner,
             });
-          if (data === '0x5c975abb')
+          if (data.slice(0, 10) === toFunctionSelector('pendingOwner()'))
+            return encodeFunctionResult({
+              abi: vaultAbi,
+              functionName: 'pendingOwner',
+              result: zeroAddress,
+            });
+          if (data.slice(0, 10) === toFunctionSelector('paused()'))
             return encodeFunctionResult({
               abi: vaultAbi,
               functionName: 'paused',
               result: false,
             });
-          if (data === '0x313ce567')
+          if (data.slice(0, 10) === toFunctionSelector('decimals()'))
             return '0x' + BigInt(18).toString(16).padStart(64, '0');
+          if (data.slice(0, 10) === toFunctionSelector('policyHash()'))
+            return encodeFunctionResult({
+              abi: proofRouterAbi,
+              functionName: 'policyHash',
+              result: zeroHash,
+            });
           return encodeFunctionResult({
             abi: vaultAbi,
             functionName: 'mandate',
@@ -257,10 +290,13 @@ describe('views', () => {
     const result = await readVault(
       133,
       addresses[133].primaryPool.address,
+      addresses[133].primaryPool.address,
       client as never,
     );
     expect(result.mandate).toEqual(snapshot.mandate);
     expect(result.decimalsB).toBe(18);
+    expect(result.routerPolicyHash).toBe(zeroHash);
+    expect(result.policiesMatch).toBe(true);
     expect(request).toHaveBeenCalled();
   });
 });

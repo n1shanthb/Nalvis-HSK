@@ -1,10 +1,11 @@
-import { zeroHash } from 'viem';
+import { zeroAddress, zeroHash } from 'viem';
 import { addresses } from '../../../packages/core/src/addresses.js';
 import type { VaultSnapshot } from '../src/lib/clients.js';
 export const owner = addresses[133].whsk.address,
   vault = addresses[133].primaryPool.address;
 export const snapshot: VaultSnapshot = {
   owner,
+  pendingOwner: zeroAddress,
   paused: false,
   blockNumber: 1n,
   decimalsA: 18,

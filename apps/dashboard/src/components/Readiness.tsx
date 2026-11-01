@@ -50,7 +50,9 @@ export function Readiness({
               ? 'Testnet · 133'
               : chain === 31337
                 ? 'Local Anvil · 31337'
-                : 'Mainnet · 177 · read-only'}
+                : import.meta.env.VITE_MAINNET_EXECUTION === 'true'
+                  ? 'Mainnet · 177 · real funds'
+                  : 'Mainnet · 177 · owner signing disabled'}
         </b>
       </span>
       <span className="micro-label">

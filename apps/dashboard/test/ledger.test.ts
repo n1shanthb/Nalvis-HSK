@@ -4,7 +4,12 @@ import {
   type SignedMandate,
   type OwnerProposal,
 } from '../../../packages/core/src/desk/proposal.js';
-import { keccak256, encodeFunctionData, zeroHash } from 'viem';
+import {
+  keccak256,
+  encodeFunctionData,
+  zeroAddress,
+  zeroHash,
+} from 'viem';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { serializeTransaction, hexToBytes, type Address, type Hex } from 'viem';
@@ -56,6 +61,7 @@ const done = (output: unknown) => ({
   observable: of({ status: 'completed', output }),
 });
 beforeEach(() => {
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
   Object.defineProperty(navigator, 'hid', { value: {}, configurable: true });
   mocks.connect.mockResolvedValue('session');
@@ -132,7 +138,7 @@ class MockSigner implements OwnerSigner {
     const signed = await account.signTransaction({
       ...tx,
       type: 'legacy',
-      chainId: 133,
+      chainId: tx.chainId,
     } as never);
     const parsed = parseTransaction(signed);
     return { r: parsed.r!, s: parsed.s!, v: Number(parsed.v) };
@@ -206,6 +212,33 @@ test('chain switch after signing refuses broadcast', async () => {
   expect(signer.signTransaction).toHaveBeenCalledOnce();
   expect(client.sendRawTransaction).not.toHaveBeenCalled();
   expect(signer.disconnect).toHaveBeenCalledOnce();
+});
+
+test('mainnet owner signing requires build opt-in and serializes EIP-155 chain 177', async () => {
+  const signer = new MockSigner(),
+    client = mockClient();
+  client.getChainId.mockResolvedValue(177);
+  await expect(
+    sendOwnerAction({
+      ...params,
+      chainId: 177,
+      signer,
+      client: client as never,
+    }),
+  ).rejects.toThrow();
+  expect(client.sendRawTransaction).not.toHaveBeenCalled();
+  vi.stubEnv('VITE_MAINNET_EXECUTION', 'true');
+  await sendOwnerAction({
+    ...params,
+    chainId: 177,
+    signer,
+    client: client as never,
+  });
+  const { parseTransaction } = await import('viem');
+  const args = client.sendRawTransaction.mock.calls[0] as unknown as [
+    { serializedTransaction: Hex },
+  ];
+  expect(parseTransaction(args[0].serializedTransaction).chainId).toBe(177);
 });
 test('Ledger adapter rejects mainnet serialized payload even when caller claims 133', async () => {
   const signer = await connectLedger(133);
@@ -361,6 +394,7 @@ test('a loaded desk cap proposal cannot block a manual emergency revoke', async 
       vault: params.vault,
       snapshot: {
         owner: account.address,
+        pendingOwner: zeroAddress,
         mandate,
         paused: false,
         blockNumber: 1n,

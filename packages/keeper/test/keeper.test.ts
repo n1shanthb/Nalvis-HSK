@@ -11,6 +11,7 @@ import {
   assertLocalAnvil,
   assertTestnetHuman,
   deploymentSchema,
+  loadDeployment,
 } from '../src/config.js';
 import { fixtureScenario } from '../src/demo.js';
 import { guardSigning } from '../src/execution.js';
@@ -105,6 +106,18 @@ describe('keeper safety and deterministic scenarios', () => {
     expect(() => assertLocalAnvil('http://127.0.0.1:8545')).not.toThrow();
     expect(() => deploymentSchema.parse({ vault: zeroAddress })).toThrow();
   });
+  it('loads the checked-in chain-133 deployment manifest', () => {
+    const deployment = loadDeployment(133);
+    expect(deployment.vault).toBe(
+      '0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc',
+    );
+    expect(deployment.router).toBe(
+      '0xC5Fa869C8423B41696886A7761ec31b3846f4e4B',
+    );
+    expect(deployment.agent).toBe(
+      '0x6845a4caCcEaCd6eE5407C9E217610c26964ba2a',
+    );
+  });
   it('parses CLI strictly', () => {
     expect(parseOptions(['run', '--once', '--exec', 'dry']).once).toBe(true);
     for (const argv of [
@@ -140,6 +153,7 @@ describe('keeper safety and deterministic scenarios', () => {
         expect(raw.llm.explanation).toContain('DEMO');
         expect(raw.policyHash).toBe(policyHash(policy));
         expect(receiptHash(raw)).toBe(raw.receiptHash);
+        expect(raw.tx.validUntil).toBe(raw.tx.deadline);
         expect(raw.marketDataChainId).toBe(177);
         expect(raw.executionChainId).toBe(31337);
         expect(raw.settlement).toBeUndefined();

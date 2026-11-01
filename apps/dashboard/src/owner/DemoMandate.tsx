@@ -70,6 +70,7 @@ export function DemoMandate({ setup = false }: { setup?: boolean }) {
         previewOnly
         snapshot={{
           owner: zeroAddress,
+          pendingOwner: zeroAddress,
           paused: false,
           blockNumber: 0n,
           decimalsA: 18,

@@ -106,6 +106,7 @@ export async function fitToMandate(args: {
   if (needsOwner(s)) return finish(waiting(0));
   for (let round = 1; round <= (args.rounds ?? 3); round++) {
     const common = {
+      executionChainId: s.chainId,
       provider: args.provider,
       journal: args.journal,
       round,

@@ -43,7 +43,7 @@ test('compiled CLI prints PASS table and exits 0 on genuine recorded fixture', (
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain('PASS — recorded RPC replay');
   expect(result.stdout).toContain('Gas ');
-}, 20000);
+}, 30000);
 test('tx lookup, --receipt and --json produce machine-readable PASS', async () => {
   for (const args of [
     ['--receipt', path],

@@ -13,10 +13,10 @@ import { createAgent } from '../../core/src/agent/agent.js';
 import { verify, rpcReader } from '../src/verify.js';
 import { receiptHashV3 } from '../../core/src/agent/receipt.js';
 import { canonical } from '../../core/src/canonical.js';
-it.skipIf(!hasAnvil)(
-  'v3 generated local anvil run: 3 wakes, watch edit, fitted trade, anchor and tampering',
-  async () => {
-    const h = await localVault();
+it.skipIf(!hasAnvil).each([31337, 177] as const)(
+  'v3 generated local anvil chain %i: 3 wakes, watch edit, fitted trade, anchor and tampering',
+  async (chainId) => {
+    const h = await localVault(chainId);
     try {
       const store = memoryStore();
       let config = agentConfigSchema.parse({
@@ -25,6 +25,7 @@ it.skipIf(!hasAnvil)(
         heartbeatSec: 300,
         anchorSec: 600,
         dailyLlmBudgetUsd: 10,
+        ...(chainId === 177 ? { executionChainId: 177 } : {}),
       });
       config = { ...config, policyFile: createAgentPolicy(config) };
       await h.write(h.vault, 'setMandate', [
@@ -93,7 +94,7 @@ it.skipIf(!hasAnvil)(
           }),
           collectEvidence: async () => ({
             marketDataChainId: 177,
-            executionChainId: 31337,
+            executionChainId: chainId,
             at: now,
             context: 'testnet prices not real',
           }),

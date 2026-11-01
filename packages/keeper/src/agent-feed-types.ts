@@ -1,4 +1,5 @@
 export interface AgentState {
+  executionChainId?: 133 | 177 | 31337;
   mode: 'live' | 'demo';
   state: 'online' | 'offline' | 'budget_paused' | 'needs_owner';
   provider: string;

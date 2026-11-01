@@ -13,6 +13,7 @@ import {
   type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { assertMainnetActivation } from './mainnet-guard.js';
 import {
   hash,
   addresses,
@@ -49,20 +50,25 @@ export class PreflightError extends Error {
 }
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export async function connectAgentRpc(
-  exec: 'testnet' | 'anvil',
+  exec: 'testnet' | 'anvil' | 'mainnet',
   store: Store,
   env = process.env,
 ) {
-  const expected = exec === 'testnet' ? 133 : 31337;
+  const expected = exec === 'mainnet' ? 177 : exec === 'testnet' ? 133 : 31337;
   const url =
-    exec === 'testnet'
-      ? env.HSK_TESTNET_RPC
-      : (env.ANVIL_RPC ?? 'http://127.0.0.1:8545');
+    exec === 'mainnet'
+      ? env.HSK_MAINNET_RPC
+      : exec === 'testnet'
+        ? env.HSK_TESTNET_RPC
+        : (env.ANVIL_RPC ?? 'http://127.0.0.1:8545');
   if (!url) throw new PreflightError('offline', 'HSK_TESTNET_RPC missing');
   if (expected === 31337) assertLocalAnvil(url);
   const chain = defineChain({
     id: expected,
-    name: 'Agent execution sandbox',
+    name:
+      expected === 177
+        ? 'HashKey mainnet — real funds'
+        : 'Agent execution sandbox',
     nativeCurrency: { name: 'HSK', symbol: 'HSK', decimals: 18 },
     rpcUrls: { default: { http: [url] } },
   });
@@ -73,7 +79,8 @@ export async function connectAgentRpc(
   });
   const guard = async () => {
     const actual = await client.getChainId();
-    assertWritableChain(actual);
+    if (actual === 177 && expected === 177) assertMainnetActivation(env);
+    else assertWritableChain(actual);
     if (actual !== expected)
       throw new PreflightError('offline', 'Execution chain mismatch');
     if (expected === 133) assertTestnetHuman(env);
@@ -84,7 +91,16 @@ export async function connectAgentRpc(
     throw new PreflightError('offline', 'AGENT_PRIVATE_KEY invalid');
   await guard(); // Before deriving the signer, including the OFFLINE path.
   const account = privateKeyToAccount(env.AGENT_PRIVATE_KEY as Hex);
-  const deployment = loadDeployment(expected, env.AGENT_DEPLOYMENT);
+  const deployment = loadDeployment(
+    expected,
+    env.AGENT_DEPLOYMENT,
+    expected === 177,
+  );
+  if (expected === 177 && deployment.commit !== env.MAINNET_DEPLOY_COMMIT)
+    throw new PreflightError(
+      'needs_owner',
+      'Reviewed deployment commit mismatch',
+    );
   if (
     !same(account.address, deployment.agent) ||
     same(account.address, deployment.owner) ||
@@ -100,7 +116,7 @@ export async function connectAgentRpc(
       'needs_owner',
       'VAULT_ADDRESS differs from manifest',
     );
-  if (expected === 133) {
+  if (expected === 133 || expected === 177) {
     const registry = (
       await readFile(join(repositoryRoot(), 'docs/ADDRESSES.md'), 'utf8')
     ).toLowerCase();
@@ -144,7 +160,7 @@ export async function connectAgentRpc(
   if ((await market.getChainId()) !== 177)
     throw new PreflightError('offline', 'Market RPC must be 177 read-only');
   const network = addresses[expected === 133 ? 133 : 177];
-  if (expected === 133)
+  if (expected === 133 || expected === 177)
     for (const [fn, address] of [
       ['tokenA', network.whsk.address],
       ['tokenB', network.usdt.address],
@@ -274,7 +290,8 @@ export async function connectAgentRpc(
         ownerEvents: events,
       };
     },
-    collectEvidence: () => collect([10, 25, 50, 100, 200]),
+    collectEvidence: () =>
+      collect(expected === 177 ? [0.1, 0.5, 1] : [10, 25, 50, 100, 200]),
     async quote(action, state) {
       const amountIn = amountFor(action, state),
         buy = action.type === 'BUY';
@@ -304,6 +321,8 @@ export async function connectAgentRpc(
     async send(receipt) {
       await guard();
       const s = await readState();
+      if (s.chainId !== expected || receipt.executionChainId !== expected)
+        throw Error('Receipt execution chain mismatch');
       const committed = mandateStateSchema.parse(
         await store.read(`states/${receipt.mandateCheck.stateHash}.json`),
       );

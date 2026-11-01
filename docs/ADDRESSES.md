@@ -117,7 +117,29 @@ Testnet caveats:
 
 ## Our deployments
 
-None yet. Add each one here with: chain, address, deploy tx hash, commit SHA, and constructor args.
+### HSK Testnet — chain 133
+
+Verified by read-only RPC calls on 1 Nov 2026. Both receipts succeeded in block
+`35175424`; deployed bytecode was present and both contracts report the
+temporary owner as `owner()`. The Blockscout address API confirms both
+addresses are contracts and lists the matching creation transaction hashes.
+
+| Contract | Address | Deployment transaction | Source commit |
+|---|---|---|---|
+| EdgewiseVault | `0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc` | `0xcb7480c81476eb9eb76f4ef7eab8e872e3d5c94cde4b23173b1ca9ad247c6941` | `00f79c4ea5fcced27b3e33940a62ba56928f1b7e` |
+| ProofTradeRouter | `0xC5Fa869C8423B41696886A7761ec31b3846f4e4B` | `0x24519a67fa5a3f4e050ce73249b0099503fcad08424b106ad8a9fed70cae031f` | `00f79c4ea5fcced27b3e33940a62ba56928f1b7e` |
+
+Both constructors used owner
+`0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927` and SwapRouter02
+`0xa6914E66690c6794244B5f66a09eAEbf66254237`. The vault additionally used
+pool `0xc076FB478b77633736738579c7f48D2539604a50`, WHSK
+`0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6`, test-USDT
+`0x98B6173A8B7DFc52ce8bc88f1184a918A1CCaa4F`, fee 3000, TWAP window 600,
+and zero oracle configuration. The vault mandate agent is
+`0x6845a4caCcEaCd6eE5407C9E217610c26964ba2a`; the router policy hash matches
+the configured mandate policy. Both were confirmed at block `35176631`.
+Full receipt and state details are recorded in
+[`contracts/deployments/133.json`](../contracts/deployments/133.json).
 
 ## Ephemeral local verifier fixture (chain 31337 only)
 

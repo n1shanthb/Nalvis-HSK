@@ -98,16 +98,17 @@ function decideInternal(
     trace('policy_hash', false, 'Policy differs from signed mandate');
     return finish('REJECT');
   }
-  const spent =
-    state.dailyBucket === Math.floor(executionNow / 86400)
-      ? state.dailySpentB
-      : 0n;
+  const spent = state.dailySpentB;
   const loss =
     state.dailyBucket === Math.floor(executionNow / 86400)
       ? state.dailyLossB
       : 0;
   if (spent >= m.maxDailyInB || loss >= p.dailyLossStopB) {
-    trace('daily_stop', false, 'Daily budget or loss stop exhausted');
+    trace(
+      'daily_stop',
+      false,
+      'Rolling 24-hour turnover or daily loss stop exhausted',
+    );
     return finish('REJECT');
   }
   const preset = p.presets[state.preset];

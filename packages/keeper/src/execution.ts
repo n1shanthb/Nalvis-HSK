@@ -298,7 +298,7 @@ export async function connectExecution(
         dailySpentB:
           options.target === 'router'
             ? routerDailySpentB
-            : scale(await integer('dailyNotionalB'), db, 6),
+            : scale(await integer('getRolling24hTurnover'), db, 6),
         dailyLossB: 0,
         llmValid: true,
       },
@@ -498,6 +498,8 @@ export async function connectExecution(
       };
       const buy = r.decision.direction === 'BUY_A',
         tokenIn = buy ? config.usdt.address : config.whsk.address;
+      if (r.tx.validUntil === undefined)
+        throw new Error('Missing decision expiry');
       if (options.target === 'vault')
         return encodeFunctionData({
           abi: vaultAbi,
@@ -508,12 +510,7 @@ export async function connectExecution(
               amountIn: quote.amountIn,
               minOut: r.tx.minOut,
               deadline: BigInt(r.tx.deadline),
-              validUntil: BigInt(
-                r.tx.validUntil ??
-                  (() => {
-                    throw new Error('Missing decision expiry');
-                  })(),
-              ),
+              validUntil: BigInt(r.tx.validUntil),
               nonce: r.tx.nonce,
               receiptHash: r.receiptHash,
               prevHead: r.prevHead,
@@ -536,12 +533,7 @@ export async function connectExecution(
             amountOutMinimum: r.tx.minOut,
             sqrtPriceLimitX96: 0n,
           },
-          BigInt(
-            r.tx.validUntil ??
-              (() => {
-                throw new Error('Missing decision expiry');
-              })(),
-          ),
+          BigInt(r.tx.validUntil),
           BigInt(r.tx.deadline),
         ],
       });

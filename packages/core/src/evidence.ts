@@ -1,6 +1,9 @@
 import { parseAbi, zeroAddress, type Address, type Abi } from 'viem';
 import { z } from 'zod';
-import { addresses, assertWritableChain } from './addresses.js';
+import {
+  addresses,
+  assertExecutionChain as assertWritableChain,
+} from './addresses.js';
 import { mandateSchema } from './policy.js';
 import { vaultAbi } from './abi/index.js';
 import {
@@ -137,7 +140,11 @@ export async function collectEvidence({
     throw new Error('Market client must be chain 177');
   const executionChainId = exec.chain?.id;
   assertWritableChain(executionChainId ?? 0);
-  if (executionChainId !== 133 && executionChainId !== 31337)
+  if (
+    executionChainId !== 133 &&
+    executionChainId !== 31337 &&
+    executionChainId !== 177
+  )
     throw new Error('Execution chain missing');
   const sources: Evidence['sources'] = {};
   async function capture<T>(
@@ -187,7 +194,12 @@ export async function collectEvidence({
   const execBlock = await capture(
     'executionBlock',
     {
-      url: executionChainId === 133 ? 'https://testnet.hsk.xyz' : 'local:anvil',
+      url:
+        executionChainId === 133
+          ? 'https://testnet.hsk.xyz'
+          : executionChainId === 177
+            ? 'https://mainnet.hsk.xyz'
+            : 'local:anvil',
       method: 'eth_getBlockByNumber',
       chainId: executionChainId,
     },
@@ -430,7 +442,10 @@ export async function collectEvidence({
     }
   }
   e.now = clock();
-  if(execBlock) {e.decisionTime=Number(execBlock.timestamp);e.validUntil=e.decisionTime+decisionTtlSec;}
+  if (execBlock) {
+    e.decisionTime = Number(execBlock.timestamp);
+    e.validUntil = e.decisionTime + decisionTtlSec;
+  }
   if (e.apro) e.apro.ageSec = e.now - e.apro.updatedAt;
   return evidenceSchema.parse(e);
 }

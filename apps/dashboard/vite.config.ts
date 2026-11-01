@@ -8,7 +8,7 @@ function jsonFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((f) =>
     f.isDirectory()
       ? jsonFiles(resolve(dir, f.name))
-      : f.name.endsWith('.json')
+      : f.name.endsWith('.json') && !f.name.endsWith('.simulation.json')
         ? [resolve(dir, f.name)]
         : [],
   );

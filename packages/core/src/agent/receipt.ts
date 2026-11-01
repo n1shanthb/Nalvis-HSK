@@ -13,7 +13,11 @@ export const receiptV3Schema = z
   .object({
     version: z.literal(3),
     marketDataChainId: z.literal(177),
-    executionChainId: z.union([z.literal(133), z.literal(31337)]),
+    executionChainId: z.union([
+      z.literal(133),
+      z.literal(177),
+      z.literal(31337),
+    ]),
     contract: z
       .string()
       .regex(/^0x[\da-fA-F]{40}$/)

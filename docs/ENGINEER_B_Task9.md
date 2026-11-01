@@ -51,15 +51,11 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
      - `EdgewiseVault.TradeParams`: added `uint256 validUntil` field. Reverts with `DecisionExpired()` if `block.timestamp > validUntil`.
      - `ProofTradeRouter.commitAndSwap`: updated signature to `commitAndSwap(bytes32 receiptHash, bytes32 prevHead, ExactInputSingleParams calldata p, uint256 validUntil, uint256 deadline)`. Reverts with `DecisionExpired()` if `block.timestamp > validUntil`.
    - **TypeScript & ABI Support:**
-     - `packages/core/src/abi/index.ts`: added `validUntil` signatures with backwards-compatible overloads.
+     - `packages/core/src/abi/index.ts`: updated vault/router signatures and added the rolling-turnover getter.
      - `packages/keeper/src/execution.ts`: passes `validUntil` in transaction encoding.
-     - `packages/verifier/src/verify.ts`: supports verifying both 4-arg and 5-arg calldata commitments.
+     - `packages/verifier/src/verify.ts`: receipt schema and independent canonical hashing include `validUntil`; decoded calldata is checked against the receipt.
    - **Testing Results:**
-     - Foundry unit tests: 104 passed (including tests for valid, boundary `block.timestamp == validUntil`, and expired `validUntil`).
-     - Core tests: 89 passed (1 skipped).
-     - Keeper tests: 17 passed (1 skipped).
-     - Verifier tests: 40 passed.
-     - Dashboard tests: 31 passed.
+     - Current complete test results are recorded in the "Final Task 9 recheck" section below.
 1. **Vault guardrails** (small, careful changes; update policyHash/mandate encoding, deploy + calldata scripts, TS types and verifier together; post the new mandate fields for Engineer A, who wires them into the dashboard and desk):
    - rolling **24 h turnover cap** in the mandate;
    - **minimum interval** between agent trades;
@@ -69,33 +65,28 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - **Contract & Guardrail updates:**
      - `Mandate` struct: Added `uint16 maxDrawdownBps`. Validated `<= 10_000` (reverts with `InvalidMandate()`).
      - `highWaterMark`: Tracked state variable. Initialized / reset on `setMandate(m)`, ratchets up on deposits / positive portfolio gains, adjusted down on owner `withdraw` to prevent false triggers.
-     - Circuit breaker: Evaluated pre-trade and post-trade in `_checkMandate` and `trade`. If total vault value (A valued in B at TWAP + B) < `highWaterMark * (10000 - maxDrawdownBps) / 10000`, reverts with `Drawdown()`.
-     - Turnover cap: Enforced via `dailyTurnoverInB[dayBucket] + valueInB <= mandate.maxDailyInB` on UTC calendar-day bucket (`block.timestamp / 1 days`).
+     - Circuit breaker: Evaluated before and after each trade. If total vault value (A valued in B at TWAP + B) < `highWaterMark * (10000 - maxDrawdownBps) / 10000`, reverts with `Drawdown()`.
+     - Turnover cap: Enforced against `maxDailyInB` over a rolling 24-hour window using 48 half-hour buckets.
      - Minimum interval: Enforced via `block.timestamp >= lastTradeAt + mandate.minIntervalSec`.
      - Script & Calldata: `MandateCalldata.s.sol` and test updated to support `MAX_DRAWDOWN_BPS` env var (default 2000 bps / 20%).
      - Dashboard: Updated `VaultMandate` types, `Mandate.tsx`, `MandateForm.tsx` to support `maxDrawdownBps`.
 2. **Fix the partial-fill bug:** router partial fills must not strand tokens (refund unspent input to the vault, or revert). Add a test. Re-check that de-risking sells still pass the exposure cap.
    - **Status:** COMPLETED.
-   - `ProofTradeRouter.commitAndSwap`: Added verification asserting exact token clearance `IERC20(p.tokenIn).balanceOf(address(this)) == 0` and `amountOut >= p.amountOutMinimum`, reverting with `Underfill()` if tokens are stranded.
-   - Added `MockRouter.setPartialFill` test harness and unit test `testPartialFillInputStrandingReverts` in `ProofTradeRouter.t.sol`.
+   - `ProofTradeRouter.commitAndSwap`: Requires the post-swap input balance to equal its pre-swap balance and `amountOut >= p.amountOutMinimum`, reverting with `Underfill()` if input is stranded.
+   - Added `MockRouter.setPartialFill` coverage, including tests proving partial fills revert atomically and preserve pre-funded router dust.
    - Verified that `_assertExposureAfter` preserves the de-risking exception: exposure > `maxExposureBps` is allowed if post-trade tokenA exposure in tokenB terms strictly decreases.
    - **Testing Results:**
-     - Foundry unit tests: 109 passed (0 failed).
-     - Core tests: 89 passed (1 skipped).
-     - Keeper tests: 17 passed (1 skipped).
-     - Verifier tests: 40 passed.
-     - Dashboard tests: 31 passed.
+     - Current complete test results are recorded in the "Final Task 9 recheck" section below.
 3. **Foundry invariant/fuzz tests:** agent can never withdraw or send funds anywhere except swaps back into the vault; no trading after expiry/revoke/pause or with an expired decision; per-trade cap, turnover cap, min interval and drawdown breaker enforced; random mandates never allow slippage > 100 bps.
    - **Status:** COMPLETED.
    - Invariant test suite: `contracts/test/invariant/VaultInvariant.t.sol` + `VaultHandler.sol`.
-     - **6 invariants:** router allowance always zero, slippage cap ≤ 100 bps, drawdown bps ≤ 10000, owner preserved, daily turnover cap, receipt chain integrity.
-     - VaultHandler drives 9 handler actions: trade (with intentionally expired validUntil), commitHold, agentAttemptWithdraw, strangerActions, deposit, ownerWithdraw, setPaused, warp, attemptSetMandate.
+     - **12 invariants:** vault custody, router allowance always zero, slippage cap ≤ 100 bps, drawdown cap, owner preserved, rolling turnover cap, receipt/nonce integrity, min interval, inactive mandate, expired decision, per-trade cap and drawdown breaker.
+     - VaultHandler drives 10 handler actions: trade (including intentionally expired validUntil), commitHold, agentAttemptWithdraw, strangerActions, deposit, ownerWithdraw, setPaused, revoke, warp and attemptSetMandate.
    - Fuzz test suite: `contracts/test/unit/VaultFuzz.t.sol`.
-     - 5 fuzz tests: MandateSlippageCap, MandateDrawdownCap, DecisionExpiry, PerTradeCap, MinInterval, AgentCannotWithdraw.
+     - 7 fuzz tests: mandate slippage/drawdown caps, decision expiry, per-trade cap, rolling turnover across midnight, minimum interval and agent withdrawal denial.
    - Added `getMandate()` external view helper to `EdgewiseVault.sol` so test contracts can read the full struct (Solidity public struct getter returns a tuple, not the struct type).
    - **Testing Results:**
-     - `forge test --match-path 'test/unit/*'`: 115 tests passed (0 failed) — includes all 6 new fuzz tests.
-     - `forge test --match-path 'test/invariant/*'`: 1 invariant suite passed (0 failed), 42s run with 256 fuzz sequences.
+     - Current complete test results are recorded in the "Final Task 9 recheck" section below.
 4. Regenerate anvil fixtures from **real** anvil txs if contract changes break them.
 5. `scripts/verify-blockscout.sh`: `forge verify-contract` commands for vault / router / ReceiptChain on testnet 133 and mainnet 177 (to be run after deploy).
    - **Status:** COMPLETED.
@@ -109,13 +100,14 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - Added mandate field reference section documenting `maxDrawdownBps`, `maxSlippageBps`, `minIntervalSec`, `maxDailyInB`.
    - `MandateCalldata.s.sol` already updated in Phase 1 to read `MAX_DRAWDOWN_BPS` env var (default 2000).
 7. **Full practice deploy on testnet (chain 133), no Ledger** — the dress rehearsal for Nishanth's real run. Do it after your Task 9 contracts are final:
-   - Use **two fresh throwaway testnet wallets** of your own: one as practice *owner*, one as practice *agent*. Fund them from https://hskchain.net/faucet (0.1 HSK/day each; ask Nishanth if you run short). Never use a wallet holding real funds; never commit keys.
-   - Follow `scripts/testnet-bootstrap.md` **exactly as written**, top to bottom, substituting the throwaway owner for the Ledger. Deploy vault / router / ReceiptChain, sign the mandate with the throwaway owner, run the keeper until you get at least one real TRADE, WAIT, RESIZE and REJECT receipt, run `nalvis verify <txHash>` on each (expect PASS), then pause → revoke → confirm an agent trade reverts.
+   - The configured temporary deployment owner is `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927`; the intended final owner is Nishanth's Ledger address, to be supplied and independently verified later.
+   - Both contracts use two-step ownership transfer. After deployment, the temporary owner must call `transferOwnership(LEDGER_ADDRESS)` on each contract, and Nishanth must call `acceptOwnership()` on each contract from the Ledger. These are four separate owner-authorized transactions; verify each `owner()` and cleared `pendingOwner()` before configuring the mandate.
+   - Follow `scripts/testnet-bootstrap.md` only after that ownership blocker is resolved. Never use a wallet holding real funds; never commit keys.
    - Run `scripts/verify-blockscout.sh` against the practice contracts.
    - **Fix the runbook** wherever a step was wrong, missing or confusing, and note gas used + HSK spent per step, so Nishanth's Ledger run is a straight copy.
    - Save results to `deployments/133-practice.json` (clearly labelled PRACTICE, throwaway owner, not the demo deployment) and `docs/PRACTICE-DEPLOY.md` (every tx hash with explorer link https://testnet-explorer.hsk.xyz, verify output, problems hit, fixes made). Only real tx hashes, never invented.
    - Chain 133 only. **Never broadcast on mainnet 177.**
-   - **Status:** PENDING — Requires Nishanth to supply testnet wallet credentials.
+   - **Status:** PENDING — Two-step ownership handover is implemented in both contracts; practice deployment and handover remain pending.
 
 ### Review Resolutions & Implementation Summary
 
@@ -159,7 +151,7 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
 6. **Regenerated Anvil Fixtures & Verifier Compatibility:**
    - Cleaned up obsolete legacy ABI overloads in `packages/core/src/abi/index.ts`.
    - Regenerated real Anvil fork fixtures with updated ABIs and preserved transaction hashes.
-   - Added explicit TODO and handoff note in `packages/keeper/src/execution.ts` for Engineer A to implement genuine off-chain decision expiry after PR #9 merges.
+   - Keeper receipts now populate a separate, hash-committed `validUntil`; executor calldata passes it explicitly.
    - All 40 verifier tests, 89 core tests, 17 keeper tests, and 31 dashboard tests pass.
 
 7. **Practice Deployment Preparation:**
@@ -173,7 +165,26 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
 - [x] Phase 2: Invariant & fuzz test suite
 - [x] Phase 3: Review blockers resolved (dust griefing, TWAP withdrawal resilience, rolling 24h turnover, calibrated calldata)
 - [x] Phase 4: Regenerated Anvil fixtures & legacy ABI cleanup
-- [ ] Phase 5: Practice testnet deploy rehearsal (awaiting Prithiv's explicit broadcast authorization)
+- [x] Phase 5: Local HSK Testnet fork rehearsal for TRADE, RESIZE, WAIT, REJECT and pause/revoke reverts (13 tests pass; no broadcast).
+- [ ] Live chain-133 practice receipts remain blocked by zero vault token balances and the need for explicit owner/agent transaction authorization. No Ledger transfer or real Testnet execution was performed.
+
+## Final Task 9 recheck (1 Nov 2026)
+
+- Added rolling 24-hour turnover to off-chain engine state handling and keeper
+  reads; UTC midnight no longer resets the turnover guard. The on-chain ring
+  buffer now stores full-width `uint256` notionals.
+- `validUntil` is committed in new receipt hashes and verified independently
+  against vault/router calldata. Historical receipts without that field remain
+  supported using their deadline as the prior expiry value.
+- Dashboard mandate review validates the drawdown cap and displays turnover as
+  a rolling 24-hour limit. ABI exports and deployment/bootstrap read commands
+  include `getRolling24hTurnover()`.
+- Verification results: `forge test` 155 passed / 1 optional fork skip;
+  chain-133 fork integration 13/13 passed; `pnpm test` 181 passed / 2 optional
+  RPC skips; `pnpm -r build`, `pnpm lint` and `forge fmt --check` passed.
+- No Testnet transaction, funding, owner change, or Ledger interaction was
+  initiated. Fork receipts are simulations and must not be presented as mined
+  chain-133 evidence.
 
 
 

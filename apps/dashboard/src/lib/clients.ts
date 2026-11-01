@@ -12,7 +12,11 @@ import {
   hskMainnet,
   hskTestnet,
 } from '../../../../packages/core/src/chains.js';
-import { vaultAbi, erc20Abi } from '../../../../packages/core/src/abi/index.js';
+import {
+  vaultAbi,
+  proofRouterAbi,
+  erc20Abi,
+} from '../../../../packages/core/src/abi/index.js';
 import addressBook from '../../../../docs/ADDRESSES.md?raw';
 
 export type DashboardChain = 133 | 177 | 31337;
@@ -59,18 +63,21 @@ const deploymentSchema = z.object({
 });
 export type Deployment = z.infer<typeof deploymentSchema>;
 export class DeploymentError extends Error {
-  constructor(public readonly kind: 'missing' | 'unverified') {
+  constructor(
+    public readonly kind: 'missing' | 'unverified',
+    chain = 133,
+  ) {
     super(
       kind === 'missing'
-        ? 'Not deployed on 133 yet'
+        ? `Not deployed on ${chain} yet`
         : 'Deployment not verified against docs/ADDRESSES.md',
     );
   }
 }
 export async function readJSON(path: string): Promise<unknown> {
   const response = await fetch(path, { signal: AbortSignal.timeout(15000) });
-  if (response.status === 404 && path === '/deployments/133.json')
-    throw new DeploymentError('missing');
+  if (response.status === 404 && /^\/deployments\/(133|177)\.json$/.test(path))
+    throw new DeploymentError('missing', path.includes('177') ? 177 : 133);
   if (
     !response.ok ||
     !(response.headers.get('content-type') ?? '').includes('json')
@@ -113,6 +120,11 @@ export type VaultMandate = {
 export type VaultSnapshot = {
   mandate: VaultMandate;
   owner: Address;
+  pendingOwner: Address;
+  routerOwner?: Address;
+  routerPendingOwner?: Address;
+  routerPolicyHash?: `0x${string}`;
+  policiesMatch?: boolean;
   paused: boolean;
   decimalsA: number;
   decimalsB: number;
@@ -126,11 +138,26 @@ export type VaultSnapshot = {
 export async function readVault(
   chain: DashboardChain,
   vault: Address,
-  client: PublicClient<Transport, Chain> = clientFor(chain),
+  routerOrClient?: Address | PublicClient<Transport, Chain>,
+  providedClient?: PublicClient<Transport, Chain>,
 ): Promise<VaultSnapshot> {
+  const router =
+    typeof routerOrClient === 'string' ? routerOrClient : undefined;
+  const client =
+    typeof routerOrClient === 'string'
+      ? (providedClient ?? clientFor(chain))
+      : (routerOrClient ?? providedClient ?? clientFor(chain));
   if ((await client.getChainId()) !== chain) throw Error('RPC chain mismatch');
   const blockNumber = await client.getBlockNumber();
-  const read = <F extends 'owner' | 'paused' | 'mandate' | 'tokenA' | 'tokenB'>(
+  const read = <
+    F extends
+      | 'owner'
+      | 'pendingOwner'
+      | 'paused'
+      | 'mandate'
+      | 'tokenA'
+      | 'tokenB',
+  >(
     functionName: F,
   ) =>
     client.readContract({
@@ -139,13 +166,43 @@ export async function readVault(
       functionName,
       blockNumber,
     });
-  const [owner, paused, raw, tokenA, tokenB] = await Promise.all([
+  const [
+    owner,
+    pendingOwner,
+    paused,
+    raw,
+    tokenA,
+    tokenB,
+  ] = await Promise.all([
     read('owner'),
+    read('pendingOwner'),
     read('paused'),
     read('mandate'),
     read('tokenA'),
     read('tokenB'),
   ]);
+  const routerState = router
+    ? await Promise.all([
+        client.readContract({
+          address: router,
+          abi: proofRouterAbi,
+          functionName: 'owner',
+          blockNumber,
+        }),
+        client.readContract({
+          address: router,
+          abi: proofRouterAbi,
+          functionName: 'pendingOwner',
+          blockNumber,
+        }),
+        client.readContract({
+          address: router,
+          abi: proofRouterAbi,
+          functionName: 'policyHash',
+          blockNumber,
+        }),
+      ])
+    : undefined;
   const cfg = addresses[chain === 133 ? 133 : 177];
   const [decimalsA, decimalsB] = await Promise.all(
     [tokenA as Address, tokenB as Address].map((token) =>
@@ -200,6 +257,17 @@ export async function readVault(
       String(tokenA).toLowerCase() !== cfg.whsk.address.toLowerCase() ||
       String(tokenB).toLowerCase() !== cfg.usdt.address.toLowerCase(),
     owner: owner as Address,
+    pendingOwner: pendingOwner as Address,
+    ...(routerState
+      ? {
+          routerOwner: routerState[0] as Address,
+          routerPendingOwner: routerState[1] as Address,
+          routerPolicyHash: routerState[2] as `0x${string}`,
+          policiesMatch:
+            policyHash.toLowerCase() ===
+            (routerState[2] as `0x${string}`).toLowerCase(),
+        }
+      : {}),
     paused: paused as boolean,
     mandate: {
       agent,

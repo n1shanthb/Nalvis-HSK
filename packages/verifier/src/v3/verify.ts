@@ -40,6 +40,7 @@ import {
   STRATEGIST_PROMPT_V1,
   FITTER_PROMPT_V1,
   FITTER_REPLY_PROMPT_V1,
+  executionPrompt,
 } from '../../../core/src/agent/strategist.js';
 import type { Store } from '../../../core/src/agent/store.js';
 import { agentPolicyHash } from '../../../core/src/agent/policy.js';
@@ -69,6 +70,7 @@ export async function verifyV3(
   try {
     const r = receiptV3Schema.parse(input);
     result.receiptV3 = r;
+    result.label = `${r.executionChainId === 177 ? 'mainnet — real funds' : r.executionChainId === 133 ? 'testnet — prices not real' : 'local anvil — prices not real'}. ${modelNotice}`;
     require('v3_artifact_store', !!store, 'Pass the agent artifact root; journal/prompts/evidence/states/policy are required');
     require('v3_receipt_hash', receiptHashV3(r) === r.receiptHash);
     require('v3_chain_id', (await reader.chainId()) === r.executionChainId);
@@ -81,8 +83,10 @@ export async function verifyV3(
     const definition = policy.strategy;
     require('v3_strategy', definition.provider === r.strategy.provider &&
       equal(definition.models, r.strategy.models) &&
-      definition.STRATEGIST_PROMPT_V1 === STRATEGIST_PROMPT_V1 &&
-      definition.FITTER_PROMPT_V1 === FITTER_PROMPT_V1 &&
+      definition.STRATEGIST_PROMPT_V1 ===
+        executionPrompt(STRATEGIST_PROMPT_V1, r.executionChainId) &&
+      definition.FITTER_PROMPT_V1 ===
+        executionPrompt(FITTER_PROMPT_V1, r.executionChainId) &&
       definition.schemaVersion === 1);
     const entries: JournalEntry[] = (await store!.text('journal.jsonl'))
       .trim()
@@ -174,8 +178,10 @@ export async function verifyV3(
           FITTER_PROMPT_V1,
           FITTER_REPLY_PROMPT_V1,
         };
-        require('v3_prompt_version', systems[String(d.promptVersion)] ===
-          prompt.system);
+        require('v3_prompt_version', executionPrompt(
+          systems[String(d.promptVersion)],
+          r.executionChainId,
+        ) === prompt.system);
         require('v3_output_hash', typeof d.rawOutput === 'string' &&
           outputHash(d.rawOutput) === d.outputHash &&
           Buffer.byteLength(d.rawOutput) <= 8192);

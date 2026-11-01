@@ -44,6 +44,7 @@ export function replay(history: Hour[], curve: MeasuredCurve, policy: Policy) {
     dailyLossB: 0,
     llmValid: true,
   };
+  let turnover: { bucket: number; notionalB: bigint }[] = [];
   const counts = { TRADE: 0, RESIZE: 0, WAIT: 0, REJECT: 0 };
   let last = history[0].dex,
     lastSwapAt = history[0].hour,
@@ -97,11 +98,20 @@ export function replay(history: Hour[], curve: MeasuredCurve, policy: Policy) {
       }
     const before =
       Number(state.balanceB) / 1e6 + (Number(state.balanceA) / 1e18) * x.dex;
-    if (state.dailyBucket !== Math.floor(x.hour / 86400)) {
-      state.dailySpentB = 0n;
-      state.dailyBucket = Math.floor(x.hour / 86400);
+    const lossBucket = Math.floor(x.hour / 86400);
+    if (state.dailyBucket !== lossBucket) {
+      state.dailyBucket = lossBucket;
       dayStart = before;
     }
+    const turnoverBucket = Math.floor(x.hour / 1800);
+    turnover = turnover.filter(
+      (entry) =>
+        turnoverBucket >= entry.bucket && turnoverBucket - entry.bucket < 48,
+    );
+    state.dailySpentB = turnover.reduce(
+      (total, entry) => total + entry.notionalB,
+      0n,
+    );
     state.dailyLossB = Math.max(0, dayStart - before);
     const decision = decide(e, policy, m, state);
     counts[decision.kind]++;
@@ -117,7 +127,9 @@ export function replay(history: Hour[], curve: MeasuredCurve, policy: Policy) {
         state.balanceB += quote.quotedOut;
       }
       state.lastTradeAt = x.hour;
-      state.dailySpentB += units(decision.sizeB!, 6);
+      const notionalB = units(decision.sizeB!, 6);
+      turnover.push({ bucket: turnoverBucket, notionalB });
+      state.dailySpentB += notionalB;
     }
     const equity =
       Number(state.balanceB) / 1e6 + (Number(state.balanceA) / 1e18) * x.dex;

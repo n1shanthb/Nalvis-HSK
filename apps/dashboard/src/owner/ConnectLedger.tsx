@@ -6,16 +6,18 @@ import { connectLedger } from './ledger.js';
 import { clientFor, loadDeployment } from '../lib/clients.js';
 import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
 export function ConnectLedger({
+  chain = 133,
   vault,
   signerFactory = connectLedger,
   readOwner = async (address: Address) =>
-    clientFor(133).readContract({
+    clientFor(chain).readContract({
       address,
       abi: vaultAbi,
       functionName: 'owner',
     }),
   onAddress,
 }: {
+  chain?: 133 | 177 | 31337;
   vault?: Address;
   signerFactory?: typeof connectLedger;
   readOwner?: (vault: Address) => Promise<Address>;
@@ -31,7 +33,7 @@ export function ConnectLedger({
     setBusy(true);
     setMessage('');
     try {
-      const signer = await signerFactory(133);
+      const signer = await signerFactory(chain);
       let account: Address;
       try {
         account = await signer.address();
@@ -41,7 +43,7 @@ export function ConnectLedger({
       setAddress(account);
       onAddress?.(account);
       try {
-        const target = vault ?? (await loadDeployment(133)).vault;
+        const target = vault ?? (await loadDeployment(chain)).vault;
         const owner = await readOwner(target);
         setMessage(
           owner.toLowerCase() === account.toLowerCase()

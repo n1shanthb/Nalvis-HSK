@@ -16,3 +16,7 @@ contracts/deployments/31337.json
 coverage/
 
 .agent-state/
+.mainnet-tools/
+mainnet-*.log
+policy/agent-mainnet-v3.json
+contracts/deployments/177.simulation.json

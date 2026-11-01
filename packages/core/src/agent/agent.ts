@@ -2,7 +2,7 @@ import { MandateStateReadError } from './turnover.js';
 import { decide } from '../engine.js';
 import { zeroHash, formatUnits, type Hex } from 'viem';
 import { hash } from '../canonical.js';
-import { assertWritableChain } from '../addresses.js';
+import { assertExecutionChain as assertWritableChain } from '../addresses.js';
 import type { Provider } from './provider.js';
 import type { Store } from './store.js';
 import { createJournal } from './journal.js';
@@ -197,7 +197,7 @@ export async function createAgent({
     if (budget.debounced) return;
     await state(
       config.mode === 'rules-demo' ? 'DEMO' : 'ONLINE',
-      'testnet sandbox; prices are not real',
+      'Execution environment is recorded in the receipt; limits remain enforced',
       now,
     );
     const ownerIds = fired
@@ -234,6 +234,8 @@ export async function createAgent({
     let local: Hex;
     try {
       local = validateAgentPolicy(config);
+      if (s.chainId === 177 && config.executionChainId !== 177)
+        throw new Error('Mainnet strategy policy required');
       if (provider.id !== 'openrouter')
         throw new Error('Provider differs from signed strategy');
       if (provider.models && hash(provider.models) !== hash(config.models))
@@ -247,6 +249,7 @@ export async function createAgent({
       return;
     }
     const common = {
+      executionChainId: s.chainId,
       provider,
       journal,
       now,
