@@ -4,7 +4,12 @@ import {
   type SignedMandate,
   type OwnerProposal,
 } from '../../../packages/core/src/desk/proposal.js';
-import { keccak256, encodeFunctionData, zeroHash } from 'viem';
+import {
+  keccak256,
+  encodeFunctionData,
+  zeroAddress,
+  zeroHash,
+} from 'viem';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { serializeTransaction, hexToBytes, type Address, type Hex } from 'viem';
@@ -389,6 +394,7 @@ test('a loaded desk cap proposal cannot block a manual emergency revoke', async 
       vault: params.vault,
       snapshot: {
         owner: account.address,
+        pendingOwner: zeroAddress,
         mandate,
         paused: false,
         blockNumber: 1n,

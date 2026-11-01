@@ -420,10 +420,10 @@ export async function verify(
       coreHash === keccak256(toBytes(canonicalCheck(independent))),
     );
     check('receiptHash', coreHash === r.receiptHash);
-    check(
-      'receipt_version',
-      r.version === 2 || legacyReceiptHashes.has(r.receiptHash),
-    );
+    const receiptVersionValid =
+      r.version === 2 || legacyReceiptHashes.has(r.receiptHash);
+    if (receiptVersionValid || r.tx.validUntil === undefined)
+      check('receipt_version', receiptVersionValid);
     current = 'replay_snapshot';
     const evidence = parseEvidenceJSON(canonical(r.evidence));
     const raw = z
@@ -443,10 +443,11 @@ export async function verify(
         mandate.policyHash === r.policyHash,
     );
     if (
-      r.version === 2 ||
-      evidence.validUntil !== undefined ||
-      r.tx.validUntil !== undefined ||
-      r.decision.validUntil !== undefined
+      receiptVersionValid &&
+      (r.version === 2 ||
+        evidence.validUntil !== undefined ||
+        r.tx.validUntil !== undefined ||
+        r.decision.validUntil !== undefined)
     )
       check(
         'decision_expiry',
@@ -504,7 +505,7 @@ export async function verify(
         'decisionTime must equal the committed execution snapshot block timestamp',
       );
     }
-    if (r.tx.validUntil !== undefined) {
+    if (receiptVersionValid && r.tx.validUntil !== undefined) {
       const at = reader.timestamp
         ? await reader.timestamp(mined.blockNumber)
         : undefined;
@@ -548,6 +549,7 @@ export async function verify(
     );
     for (const key of ['receiptHash', 'prevHead', 'seq', 'policyHash'] as const)
       check(`event_${key}`, same(ev[key], r[key]));
+    if (!receiptVersionValid) check('receipt_version', false);
     check(
       'event_kind',
       ev.kind ===
@@ -628,6 +630,11 @@ export async function verify(
             p.kind === ev.kind,
         );
       else {
+        const validUntil = (
+          call.args!.length > 4
+            ? call.args![3]
+            : (r.tx.validUntil ?? r.tx.deadline)
+        ) as bigint;
         const deadline = (
           call.args!.length > 4 ? call.args![4] : call.args![3]
         ) as bigint;
@@ -635,8 +642,10 @@ export async function verify(
           'calldata_commitment',
           same(call.args![0], r.receiptHash) &&
             same(call.args![1], r.prevHead) &&
+            validUntil === BigInt(r.tx.validUntil ?? r.tx.deadline) &&
             deadline === BigInt(r.tx.deadline) &&
-            (r.tx.validUntil === undefined ||
+            (call.args!.length <= 4 ||
+              r.tx.validUntil === undefined ||
               call.args![3] === BigInt(r.tx.validUntil)) &&
             ev.kind === 0,
         );

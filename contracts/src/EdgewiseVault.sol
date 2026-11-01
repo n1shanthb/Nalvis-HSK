@@ -12,7 +12,8 @@ import {FullMath} from "./lib/FullMath.sol";
 
 /// @notice Owner-governed, pair-scoped trading with atomic receipt commitments.
 contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
-    address public immutable owner;
+    address public owner;
+    address public pendingOwner;
     address public immutable router;
     address public immutable pool;
     address public immutable tokenA;
@@ -58,11 +59,12 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
 
     struct TurnoverSlot {
         uint32 epochBucket;
-        uint224 notionalB;
+        uint256 notionalB;
     }
     TurnoverSlot[48] private _turnoverSlots;
     uint256 public highWaterMark;
     error Unauthorized();
+    error InvalidOwner();
     error InvalidConfig();
     error InvalidMandate();
     error Inactive();
@@ -81,6 +83,8 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     event MandateSet(Mandate mandate);
     event Revoked();
     event Paused(bool paused);
+    event OwnershipTransferStarted(address indexed owner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
         _;
@@ -120,6 +124,7 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         unitA = 10 ** da;
         unitB = 10 ** db;
         owner = owner_;
+        emit OwnershipTransferred(address(0), owner_);
         router = router_;
         pool = pool_;
         tokenA = tokenA_;
@@ -139,6 +144,24 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
     /// @notice Most recent receipt chain head.
     function head() external view returns (bytes32) {
         return chain.head;
+    }
+
+    /// @notice Nominate the next owner; pass address(0) to cancel a pending transfer.
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner != address(0) && (newOwner == owner || newOwner == mandate.agent)) revert InvalidOwner();
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @notice Accept ownership as the nominated address.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner || msg.sender == address(0) || msg.sender == mandate.agent) {
+            revert Unauthorized();
+        }
+        address previousOwner = owner;
+        owner = msg.sender;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, msg.sender);
     }
 
     /// @notice Replace the mandate, preserving nonce, interval and daily spend history, resetting highWaterMark.
@@ -370,10 +393,10 @@ contract EdgewiseVault is ReceiptChain, ReentrancyGuard {
         uint256 slotIdx = currentBucket % 48;
         TurnoverSlot storage s = _turnoverSlots[slotIdx];
         if (s.epochBucket == currentBucket) {
-            s.notionalB += uint224(notionalB);
+            s.notionalB += notionalB;
         } else {
             s.epochBucket = currentBucket;
-            s.notionalB = uint224(notionalB);
+            s.notionalB = notionalB;
         }
     }
 

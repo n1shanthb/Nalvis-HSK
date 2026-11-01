@@ -7,6 +7,13 @@ real-funds transfer, real Ledger signature or model request was made by Codex.
 
 ## Implemented and tested
 
+PR #18 is integrated into this readiness branch. New mainnet deployments use the
+combined source, including two-step ownership transfer and full-width turnover
+accounting. The recorded testnet deployment identifies its own earlier source
+commit; its addresses are not mainnet deployments. Agent strategy modes can be
+added off-chain later without redeploying these contracts, with a new signed
+policy authorizing the mode definitions. Reconciliation adds no trading limits.
+
 - Dedicated DeployMainnet.s.sol: chain 177 only, explicit acknowledgment, distinct
   roles, registry addresses, 18/6 decimals, 600-second TWAP and zero oracle. APRO
   normal contract calls revert; no APRO protection is claimed. Testnet deploy unchanged.

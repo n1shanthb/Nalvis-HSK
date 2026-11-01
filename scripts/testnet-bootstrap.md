@@ -23,6 +23,12 @@ keeper variable, not the always-on service's signer variable.
 Set public `OWNER_ADDRESS`, `DEPLOYER_ADDRESS`, `AGENT_ADDRESS`, and the documented
 `HSK_TESTNET_RPC`/`HSK_MAINNET_RPC`. All token, pool, quoter and router addresses
 come from the single config backed by [ADDRESSES](../docs/ADDRESSES.md).
+The owner, deployer and agent must be three distinct addresses. Use only
+human-approved, existing signers; do not generate substitute keys. For an
+existing deployment, verify both contract owners and pending owners before
+proceeding. Any ownership handover is a separate, explicitly authorized
+two-step action; follow [OWNERSHIP-HANDOVER](../docs/OWNERSHIP-HANDOVER.md).
+Do not redeploy contracts already present in the verified manifest.
 
 Claim test HSK from https://faucet.hsk.xyz (redirects to
 https://faucet.hashkeychain.net). Faucet remains **UNVERIFIED**. Before setup:
@@ -114,6 +120,12 @@ Never use the deployer or agent key for owner actions. Save the mandate tx hash.
 Read back `mandate()` and confirm exact hash/caps. A stale expiry, policy mismatch,
 paused/revoked mandate or wrong signer shows NEEDS_OWNER and prevents execution.
 
+On the existing practice deployment, the temporary owner and pending-owner
+state must be checked before any owner action. If ownership handover is required,
+stop and follow [OWNERSHIP-HANDOVER](../docs/OWNERSHIP-HANDOVER.md) only after
+the Ledger address is independently verified and the human explicitly authorizes
+the transactions.
+
 ## 4. Register, start, confirm first wake/anchor and verify
 
 Add verified vault **and** ProofTradeRouter rows to
@@ -138,6 +150,12 @@ pnpm keeper agent --exec testnet
 No key means OFFLINE and zero sends. `tick` polls watches; it wakes only on eligible
 conditions, including heartbeat/owner events. Confirm `/feed/state`, active watches,
 journal entries and the first wake/WAIT anchor or trade. Stop cleanly before freeze:
+
+Task 9 guardrails remain mandatory: `maxDrawdownBps` limits loss from the vault
+high-water mark; `maxSlippageBps` is contract-capped at 100 bps; and
+`minIntervalSec` is enforced between trades. Although the mandate field is named
+`maxDailyInB`, it represents rolling 24-hour turnover, not a UTC calendar-day
+reset. Trade `validUntil` is enforced on-chain and committed in new receipt hashes.
 
 ```sh
 pnpm keeper export-agent --chain 133

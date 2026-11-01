@@ -96,6 +96,11 @@ contract VaultInvariantTest is StdInvariant, Test {
         assertFalse(handler.ghost_tradeSucceededWhileInactive(), "Trade executed under inactive mandate");
     }
 
+    /// @notice Invariant: A decision cannot execute after its validUntil timestamp.
+    function invariant_expiredDecisionNeverTrades() public view {
+        assertFalse(handler.ghost_tradeSucceededWithExpiredDecision(), "Expired decision executed");
+    }
+
     /// @notice Invariant 6: Per-trade caps are never bypassed
     function invariant_perTradeCapNeverBypassed() public view {
         assertFalse(handler.ghost_tradeExceededPerTradeCap(), "Per trade cap exceeded");
@@ -126,7 +131,7 @@ contract VaultInvariantTest is StdInvariant, Test {
         }
     }
 
-    /// @notice Invariant 11: Vault owner is immutable / preserved
+    /// @notice Invariant 11: Vault owner remains unchanged when no transfer is requested.
     function invariant_ownerPreserved() public view {
         assertEq(vault.owner(), owner, "Vault owner mutated");
     }

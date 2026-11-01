@@ -54,6 +54,13 @@ describe('recorded genuine T5 fork execution', () => {
       'receiptHash',
     ],
     [
+      'validUntil',
+      (r: typeof trade) => {
+        r.tx.validUntil = r.tx.deadline - 1;
+      },
+      'receiptHash',
+    ],
+    [
       'prevHead',
       (r: typeof trade) => {
         r.prevHead = hash('wrong');
@@ -117,6 +124,13 @@ describe('recorded genuine T5 fork execution', () => {
         r.tx.minOut = String(BigInt(r.tx.minOut) + 1n);
       },
       'receipt_version',
+    ],
+    [
+      'validUntil',
+      (r: typeof trade) => {
+        r.tx.validUntil = r.tx.deadline - 1;
+      },
+      'event_receiptHash',
     ],
     [
       'prevHead',

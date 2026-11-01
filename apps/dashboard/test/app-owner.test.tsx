@@ -1,7 +1,7 @@
 import '../src/owner/MandateForm.js';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { keccak256, zeroHash } from 'viem';
+import { keccak256, zeroAddress, zeroHash } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { addresses } from '../../../packages/core/src/addresses.js';
 import {
@@ -66,6 +66,7 @@ beforeEach(() => {
   });
   vi.mocked(clients.readVault).mockResolvedValue({
     owner,
+    pendingOwner: zeroAddress,
     mandate,
     paused: false,
     decimalsA: 18,

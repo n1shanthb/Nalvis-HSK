@@ -73,6 +73,9 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
             title: 'Authority & expiry',
             values: {
               Owner: snapshot.owner,
+              'Vault pending owner': snapshot.pendingOwner,
+              'Router owner': snapshot.routerOwner,
+              'Router pending owner': snapshot.routerPendingOwner,
               Agent: m.agent,
               Expiry: displayTime(m.expiry),
             },
@@ -82,7 +85,7 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
             values: {
               'WHSK per trade': formatUnits(m.maxTradeInA, snapshot.decimalsA),
               'USDT per trade': formatUnits(m.maxTradeInB, snapshot.decimalsB),
-              'USDT per UTC day': formatUnits(
+              'USDT rolling 24-hour cap': formatUnits(
                 m.maxDailyInB,
                 snapshot.decimalsB,
               ),
@@ -116,9 +119,25 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
         <summary>Policy commitment & read block</summary>
         <dl>
           <div>
-            <dt>Policy hash</dt>
+            <dt>Vault policy hash</dt>
             <dd>
               <code>{m.policyHash}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Router policy hash</dt>
+            <dd>
+              <code>{snapshot.routerPolicyHash}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Vault/router policy match</dt>
+            <dd>
+              {snapshot.policiesMatch === undefined
+                ? 'Unavailable'
+                : snapshot.policiesMatch
+                  ? 'Yes'
+                  : 'NO'}
             </dd>
           </div>
           <div>
@@ -146,7 +165,11 @@ export function MandateView({
   const resource = useResource(
     useCallback(async () => {
       const deployment = await loadDeployment(chain);
-      const snapshot = await readVault(chain, deployment.vault);
+      const snapshot = await readVault(
+        chain,
+        deployment.vault,
+        deployment.router,
+      );
       const risk = await readChartRisk(
         clientFor(chain),
         deployment.vault,

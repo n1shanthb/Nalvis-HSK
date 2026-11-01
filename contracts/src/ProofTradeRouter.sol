@@ -8,7 +8,8 @@ import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
 
 /// @notice Permissionless swaps with independent receipt chains for each caller.
 contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
-    address public immutable owner;
+    address public owner;
+    address public pendingOwner;
     bytes32 public policyHash;
     mapping(address => Chain) private chains;
     error Unauthorized();
@@ -19,11 +20,14 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     error Underfill();
     error PriceLimit();
     event PolicySet(bytes32 policyHash);
+    event OwnershipTransferStarted(address indexed owner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    /// @notice Set the immutable owner and SwapRouter02 destination.
+    /// @notice Set the initial owner and immutable SwapRouter02 destination.
     constructor(address owner_, address router_) {
         if (owner_ == address(0) || router_.code.length == 0) revert InvalidOwner();
         owner = owner_;
+        emit OwnershipTransferred(address(0), owner_);
         router = router_;
     }
     address public immutable router;
@@ -36,6 +40,23 @@ contract ProofTradeRouter is ReceiptChain, ReentrancyGuard {
     /// @notice Read a caller's latest chain head.
     function head(address caller) external view returns (bytes32) {
         return chains[caller].head;
+    }
+
+    /// @notice Nominate the next owner; pass address(0) to cancel a pending transfer.
+    function transferOwnership(address newOwner) external {
+        if (msg.sender != owner) revert Unauthorized();
+        if (newOwner == owner) revert InvalidOwner();
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @notice Accept ownership as the nominated address.
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner || msg.sender == address(0)) revert Unauthorized();
+        address previousOwner = owner;
+        owner = msg.sender;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previousOwner, msg.sender);
     }
 
     /// @notice Owner selects the policy committed by subsequent receipts.

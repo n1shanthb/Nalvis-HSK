@@ -29,6 +29,7 @@ contract VaultHandler is Test {
     bool public ghost_tradeSucceededInDrawdown;
     bool public ghost_tradeExceededPerTradeCap;
     bool public ghost_tradeViolatedSlippage;
+    bool public ghost_tradeSucceededWithExpiredDecision;
 
     constructor(
         EdgewiseVault _vault,
@@ -135,6 +136,9 @@ contract VaultHandler is Test {
             }
             if (minOut < (amountIn * (10_000 - m.maxSlippageBps)) / 10_000) {
                 ghost_tradeViolatedSlippage = true;
+            }
+            if (block.timestamp > validUntil) {
+                ghost_tradeSucceededWithExpiredDecision = true;
             }
 
             ghost_lastSuccessfulTradeTimestamp = block.timestamp;
@@ -249,6 +253,12 @@ contract VaultHandler is Test {
         } else if (!shouldPause && vault.paused()) {
             vault.unpause();
         }
+    }
+
+    /// @notice Handler action: Owner revokes agent authority.
+    function revoke() public {
+        vm.prank(owner);
+        vault.revoke();
     }
 
     /// @notice Handler action: Time advance
