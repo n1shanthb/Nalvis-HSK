@@ -6,7 +6,7 @@ const observation = vi.hoisted(() => ({
   actions: [] as ActionView[],
   lastTradeB: undefined as number | undefined,
 }));
-vi.mock('../src/agent/useAgentFeed.js', () => ({ useAgentFeed: () => null }));
+vi.mock('../src/agent/useAgentFeed.js', () => ({ useAgentFeed: () => ({ feed: null, unreachable: false }) }));
 vi.mock('../src/agent/useReceiptEvents.js', () => ({
   useReceiptEvents: () => ({
     data: [

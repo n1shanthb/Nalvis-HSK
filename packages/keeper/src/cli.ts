@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { agentCommand, exportAgentCommand } from './agent-service.js';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { encodeFunctionData, zeroHash } from 'viem';
@@ -27,6 +28,8 @@ export async function main(
   argv = process.argv.slice(2),
   injectedExecution?: Execution,
 ) {
+  if (argv[0] === 'agent') return agentCommand(argv.slice(1));
+  if (argv[0] === 'export-agent') return exportAgentCommand(argv.slice(1));
   const options = parseOptions([...argv]);
   if (options.exec === 'testnet') assertTestnetHuman();
   const policy = loadPolicy();

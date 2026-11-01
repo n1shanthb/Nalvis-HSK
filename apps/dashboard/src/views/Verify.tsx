@@ -1,3 +1,8 @@
+import {
+  verificationStore,
+  v3Groups,
+  receiptForTransaction,
+} from '../agent/verify-store.js';
 import { demoReceipts } from '../lib/demo.js';
 import demoRecording from '../../../../packages/verifier/test/fixtures/t8/chain.json';
 import { useEffect, useRef, useState } from 'react';
@@ -48,24 +53,39 @@ export function VerifyView({
       else {
         if (!/^0x[0-9a-fA-F]{64}$/.test(hash))
           throw Error('Enter a 32-byte transaction hash');
-        const input: unknown = json.trim()
+        let input: unknown = json.trim()
           ? JSON.parse(json)
-          : (demo ? demoReceipts : await localReceipts()).find(
+          : (demo ? demoReceipts : await localReceipts().catch(() => [])).find(
               (r) =>
                 r.executionChainId === chain &&
                 r.settlement?.transactionHash.toLowerCase() ===
                   hash.toLowerCase(),
             );
+        if (!input && !demo) {
+          try {
+            input = await receiptForTransaction(hash);
+          } catch {
+            /* allow explicit JSON */
+          }
+        }
         if (!input)
           throw Error(
             'Matching receipt JSON unavailable. Paste the keeper receipt below.',
           );
         const url = clientFor(chain).chain.rpcUrls.default.http[0];
+        const v3 =
+          typeof input === 'object' &&
+          input !== null &&
+          'version' in input &&
+          input.version === 3;
         setResult(
           await verify(
             input,
             demo ? recordedReader(demoRecording) : rpcReader(url),
-            { txHash: hash as Hex },
+            {
+              txHash: hash as Hex,
+              ...(v3 ? { agentStore: await verificationStore() } : {}),
+            },
           ),
         );
       }
@@ -139,6 +159,23 @@ export function VerifyView({
         <div aria-live="polite">
           <h3>{result.status}</h3>
           <p>{result.label}</p>
+          {result.receiptV3 && (
+            <div aria-label="v3 receipt checks">
+              {v3Groups.map(([label, names]) => {
+                const rows = result.checks.filter((c) =>
+                  (names as readonly string[]).includes(c.name),
+                );
+                const pass = rows.length > 0 && rows.every((c) => c.pass);
+                return (
+                  <p key={label}>
+                    <span className="badge">{pass ? 'PASS' : 'FAIL'}</span>{' '}
+                    {label}
+                  </p>
+                );
+              })}
+              <p>Model outputs are recorded and bound, not reproduced.</p>
+            </div>
+          )}
           <p>
             Checks run in order and stop at the first failure. Later checks are
             not run.

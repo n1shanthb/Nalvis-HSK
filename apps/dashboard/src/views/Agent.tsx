@@ -2,6 +2,7 @@ import { CostChart } from '../components/charts/CostChart.js';
 import { useState } from 'react';
 import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
+import { fallbackMessage } from '../agent/feed-client.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
   displayTime,
@@ -22,8 +23,11 @@ export function AgentView({
   enableOwner?: boolean;
   onProposal?: (p: OwnerProposal) => void;
 }) {
-  const feed = useAgentFeed();
-  const receipts = useReceiptEvents(chain, !feed);
+  const { feed, unreachable } = useAgentFeed();
+  const receipts = useReceiptEvents(
+    chain,
+    !feed || unreachable || feed.state.mode === 'live',
+  );
   const [history, setHistory] = useState(false);
   const state = feed?.state;
   const mode = !state
@@ -45,6 +49,7 @@ export function AgentView({
         Every outcome leaves evidence.
       </p>
       <Readiness feed={feed} demo={state?.mode === 'demo'} chain={chain} />
+      {unreachable && <p role="status">{fallbackMessage}</p>}
       <OperationView feed={feed} />
       <div className="agent-workspace">
         <section className="agent-chat">

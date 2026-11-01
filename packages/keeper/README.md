@@ -105,3 +105,52 @@ Typed ABI subsets are manually exported from contract public declarations in
 `packages/core/src/abi/index.ts`; `forge build && node scripts/export-abis.mjs`
 exports full typed artifact ABIs alongside them. `twap.ts` ports the repository's
 Uniswap TickMath implementation under GPL-2.0-or-later, with the same attribution.
+
+## Always-on T12B service
+
+`pnpm keeper agent --exec testnet|anvil [--once]` wraps the T12 library; it does not
+use the legacy deterministic keeper loop. Supply `AGENT_PRIVATE_KEY` and the
+provider/model variables only through runtime environment configuration. No key
+means OFFLINE and zero sends. The configured execution RPC must report 133 or
+local 31337 before a signing account is constructed. Mainnet 177 is read-only.
+Testnet service use is refused in test/CI; all integration sends use local Anvil.
+
+`KEEPER_STATE_DIR` defaults to `./.agent-state`. When `AGENT_DATA_DIR` is set,
+it defaults to `<AGENT_DATA_DIR>/agent` and must stay inside that directory.
+Railway uses `/data`. A writable persistent mount is required; an explicit
+`AGENT_ALLOW_EPHEMERAL=1` permits local experimentation and is visible in health.
+A Linux `flock` advisory lock enforces one writer and survives PID reuse safely:
+the kernel releases it on crash/container death. Keep one replica per volume.
+
+The feed binds `0.0.0.0:$PORT` (`AGENT_FEED_PORT`, default 8787, off Railway).
+Set `AGENT_FEED_ORIGINS` or `AGENT_FEED_CORS_ORIGIN` to exact browser origins.
+Only GET is accepted; the socket peer gets ten requests/second. Routes are
+`/healthz`, `/feed/state`, `/feed/watches`, `/feed/actions?limit=50`,
+`/feed/journal?after=<entryHash>&limit=200`, and content-addressed
+`/feed/prompts/:hash` / `/feed/evidence/:hash`. Read-only `/feed/stats`,
+`/feed/states/:hash`, `/feed/receipts/:hash`, and `/feed/policy` support the T13A
+cost chart and complete browser v3 verification. No env/pending/runtime route
+exists. Health includes bounded failure reasons; state uses the T11 lowercase
+wire enum. Missing/invalid policy or mandate requires the owner; missing key/model,
+RPC or storage keeps execution offline. `/healthz` is liveness, not authorization.
+
+Polls never overlap; T12 tick merges fired watches into a wake. SIGTERM interrupts
+the poll delay, drains the current wake, and finishes fsynced journal writes.
+Before broadcasting, the service persists the signed transaction hash (never the
+raw signature/key), performs final chain/mandate/head/nonce/simulation guards,
+and disables transport retries. Restart matches mined intent against calldata,
+sender and Receipt before clearing guards. Ambiguous/reverted intents stay blocked;
+they are never blindly resent. Owner event cursor/queue persists across restarts.
+
+Stop cleanly before `pnpm keeper export-agent --chain 133` (or 31337 for tests).
+Export holds the writer lock, rejects pending intents/broken journals, and copies
+the full artifact tree plus feed/journal JSON to `receipts/<chain>/agent/`.
+Verify with `pnpm verify <snapshot>/receipts/<hash>.json --rpc <RPC>
+--agent-root <snapshot>`. Review a freeze export before force-adding generated
+receipts to git. The dashboard polls `VITE_AGENT_FEED_URL` every ten seconds with
+error backoff, or shows the exported snapshot and on-chain logs with a clear banner.
+No synthetic Agent fixture is bundled in production. T13A charts are retained.
+
+See [Railway/systemd hosting](../../deploy/agent/README.md) and the corrected
+[human testnet bootstrap](../../scripts/testnet-bootstrap.md). Codex deploys
+nothing and sends no transactions outside local tests.

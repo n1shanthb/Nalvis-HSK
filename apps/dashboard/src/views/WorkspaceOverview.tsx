@@ -20,7 +20,7 @@ export default function WorkspaceOverview({
   chain: DashboardChain;
   demo: boolean;
 }) {
-  const feed = useAgentFeed();
+  const { feed } = useAgentFeed();
   const events = useReceiptEvents(chain, !demo);
   const vault = useResource(
     useCallback(async () => {
