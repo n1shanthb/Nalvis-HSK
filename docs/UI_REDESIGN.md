@@ -1,5 +1,7 @@
 # Nalvis UI audit and implementation record
 
+Historical record: the visual direction below was superseded by [the Ledger Guard adaptation](LEDGER_GUARD_UI.md).
+
 Reviewed 1 November 2026 (IST). Audience: owners and operators. Scope: dashboard presentation and interaction only. No backend, contract, signing implementation, data source, or trading-rule edits.
 
 ## Baseline and evidence

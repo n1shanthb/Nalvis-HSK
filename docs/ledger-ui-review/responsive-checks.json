@@ -1,0 +1,194 @@
+[
+  {
+    "page": "landing",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "overview",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "setup",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "mandate",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "activity",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "agent",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "evidence",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "verify",
+    "width": 375,
+    "documentWidth": 360,
+    "viewport": 375
+  },
+  {
+    "page": "landing",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "overview",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "setup",
+    "width": 768,
+    "documentWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "mandate",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "activity",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "agent",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "evidence",
+    "width": 768,
+    "documentWidth": 753,
+    "viewport": 768
+  },
+  {
+    "page": "verify",
+    "width": 768,
+    "documentWidth": 768,
+    "viewport": 768
+  },
+  {
+    "page": "landing",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "overview",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "setup",
+    "width": 1024,
+    "documentWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "mandate",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "activity",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "agent",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "evidence",
+    "width": 1024,
+    "documentWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "page": "verify",
+    "width": 1024,
+    "documentWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "page": "landing",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "overview",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "setup",
+    "width": 1440,
+    "documentWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "page": "mandate",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "activity",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "agent",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "evidence",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "page": "verify",
+    "width": 1440,
+    "documentWidth": 1425,
+    "viewport": 1440
+  }
+]
