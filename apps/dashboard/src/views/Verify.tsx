@@ -1,3 +1,5 @@
+import { verificationStore, v3Groups } from '../agent/verify-store.js';
+import { snapshotBase, readFeedJSON } from '../agent/feed-client.js';
 import { useEffect, useRef, useState } from 'react';
 import { type Hex } from 'viem';
 import {
@@ -44,7 +46,7 @@ export function VerifyView({
       else {
         if (!/^0x[0-9a-fA-F]{64}$/.test(hash))
           throw Error('Enter a 32-byte transaction hash');
-        const input: unknown = json.trim()
+        let input: unknown = json.trim()
           ? JSON.parse(json)
           : (await localReceipts()).find(
               (r) =>
@@ -52,12 +54,40 @@ export function VerifyView({
                 r.settlement?.transactionHash.toLowerCase() ===
                   hash.toLowerCase(),
             );
+        if (!input) {
+          try {
+            const saved = (await readFeedJSON(
+              '',
+              snapshotBase + '/feed.json',
+            )) as { actions: { txHash?: string; receiptHash?: string }[] };
+            const action = saved.actions.find(
+              (a) => a.txHash?.toLowerCase() === hash.toLowerCase(),
+            );
+            if (action?.receiptHash)
+              input = await readFeedJSON(
+                '',
+                snapshotBase + '/receipts/' + action.receiptHash + '.json',
+              );
+          } catch {
+            /* allow explicit JSON */
+          }
+        }
         if (!input)
           throw Error(
             'Matching receipt JSON unavailable. Paste the keeper receipt below.',
           );
         const url = clientFor(chain).chain.rpcUrls.default.http[0];
-        setResult(await verify(input, rpcReader(url), { txHash: hash as Hex }));
+        const v3 =
+          typeof input === 'object' &&
+          input !== null &&
+          'version' in input &&
+          input.version === 3;
+        setResult(
+          await verify(input, rpcReader(url), {
+            txHash: hash as Hex,
+            ...(v3 ? { agentStore: await verificationStore() } : {}),
+          }),
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed');
@@ -115,6 +145,26 @@ export function VerifyView({
         <div aria-live="polite">
           <h3>{result.status}</h3>
           <p>{result.label}</p>
+          {result.receiptV3 && (
+            <div aria-label="v3 receipt checks">
+              {v3Groups.map(([label, names]) => {
+                const rows = result.checks.filter((c) =>
+                  (names as readonly string[]).includes(c.name),
+                );
+                const pass =
+                  result.status === 'PASS' &&
+                  rows.length > 0 &&
+                  rows.every((c) => c.pass);
+                return (
+                  <p key={label}>
+                    <span className="badge">{pass ? 'PASS' : 'FAIL'}</span>{' '}
+                    {label}
+                  </p>
+                );
+              })}
+              <p>Model outputs are recorded and bound, not reproduced.</p>
+            </div>
+          )}
           <ul>
             {result.checks.map((c, i) => (
               <li key={i}>

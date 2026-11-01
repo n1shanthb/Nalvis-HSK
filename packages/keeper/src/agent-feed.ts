@@ -1,3 +1,4 @@
+import { journalSpendByDay } from './feed.js';
 import { createServer } from 'node:http';
 import type {
   Store,
@@ -65,6 +66,7 @@ export async function projectFeed(
   }
   return {
     state,
+    spendByDay: journalSpendByDay(entries, now),
     watches: (saved?.watches ?? [])
       .filter(
         (w) =>
@@ -175,6 +177,8 @@ export function feedServer(options: {
       }
       const { feed, entries } = await options.snapshot();
       if (u.pathname === '/feed/state') return reply(200, feed.state);
+      if (u.pathname === '/feed/stats')
+        return reply(200, { stats: feed.stats, spendByDay: feed.spendByDay });
       if (u.pathname === '/feed/watches')
         return reply(200, { active: feed.watches, history: feed.history });
       if (u.pathname === '/feed/actions')

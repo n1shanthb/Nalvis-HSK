@@ -3,6 +3,7 @@ import { CostChart } from '../components/charts/CostChart.js';
 import { DemoLimits } from '../components/charts/DemoLimits.js';
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
 import { lazy, Suspense, useState } from 'react';
+import { fallbackMessage } from '../agent/feed-client.js';
 const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import { useAgentFeed } from '../agent/useAgentFeed.js';
@@ -18,8 +19,11 @@ import { demoEvidence, demoReceipts } from '../lib/demo.js';
 const at = (time: number | null | undefined) =>
   time ? displayTime(time) : 'Not scheduled';
 export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
-  const feed = useAgentFeed();
-  const receipts = useReceiptEvents(chain, !feed);
+  const { feed, unreachable } = useAgentFeed();
+  const receipts = useReceiptEvents(
+    chain,
+    !feed || unreachable || feed.state.mode === 'live',
+  );
   const [history, setHistory] = useState(false);
   const state = feed?.state;
   const demoActions = demoReceipts.map((r, i) => ({
@@ -71,6 +75,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
     <section className="agent-view">
       <p className="eyebrow">AUTONOMOUS AGENT / BOUNDED EXECUTION</p>
       <h2>Agent</h2>
+      {unreachable && <p role="status">{fallbackMessage}</p>}
       {state?.mode === 'demo' ? (
         <>
           <Suspense fallback={<p>Loading recorded chart…</p>}>
@@ -104,7 +109,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
               'LLM calls today': state.llmCallsToday,
               'Spend / budget (USD)': `${state.spendTodayUsd} / ${state.budgetUsd}`,
               'Policy hash': state.policyHashOk ? 'Matches' : 'Needs owner',
-              'Journal head': state.journalHead ?? 'No journal in fixture',
+              'Journal head': state.journalHead ?? 'No journal yet',
             }).map(([k, v]) => (
               <div key={k}>
                 <dt>{k}</dt>
@@ -258,13 +263,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
             </a>
           </p>
         ))}
-        {!receipts.data?.length && (
-          <p>
-            {feed
-              ? 'Recorded UI fixtures; no live transaction activity.'
-              : 'Waiting for agent receipts.'}
-          </p>
-        )}
+        {!receipts.data?.length && <p>Waiting for agent receipts.</p>}
       </article>
       <article className="agent-card">
         <h3>Model stats</h3>
