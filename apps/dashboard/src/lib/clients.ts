@@ -59,18 +59,21 @@ const deploymentSchema = z.object({
 });
 export type Deployment = z.infer<typeof deploymentSchema>;
 export class DeploymentError extends Error {
-  constructor(public readonly kind: 'missing' | 'unverified') {
+  constructor(
+    public readonly kind: 'missing' | 'unverified',
+    chain = 133,
+  ) {
     super(
       kind === 'missing'
-        ? 'Not deployed on 133 yet'
+        ? `Not deployed on ${chain} yet`
         : 'Deployment not verified against docs/ADDRESSES.md',
     );
   }
 }
 export async function readJSON(path: string): Promise<unknown> {
   const response = await fetch(path, { signal: AbortSignal.timeout(15000) });
-  if (response.status === 404 && path === '/deployments/133.json')
-    throw new DeploymentError('missing');
+  if (response.status === 404 && /^\/deployments\/(133|177)\.json$/.test(path))
+    throw new DeploymentError('missing', path.includes('177') ? 177 : 133);
   if (
     !response.ok ||
     !(response.headers.get('content-type') ?? '').includes('json')

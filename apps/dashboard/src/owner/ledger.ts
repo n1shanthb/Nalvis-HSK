@@ -30,6 +30,8 @@ import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
 export const BLIND_SIGNING_WARNING =
   'Blind signing: HashKey Chain has no Ledger clear-signing metadata; verify the calldata hash shown here matches your device.';
 export function assertOwnerChain(chainId: number) {
+  if (chainId === 177 && import.meta.env.VITE_MAINNET_EXECUTION === 'true')
+    return;
   assertWritableChain(chainId);
   if (chainId !== 133)
     throw Error('Ledger owner actions require chain 133 only');
@@ -130,6 +132,8 @@ export async function connectLedger(
       async signTransaction(unsigned, id) {
         assertOwnerChain(id);
         assertOwnerChain(parseTransaction(unsigned).chainId ?? 0);
+        if (id !== chainId || parseTransaction(unsigned).chainId !== id)
+          throw Error('Ledger transaction chain mismatch');
         return deviceResult<{ r: Hex; s: Hex; v: number }, unknown, unknown>(
           signer.signTransaction(path, hexToBytes(unsigned)),
         );
@@ -154,7 +158,7 @@ export async function sendOwnerAction({
   owner,
   data,
   signer,
-  client = clientFor(133),
+  client = clientFor(chainId === 177 ? 177 : 133),
   proposal,
 }: {
   chainId: number;
@@ -176,7 +180,9 @@ export async function sendOwnerAction({
       action.functionName !== 'withdraw'
     )
       throw Error('Unsupported owner action');
-    assertOwnerChain(await client.getChainId());
+    const actualChain = await client.getChainId();
+    if (actualChain !== chainId) throw Error('Owner RPC chain mismatch');
+    assertOwnerChain(actualChain);
     const liveOwner = await client.readContract({
       address: vault,
       abi: vaultAbi,
@@ -195,7 +201,7 @@ export async function sendOwnerAction({
     ]);
     const tx = {
       type: 'legacy' as const,
-      chainId: 133,
+      chainId,
       nonce,
       gasPrice,
       gas: (gas * 12n) / 10n,
@@ -265,13 +271,13 @@ export async function sendOwnerAction({
         ? v
         : v === 27n || v === 28n
           ? v - 27n
-          : v - 35n - 266n;
+          : v - 35n - 2n * BigInt(chainId);
     if (parity !== 0n && parity !== 1n)
       throw Error('Ledger signature chain mismatch');
     const signed = serializeTransaction(tx, {
       r: signature.r,
       s: signature.s,
-      v: 301n + parity,
+      v: 35n + 2n * BigInt(chainId) + parity,
     });
     if (
       getAddress(
@@ -281,6 +287,8 @@ export async function sendOwnerAction({
       throw Error('Signed transaction does not recover to vault owner');
     assertOwnerChain(await client.getChainId());
     await checkLiveProposal();
+    if ((await client.getChainId()) !== chainId)
+      throw Error('Owner RPC chain changed');
     return await client.sendRawTransaction({ serializedTransaction: signed });
   } finally {
     await signer.disconnect();

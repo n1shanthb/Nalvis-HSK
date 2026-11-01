@@ -1,5 +1,6 @@
 import { DeskDrawer } from './components/DeskDrawer.js';
 import { LedgerProvider } from './owner/LedgerContext.js';
+import { MainnetOwner } from './owner/MainnetOwner.js';
 import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
 import { AgentView } from './views/Agent.js';
@@ -43,7 +44,7 @@ const routes = [
 type AppRoute = Route | 'home';
 export type Route = (typeof routes)[number];
 function AppContent({
-  initialChain = 133,
+  initialChain = import.meta.env.VITE_EXECUTION_CHAIN === '177' ? 177 : 133,
   initialRoute,
   enableOwner = import.meta.env.VITE_ENABLE_OWNER !== 'false',
 }: {
@@ -119,7 +120,8 @@ function AppContent({
         )}
         {!demo && chain === 177 && (
           <div className="banner" role="note">
-            Mainnet 177 — read-only
+            Mainnet 177 — real funds; owner actions require explicit build
+            activation
           </div>
         )}
         <main
@@ -176,38 +178,47 @@ function AppContent({
                     setup={route === 'setup'}
                     onOwner={
                       enableOwner
-                        ? (d, s, reload) => (
-                            <Suspense fallback={<p>Loading owner panel…</p>}>
-                              <MandateWizard
-                                chain={chain}
-                                vault={d.vault}
+                        ? (d, s, reload) =>
+                            chain === 177 ? (
+                              <MainnetOwner
+                                deployment={d}
                                 snapshot={s}
-                                onConfirmed={() => {
-                                  setProposal(undefined);
-                                  return reload();
-                                }}
+                                reload={reload}
                               />
-                              <OwnerActions
-                                chain={chain}
-                                vault={d.vault}
-                                snapshot={s}
-                                onConfirmed={() => {
-                                  setProposal(undefined);
-                                  return reload();
-                                }}
-                              />
-                              {proposal && (
-                                <OwnerPanel
+                            ) : (
+                              <Suspense fallback={<p>Loading owner panel…</p>}>
+                                <MandateWizard
                                   chain={chain}
                                   vault={d.vault}
                                   snapshot={s}
-                                  proposal={proposal}
-                                  proposalOnly
-                                  onProposalClear={() => setProposal(undefined)}
+                                  onConfirmed={() => {
+                                    setProposal(undefined);
+                                    return reload();
+                                  }}
                                 />
-                              )}
-                            </Suspense>
-                          )
+                                <OwnerActions
+                                  chain={chain}
+                                  vault={d.vault}
+                                  snapshot={s}
+                                  onConfirmed={() => {
+                                    setProposal(undefined);
+                                    return reload();
+                                  }}
+                                />
+                                {proposal && (
+                                  <OwnerPanel
+                                    chain={chain}
+                                    vault={d.vault}
+                                    snapshot={s}
+                                    proposal={proposal}
+                                    proposalOnly
+                                    onProposalClear={() =>
+                                      setProposal(undefined)
+                                    }
+                                  />
+                                )}
+                              </Suspense>
+                            )
                         : undefined
                     }
                   />

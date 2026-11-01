@@ -2,7 +2,11 @@ import { keccak256, toBytes } from 'viem';
 import { z } from 'zod';
 import { canonical, hash } from '../canonical.js';
 import { defaultWatchBounds } from './watches.js';
-import { STRATEGIST_PROMPT_V1, FITTER_PROMPT_V1 } from './strategist.js';
+import {
+  STRATEGIST_PROMPT_V1,
+  FITTER_PROMPT_V1,
+  executionPrompt,
+} from './strategist.js';
 import { schemaVersion } from './schema.js';
 const positive = z.number().int().positive();
 export const agentConfigSchema = z
@@ -31,6 +35,7 @@ export const agentConfigSchema = z
     anchorSec: positive.default(7200),
     ttlSec: positive.max(120).default(120),
     policyFile: z.string(),
+    executionChainId: z.literal(177).optional(),
   })
   .strict();
 export type AgentConfig = z.infer<typeof agentConfigSchema>;
@@ -52,28 +57,45 @@ export function configFromEnv(
     dailyLlmBudgetUsd: Number(env.AGENT_DAILY_LLM_BUDGET_USD ?? 1),
     anchorSec: Number(env.AGENT_ANCHOR_SEC ?? 7200),
     policyFile,
+    ...(env.EXECUTION_CHAIN === '177' ? { executionChainId: 177 } : {}),
   });
 }
 export function strategyDefinition(
-  config: Pick<AgentConfig, 'models' | 'watchBounds' | 'fitRounds'>,
+  config: Pick<
+    AgentConfig,
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+  >,
 ) {
   return {
     provider: 'openrouter',
     models: config.models,
-    STRATEGIST_PROMPT_V1,
-    FITTER_PROMPT_V1,
+    STRATEGIST_PROMPT_V1: executionPrompt(
+      STRATEGIST_PROMPT_V1,
+      config.executionChainId,
+    ),
+    FITTER_PROMPT_V1: executionPrompt(
+      FITTER_PROMPT_V1,
+      config.executionChainId,
+    ),
+    ...(config.executionChainId === 177 ? { executionChainId: 177 } : {}),
     schemaVersion,
     watchBounds: config.watchBounds,
     fitRounds: config.fitRounds,
   };
 }
 export const strategyHash = (
-  config: Pick<AgentConfig, 'models' | 'watchBounds' | 'fitRounds'>,
+  config: Pick<
+    AgentConfig,
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+  >,
 ) => hash(strategyDefinition(config));
 /** Ledger helper hashes exact file bytes, including any trailing newline. */
 export const agentPolicyHash = (file: string) => keccak256(toBytes(file));
 export function createAgentPolicy(
-  config: Pick<AgentConfig, 'models' | 'watchBounds' | 'fitRounds'>,
+  config: Pick<
+    AgentConfig,
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+  >,
   extra: Record<string, unknown> = {},
 ) {
   return canonical({

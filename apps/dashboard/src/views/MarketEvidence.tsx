@@ -11,7 +11,7 @@ export default function MarketEvidence({
   chain?: DashboardChain;
 }) {
   const { feed } = useAgentFeed();
-  const receipts = useReceiptEvents(chain, !feed);
+  const receipts = useReceiptEvents(chain, !feed || feed.state.mode === 'live');
   const actions =
     feed?.actions ??
     receipts.data?.map((r) => ({

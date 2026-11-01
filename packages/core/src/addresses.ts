@@ -90,6 +90,13 @@ export const addresses = {
 } as const satisfies Record<177 | 133, Record<string, AddressEntry>>;
 
 export const CHAIN_ALLOWLIST_WRITE = [133, 31337] as const;
+/** Mainnet is opt-in at each signing boundary; decoding/read-only replay is separate. */
+export function assertExecutionChain(
+  chainId: number,
+): asserts chainId is 133 | 177 | 31337 {
+  if (![133, 177, 31337].includes(chainId))
+    throw new Error(`Unsupported execution chain ${chainId}`);
+}
 export function assertWritableChain(
   chainId: number,
 ): asserts chainId is 133 | 31337 {

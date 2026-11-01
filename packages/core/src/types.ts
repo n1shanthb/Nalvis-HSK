@@ -30,7 +30,11 @@ export type Quote = z.infer<typeof quoteSchema>;
 export const evidenceSchema = z
   .object({
     marketDataChainId: z.literal(177),
-    executionChainId: z.union([z.literal(133), z.literal(31337)]),
+    executionChainId: z.union([
+      z.literal(133),
+      z.literal(177),
+      z.literal(31337),
+    ]),
     blockNumber: z.bigint().nonnegative(),
     executionBlockNumber: z.bigint().nonnegative(),
     now: time,

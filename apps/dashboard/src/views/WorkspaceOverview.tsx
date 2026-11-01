@@ -65,7 +65,7 @@ export default function WorkspaceOverview({
           <a className="button" href={demo ? '#/activity' : '#/setup'}>
             {demo ? 'Inspect activity' : 'Set mandate'}
           </a>
-          {!demo && <ConnectLedger />}
+          {!demo && <ConnectLedger chain={chain} />}
           <span className="micro-label">
             {demo
               ? 'RECORDED SESSION'

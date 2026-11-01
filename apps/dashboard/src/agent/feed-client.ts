@@ -120,4 +120,4 @@ export async function fetchFeed(
 }
 export const fallbackMessage =
   'Agent feed unreachable — showing on-chain receipts and the last exported snapshot';
-export const snapshotBase = '/receipts/133/agent';
+export const snapshotBase = `/receipts/${import.meta.env.VITE_EXECUTION_CHAIN === '177' ? 177 : 133}/agent`;

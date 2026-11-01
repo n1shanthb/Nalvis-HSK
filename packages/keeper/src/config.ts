@@ -48,8 +48,12 @@ export const deploymentSchema = z
     'Roles must be distinct',
   );
 export type Deployment = z.infer<typeof deploymentSchema>;
-export function loadDeployment(chainId: number, path?: string): Deployment {
-  assertWritableChain(chainId);
+export function loadDeployment(
+  chainId: number,
+  path?: string,
+  mainnet = false,
+): Deployment {
+  if (chainId !== 177 || !mainnet) assertWritableChain(chainId);
   // T3 writes manifests relative to the Foundry project root.
   return deploymentSchema.parse(
     JSON.parse(

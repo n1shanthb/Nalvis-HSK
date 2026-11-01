@@ -12,7 +12,7 @@ import {
 } from 'viem';
 import { vaultAbi, erc20Abi, poolReadAbi } from '../abi/index.js';
 import { readCachedTurnover } from './turnover.js';
-import { assertWritableChain } from '../addresses.js';
+import { assertExecutionChain as assertWritableChain } from '../addresses.js';
 import { hash } from '../canonical.js';
 import { meanTick, twapOutput } from './twap.js';
 import { actionSchema, type Action } from './schema.js';
@@ -29,7 +29,7 @@ const hex = z
   .transform((v) => v as Hex);
 export const mandateStateSchema = z
   .object({
-    chainId: z.union([z.literal(133), z.literal(31337)]),
+    chainId: z.union([z.literal(133), z.literal(177), z.literal(31337)]),
     vault: addr,
     agent: addr,
     tokenA: addr,

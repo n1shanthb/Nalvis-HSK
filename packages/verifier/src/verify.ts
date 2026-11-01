@@ -61,9 +61,13 @@ const trace = z.array(
 export const receiptSchema = z
   .object({
     version: z.union([z.literal(1), z.literal(2)]),
-    chainId: z.union([z.literal(133), z.literal(31337)]),
+    chainId: z.union([z.literal(133), z.literal(177), z.literal(31337)]),
     marketDataChainId: z.literal(177),
-    executionChainId: z.union([z.literal(133), z.literal(31337)]),
+    executionChainId: z.union([
+      z.literal(133),
+      z.literal(177),
+      z.literal(31337),
+    ]),
     contract: address.refine((v) => v !== zeroAddress),
     seq: integer,
     prevHead: hex,
@@ -359,7 +363,9 @@ export async function verify(
     result.label =
       r.executionChainId === 133
         ? 'testnet — prices not real'
-        : 'local anvil — prices not real';
+        : r.executionChainId === 177
+          ? 'mainnet — real funds'
+          : 'local anvil — prices not real';
     check(
       'chain_ids',
       r.chainId === r.executionChainId &&

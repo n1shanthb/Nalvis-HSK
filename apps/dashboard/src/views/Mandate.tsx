@@ -185,8 +185,11 @@ export function MandateView({
         </ol>
       )}
       <div className="mandate-connection">
-        <ConnectLedger />
-        <span className="micro-label">Testnet 133 · Ledger blind signing</span>
+        <ConnectLedger chain={chain} />
+        <span className="micro-label">
+          {chain === 177 ? 'Mainnet 177 · Real funds' : 'Testnet 133'} · Ledger
+          blind signing
+        </span>
       </div>
       {resource.loading && (
         <p className="skeleton" role="status">
@@ -205,30 +208,40 @@ export function MandateView({
         resource.cause instanceof DeploymentError &&
         resource.cause.kind === 'missing' && (
           <div role="status" className="agent-card">
-            <h3>Not deployed on 133 yet</h3>
-            <p>
-              The vault deployment could not be loaded or verified. Follow the
-              human testnet bootstrap:
-            </p>
-            <ol>
-              <li>
-                Create separate deployer and agent testnet wallets; connect the
-                Ledger owner.
-              </li>
-              <li>Claim test HSK, wrap it and acquire test USDT.</li>
-              <li>
-                Deploy and fund on chain 133, then verify owners and deployment
-                receipts.
-              </li>
-              <li>
-                Build the mandate calldata and review it on Ledger with blind
-                signing enabled.
-              </li>
-            </ol>
-            <p>
-              See scripts/testnet-bootstrap.md. No keys or transactions are
-              handled by Codex.
-            </p>
+            <h3>No verified deployment on chain {chain} yet</h3>
+            {chain === 177 ? (
+              <p>
+                Complete the reviewed mainnet deployment and publish its
+                verified manifest before owner actions. Follow
+                docs/MAINNET_READINESS.md; testnet setup commands do not apply.
+              </p>
+            ) : (
+              <>
+                <p>
+                  The vault deployment could not be loaded or verified. Follow
+                  the human testnet bootstrap:
+                </p>
+                <ol>
+                  <li>
+                    Create separate deployer and agent testnet wallets; connect
+                    the Ledger owner.
+                  </li>
+                  <li>Claim test HSK, wrap it and acquire test USDT.</li>
+                  <li>
+                    Deploy and fund on chain 133, then verify owners and
+                    deployment receipts.
+                  </li>
+                  <li>
+                    Build the mandate calldata and review it on Ledger with
+                    blind signing enabled.
+                  </li>
+                </ol>
+                <p>
+                  See scripts/testnet-bootstrap.md. No keys or transactions are
+                  handled by Codex.
+                </p>
+              </>
+            )}
           </div>
         )}
       {resource.data && (

@@ -28,7 +28,7 @@ export function stateRoot(env: Env = process.env) {
   );
 }
 export async function startAgentService(options: {
-  exec: 'testnet' | 'anvil';
+  exec: 'testnet' | 'anvil' | 'mainnet';
   once?: boolean;
   env?: Env;
   // Test injection keeps all hosted providers and real networks outside tests.
@@ -40,7 +40,8 @@ export async function startAgentService(options: {
   const env = options.env ?? process.env,
     root = stateRoot(env),
     store = jsonFileStore(root);
-  const chain = options.exec === 'testnet' ? 133 : 31337;
+  const chain =
+    options.exec === 'mainnet' ? 177 : options.exec === 'testnet' ? 133 : 31337;
   let reason = 'Starting preflight',
     forced: AgentState['state'] | undefined = 'offline',
     policyHashOk = false;
@@ -50,7 +51,10 @@ export async function startAgentService(options: {
     if (
       env.AGENT_DATA_DIR &&
       root !== resolve(env.AGENT_DATA_DIR) &&
-      !root.startsWith(resolve(env.AGENT_DATA_DIR) + '/')
+      !root.startsWith(
+        resolve(env.AGENT_DATA_DIR) +
+          (process.platform === 'win32' ? '\\' : '/'),
+      )
     )
       throw Error('State root must be inside AGENT_DATA_DIR');
     await storageReady(
@@ -201,8 +205,7 @@ export async function startAgentService(options: {
         options.provider ??
         openRouter({
           ...env,
-          AGENT_OPENROUTER_API_KEY:
-            env.AGENT_OPENROUTER_API_KEY,
+          AGENT_OPENROUTER_API_KEY: env.AGENT_OPENROUTER_API_KEY,
         });
       if (!provider.isConfigured())
         throw new PreflightError(
@@ -214,10 +217,19 @@ export async function startAgentService(options: {
           config = configFromEnv(
             await readFile(
               env.AGENT_POLICY_FILE ??
-                join(repositoryRoot(), 'policy/agent-v3.json'),
+                join(
+                  repositoryRoot(),
+                  chain === 177
+                    ? 'policy/agent-mainnet-v3.json'
+                    : 'policy/agent-v3.json',
+                ),
               'utf8',
             ),
-            { ...env, AGENT_POLL_SEC: env.AGENT_POLL_SEC ?? '30' },
+            {
+              ...env,
+              ...(chain === 177 ? { EXECUTION_CHAIN: '177' } : {}),
+              AGENT_POLL_SEC: env.AGENT_POLL_SEC ?? '30',
+            },
           );
         } catch {
           throw new PreflightError(
@@ -230,6 +242,11 @@ export async function startAgentService(options: {
         throw new PreflightError(
           'needs_owner',
           'rules-demo is unavailable in the always-on service',
+        );
+      if (chain === 177 && config.executionChainId !== 177)
+        throw new PreflightError(
+          'needs_owner',
+          'Mainnet requires a mainnet-bound strategy policy',
         );
       try {
         validateAgentPolicy(config);
@@ -382,14 +399,14 @@ export async function startAgentService(options: {
 }
 export async function agentCommand(argv: string[]) {
   const args = [...argv];
-  let exec: 'testnet' | 'anvil' | undefined,
+  let exec: 'testnet' | 'anvil' | 'mainnet' | undefined,
     once = false;
   while (args.length) {
     const a = args.shift();
     if (a === '--once') once = true;
     else if (a === '--exec') {
       const v = args.shift();
-      if (v !== 'testnet' && v !== 'anvil')
+      if (v !== 'testnet' && v !== 'anvil' && v !== 'mainnet')
         throw Error('agent --exec testnet|anvil');
       exec = v;
     } else throw Error('Unknown agent option');
@@ -406,7 +423,7 @@ export async function exportAgentCommand(argv: string[]) {
   if (
     argv.length !== 2 ||
     argv[0] !== '--chain' ||
-    !['133', '31337'].includes(argv[1])
+    !['133', '177', '31337'].includes(argv[1])
   )
     throw Error('export-agent --chain 133|31337');
   const root = stateRoot(),
