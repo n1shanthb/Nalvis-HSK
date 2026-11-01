@@ -120,3 +120,51 @@ export const v3Groups = [
     ['v3_calldata', 'v3_receipt_event', 'v3_chain_head'],
   ],
 ] as const;
+
+export async function receiptForTransaction(txHash: string): Promise<unknown> {
+  const base = import.meta.env.VITE_AGENT_FEED_URL;
+  if (base)
+    try {
+      const actions = await readFeedJSON(base, '/feed/actions?limit=200');
+      if (Array.isArray(actions)) {
+        const action = actions.find(
+          (a) =>
+            typeof a.txHash === 'string' &&
+            a.txHash.toLowerCase() === txHash.toLowerCase(),
+        );
+        if (
+          action &&
+          typeof action.receiptHash === 'string' &&
+          hash.test(action.receiptHash)
+        )
+          return await readFeedJSON(
+            base,
+            '/feed/receipts/' + action.receiptHash,
+          );
+      }
+    } catch {
+      /* fall back to the export */
+    }
+  const saved = await readFeedJSON('', snapshotBase + '/feed.json');
+  if (
+    typeof saved !== 'object' ||
+    saved === null ||
+    !('actions' in saved) ||
+    !Array.isArray(saved.actions)
+  )
+    return undefined;
+  const action = saved.actions.find(
+    (a) =>
+      typeof a.txHash === 'string' &&
+      a.txHash.toLowerCase() === txHash.toLowerCase(),
+  );
+  if (
+    action &&
+    typeof action.receiptHash === 'string' &&
+    hash.test(action.receiptHash)
+  )
+    return readFeedJSON(
+      '',
+      snapshotBase + '/receipts/' + action.receiptHash + '.json',
+    );
+}

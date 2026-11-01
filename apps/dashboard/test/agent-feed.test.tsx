@@ -96,3 +96,32 @@ it('browser verifier uses exported journal and exact policy bytes when feed is u
   await expect(store.read('../.env')).rejects.toThrow('denied');
   await expect(store.write('x', {})).rejects.toThrow('Read only');
 });
+
+it('Verify renders eight independent v3 check chips and keeps earlier passes on a later failure', async () => {
+  const { VerifyView } = await import('../src/views/Verify.js');
+  const { fireEvent } = await import('@testing-library/react');
+  const result = {
+    status: 'FAIL' as const,
+    label: 'Local v3 verification',
+    receiptV3: {} as never,
+    checks: [
+      { name: 'v3_receipt_hash', pass: true },
+      { name: 'v3_policy_binding', pass: true },
+      { name: 'v3_journal_range', pass: true },
+      { name: 'v3_evidence_hash', pass: true },
+      { name: 'v3_system_watch', pass: true },
+      { name: 'v3_final_check', pass: true },
+      { name: 'v3_final_action', pass: true },
+      { name: 'v3_receipt_event', pass: false },
+    ],
+  };
+  render(<VerifyView chain={133} runRecorded={async () => result} />);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Replay recorded Anvil trade' }),
+  );
+  const group = await screen.findByLabelText('v3 receipt checks');
+  expect(group.querySelectorAll('.badge').length).toBe(8);
+  expect(
+    [...group.querySelectorAll('.badge')].map((c) => c.textContent),
+  ).toEqual(['PASS', 'PASS', 'PASS', 'PASS', 'PASS', 'PASS', 'PASS', 'FAIL']);
+});

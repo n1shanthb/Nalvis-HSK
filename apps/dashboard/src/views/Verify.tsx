@@ -1,5 +1,8 @@
-import { verificationStore, v3Groups } from '../agent/verify-store.js';
-import { snapshotBase, readFeedJSON } from '../agent/feed-client.js';
+import {
+  verificationStore,
+  v3Groups,
+  receiptForTransaction,
+} from '../agent/verify-store.js';
 import { useEffect, useRef, useState } from 'react';
 import { type Hex } from 'viem';
 import {
@@ -48,7 +51,7 @@ export function VerifyView({
           throw Error('Enter a 32-byte transaction hash');
         let input: unknown = json.trim()
           ? JSON.parse(json)
-          : (await localReceipts()).find(
+          : (await localReceipts().catch(() => [])).find(
               (r) =>
                 r.executionChainId === chain &&
                 r.settlement?.transactionHash.toLowerCase() ===
@@ -56,18 +59,7 @@ export function VerifyView({
             );
         if (!input) {
           try {
-            const saved = (await readFeedJSON(
-              '',
-              snapshotBase + '/feed.json',
-            )) as { actions: { txHash?: string; receiptHash?: string }[] };
-            const action = saved.actions.find(
-              (a) => a.txHash?.toLowerCase() === hash.toLowerCase(),
-            );
-            if (action?.receiptHash)
-              input = await readFeedJSON(
-                '',
-                snapshotBase + '/receipts/' + action.receiptHash + '.json',
-              );
+            input = await receiptForTransaction(hash);
           } catch {
             /* allow explicit JSON */
           }
@@ -151,10 +143,7 @@ export function VerifyView({
                 const rows = result.checks.filter((c) =>
                   (names as readonly string[]).includes(c.name),
                 );
-                const pass =
-                  result.status === 'PASS' &&
-                  rows.length > 0 &&
-                  rows.every((c) => c.pass);
+                const pass = rows.length > 0 && rows.every((c) => c.pass);
                 return (
                   <p key={label}>
                     <span className="badge">{pass ? 'PASS' : 'FAIL'}</span>{' '}
