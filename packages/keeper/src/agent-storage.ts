@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import {
   mkdir,
   open,
@@ -6,6 +7,7 @@ import {
   rename,
   cp,
   readdir,
+  realpath,
 } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -20,7 +22,7 @@ export async function storageReady(data: string, allowEphemeral: boolean) {
   await rm(probe);
   if (allowEphemeral) return;
   const mounts = await readFile('/proc/self/mountinfo', 'utf8');
-  const target = resolve(data);
+  const target = await realpath(resolve(data));
   const durable = mounts.split('\n').some((line) => {
     const [before, after] = line.split(' - '),
       point = before?.split(' ')[4]?.replace(/\\040/g, ' ');
@@ -37,35 +39,40 @@ export async function storageReady(data: string, allowEphemeral: boolean) {
       'Persistent volume required; AGENT_ALLOW_EPHEMERAL=1 explicitly permits local storage',
     );
 }
-/** Exclusive process lock; dead local PIDs can be recovered, live writers cannot. */
+/** Linux advisory lock: kernel releases it on process/container death, even with PID reuse. */
 export async function agentLock(root: string) {
   await mkdir(root, { recursive: true });
-  const lock = join(root, '.service.lock');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const f = await open(lock, 'wx', 0o600);
-      await f.writeFile(String(process.pid));
-      await f.sync();
-      await f.close();
-      return () => rm(lock, { force: true });
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
-      const pid = Number(await readFile(lock, 'utf8'));
-      if (!Number.isSafeInteger(pid) || pid <= 0)
-        throw Error('Invalid service lock; inspect manually');
-      try {
-        process.kill(pid, 0);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
-          await rm(lock);
-          continue;
-        }
-        throw error;
-      }
-      throw Error('Agent store already has a writer');
-    }
-  }
-  throw Error('Could not acquire service lock');
+  const child = spawn(
+    'flock',
+    [
+      '--exclusive',
+      '--nonblock',
+      join(root, '.service.lock'),
+      'sh',
+      '-c',
+      'printf "READY\\n"; cat >/dev/null',
+    ],
+    { stdio: ['pipe', 'pipe', 'ignore'] },
+  );
+  await new Promise<void>((resolve, reject) => {
+    child.once('error', () =>
+      reject(Error('flock is required for the service writer lock')),
+    );
+    child.once('exit', () => reject(Error('Agent store already has a writer')));
+    child.stdout.once('data', () => resolve());
+  });
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    const done = new Promise<void>((r) => {
+      if (child.exitCode !== null) r();
+      else child.once('exit', () => r());
+    });
+    child.stdin.end();
+    await done;
+    // Keep the lock inode: unlinking it can let concurrent writers lock different files.
+  };
 }
 /** Export only while holding the writer lock or from the service's serialized queue. */
 export async function exportSnapshot(root: string, destination: string) {

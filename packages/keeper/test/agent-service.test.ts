@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { describe, it, expect, vi } from 'vitest';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -204,16 +205,82 @@ describe('durable service lifecycle', () => {
       await rm(root, { recursive: true, force: true });
     }
   });
-  it('recovers a dead local process lock but refuses malformed locks', async () => {
+  it('reclaims stale lock metadata safely without trusting PID values', async () => {
     const root = await mkdtemp(join(tmpdir(), 'agent-'));
     try {
       await writeFile(join(root, '.service.lock'), '2147483647');
       const release = await agentLock(root);
       await release();
       await writeFile(join(root, '.service.lock'), 'bad');
-      await expect(agentLock(root)).rejects.toThrow('Invalid');
+      const releaseAgain = await agentLock(root);
+      await releaseAgain();
     } finally {
       await rm(root, { recursive: true, force: true });
     }
   });
+});
+
+it('kernel releases the writer lock after an abrupt process death, independent of PID reuse', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'agent-crash-'));
+  const module = new URL('../dist/keeper/src/agent-storage.js', import.meta.url)
+    .href;
+  const child = spawn(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import {agentLock} from ${JSON.stringify(module)};await agentLock(${JSON.stringify(root)});console.log('locked');setInterval(()=>{},1000);`,
+    ],
+    { stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  try {
+    await new Promise<void>((ok, fail) => {
+      child.stdout.once('data', () => ok());
+      child.once('error', fail);
+      child.once('exit', (code) => {
+        if (code !== null) fail(Error('Lock child exited'));
+      });
+    });
+    await expect(agentLock(root)).rejects.toThrow('writer');
+    const exited = new Promise<void>((r) => child.once('exit', () => r()));
+    child.kill('SIGKILL');
+    await exited;
+    let release: (() => Promise<void>) | undefined;
+    for (let i = 0; i < 100 && !release; i++) {
+      try {
+        release = await agentLock(root);
+      } catch {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    }
+    expect(release).toBeDefined();
+    await release?.();
+  } finally {
+    child.kill('SIGKILL');
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+it('releases its writer lock when feed port binding fails', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'agent-port-')),
+    s = await server();
+  try {
+    const port = new URL(s.base).port;
+    await expect(
+      startAgentService({
+        exec: 'anvil',
+        once: true,
+        env: {
+          KEEPER_STATE_DIR: root,
+          AGENT_ALLOW_EPHEMERAL: '1',
+          AGENT_FEED_PORT: port,
+        },
+      }),
+    ).rejects.toThrow('port unavailable');
+    const release = await agentLock(root);
+    await release();
+  } finally {
+    await s.close();
+    await rm(root, { recursive: true, force: true });
+  }
 });

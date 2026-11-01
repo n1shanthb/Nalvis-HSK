@@ -12,6 +12,7 @@ import {
   type Provider,
   type JournalEntry,
   type AgentConfig,
+  type WatchState,
 } from '../../core/src/agent/index.js';
 import { feedServer, projectFeed, type AgentState } from './agent-feed.js';
 import { storageReady, agentLock, exportSnapshot } from './agent-storage.js';
@@ -32,6 +33,7 @@ export async function startAgentService(options: {
   env?: Env;
   // Test injection keeps all hosted providers and real networks outside tests.
   clients?: AgentClients;
+  connect?: typeof connectAgentRpc;
   provider?: Provider;
   config?: AgentConfig;
 }) {
@@ -45,11 +47,25 @@ export async function startAgentService(options: {
   let storageOk = false,
     release: (() => Promise<void>) | undefined;
   try {
+    if (
+      env.AGENT_DATA_DIR &&
+      root !== resolve(env.AGENT_DATA_DIR) &&
+      !root.startsWith(resolve(env.AGENT_DATA_DIR) + '/')
+    )
+      throw Error('State root must be inside AGENT_DATA_DIR');
     await storageReady(
       env.AGENT_DATA_DIR ?? root,
       env.AGENT_ALLOW_EPHEMERAL === '1',
     );
+    await storageReady(root, env.AGENT_ALLOW_EPHEMERAL === '1');
     release = await agentLock(root);
+    const storedChain = await store.read<number>('execution-chain.json');
+    if (storedChain !== undefined && storedChain !== chain) {
+      await release();
+      release = undefined;
+      throw Error('Store belongs to another chain');
+    }
+    await store.write('execution-chain.json', chain);
     storageOk = true;
   } catch {
     reason =
@@ -73,6 +89,27 @@ export async function startAgentService(options: {
     const today = now - (now % 86400);
     const calls = entries.filter((e) => e.type === 'LLM_CALL' && e.at >= today);
     const budget = runtime?.budget;
+    const watches = storageOk
+      ? await store.read<WatchState>('watches.json')
+      : undefined;
+    const scheduled = (watches?.watches ?? []).flatMap((w) => {
+      if (w.expiresAt !== undefined && w.expiresAt <= now) return [];
+      const k = w.kind;
+      if (k.type === 'retry' || (k.type === 'time' && k.at !== undefined))
+        return w.fireCount
+          ? []
+          : [
+              Math.max(
+                'at' in k ? (k.at ?? now) : now,
+                (w.lastFiredAt ?? 0) + w.cooldownSec,
+              ),
+            ];
+      if (k.type === 'time' && k.everySec !== undefined)
+        return [
+          (w.lastFiredAt ?? w.createdAt) + Math.max(k.everySec, w.cooldownSec),
+        ];
+      return [];
+    });
     const state: AgentState = {
       mode: 'live',
       state:
@@ -92,9 +129,7 @@ export async function startAgentService(options: {
         fitter: env.FITTER_MODEL || env.STRATEGIST_MODEL || '',
       },
       lastWakeAt: budget?.lastWake ?? null,
-      nextWakeAt: budget?.lastWake
-        ? budget.lastWake + (config?.heartbeatSec ?? 3600)
-        : null,
+      nextWakeAt: scheduled.length ? Math.min(...scheduled) : null,
       wakesToday: budget?.wakes.filter((t) => t >= today).length ?? 0,
       llmCallsToday: calls.length,
       spendTodayUsd:
@@ -136,13 +171,18 @@ export async function startAgentService(options: {
     await release?.();
     throw Error('Invalid feed port');
   }
-  await new Promise<void>((ok, fail) => {
-    server.once('error', fail);
-    server.listen(port, '0.0.0.0', () => {
-      server.off('error', fail);
-      ok();
+  try {
+    await new Promise<void>((ok, fail) => {
+      server.once('error', fail);
+      server.listen(port, '0.0.0.0', () => {
+        server.off('error', fail);
+        ok();
+      });
     });
-  });
+  } catch {
+    await release?.();
+    throw Error('Agent feed port unavailable');
+  }
   let stopped = false,
     active = Promise.resolve();
   const abort = new AbortController();
@@ -155,15 +195,8 @@ export async function startAgentService(options: {
   const cycle = async () => {
     if (!storageOk) return;
     try {
-      if (!config)
-        config = configFromEnv(
-          await readFile(
-            env.AGENT_POLICY_FILE ??
-              join(repositoryRoot(), 'policy/agent-v3.json'),
-            'utf8',
-          ),
-          env,
-        );
+      if (!options.clients && !env.AGENT_PRIVATE_KEY)
+        throw new PreflightError('offline', 'AGENT_PRIVATE_KEY missing');
       const provider =
         options.provider ??
         openRouter({
@@ -171,6 +204,41 @@ export async function startAgentService(options: {
           AGENT_OPENROUTER_API_KEY:
             env.OPENROUTER_API_KEY ?? env.AGENT_OPENROUTER_API_KEY,
         });
+      if (!provider.isConfigured())
+        throw new PreflightError(
+          'offline',
+          'OPENROUTER_API_KEY or STRATEGIST_MODEL missing',
+        );
+      if (!config) {
+        try {
+          config = configFromEnv(
+            await readFile(
+              env.AGENT_POLICY_FILE ??
+                join(repositoryRoot(), 'policy/agent-v3.json'),
+              'utf8',
+            ),
+            { ...env, AGENT_POLL_SEC: env.AGENT_POLL_SEC ?? '30' },
+          );
+        } catch {
+          throw new PreflightError(
+            'needs_owner',
+            'AGENT_POLICY_FILE missing or invalid v3 configuration',
+          );
+        }
+      }
+      if (config.mode === 'rules-demo')
+        throw new PreflightError(
+          'needs_owner',
+          'rules-demo is unavailable in the always-on service',
+        );
+      try {
+        validateAgentPolicy(config);
+      } catch {
+        throw new PreflightError(
+          'needs_owner',
+          'Local v3 policy/model/prompt binding invalid',
+        );
+      }
       if (!agent) {
         validateAgentPolicy(config);
         const journal = await createJournal(store);
@@ -186,7 +254,11 @@ export async function startAgentService(options: {
                   );
               },
             }
-          : await connectAgentRpc(options.exec, store, env);
+          : await (options.connect ?? connectAgentRpc)(
+              options.exec,
+              store,
+              env,
+            );
         await rpc.reconcile(journal);
         const live = await rpc.clients.readState();
         policyHashOk = live.mandate.policyHash === validateAgentPolicy(config);
@@ -247,16 +319,21 @@ export async function startAgentService(options: {
           : 'Preflight or wake failed; inspect policy, RPC, volume and pending intent';
       // Never emit arbitrary RPC/provider errors: they can contain credential-bearing URLs.
     }
-    if (storageOk) {
-      const { feed } = await snapshot();
-      await store.write('feed.json', feed);
-      await store.write('service-status.json', {
-        state: forced ?? feed.state.state,
-        reason,
-        ephemeral: env.AGENT_ALLOW_EPHEMERAL === '1',
-        chain,
-      });
-    }
+    if (storageOk)
+      try {
+        const { feed } = await snapshot();
+        await store.write('feed.json', feed);
+        await store.write('service-status.json', {
+          state: forced ?? feed.state.state,
+          reason,
+          ephemeral: env.AGENT_ALLOW_EPHEMERAL === '1',
+          chain,
+        });
+      } catch {
+        storageOk = false;
+        forced = 'offline';
+        reason = 'Agent state storage unavailable; execution stopped';
+      }
   };
   let readState: AgentClients['readState'] | undefined;
   const run = async () => {
@@ -276,14 +353,20 @@ export async function startAgentService(options: {
   const done = run();
   const close = async () => {
     stop();
-    await done;
-    await active;
-    await new Promise<void>((ok, fail) =>
-      server.close((e) => (e ? fail(e) : ok())),
-    );
-    process.off('SIGTERM', stop);
-    process.off('SIGINT', stop);
-    await release?.();
+    try {
+      await done;
+      await active;
+    } finally {
+      try {
+        await new Promise<void>((ok, fail) =>
+          server.close((e) => (e ? fail(e) : ok())),
+        );
+      } finally {
+        process.off('SIGTERM', stop);
+        process.off('SIGINT', stop);
+        await release?.();
+      }
+    }
   };
   return {
     server,
@@ -329,6 +412,11 @@ export async function exportAgentCommand(argv: string[]) {
   const root = stateRoot(),
     release = await agentLock(root);
   try {
+    const storedChain = await jsonFileStore(root).read<number>(
+      'execution-chain.json',
+    );
+    if (storedChain !== Number(argv[1]))
+      throw Error('Export chain differs from stored execution chain');
     await exportSnapshot(
       root,
       join(repositoryRoot(), 'receipts', argv[1], 'agent'),

@@ -14,6 +14,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
+  hash,
   addresses,
   assertWritableChain,
   collectEvidence,
@@ -26,6 +27,7 @@ import {
   calldata,
   simulate,
   receiptV3Schema,
+  mandateStateSchema,
   type AgentClients,
   type Store,
   type Journal,
@@ -111,14 +113,14 @@ export async function connectAgentRpc(
         'Deployment missing from docs/ADDRESSES.md',
       );
   }
+  const code = await client.getCode({ address: vault });
+  if (!code || code === '0x')
+    throw new PreflightError('needs_owner', 'Vault code missing');
   const owner = await client.readContract({
     address: vault,
     abi: vaultAbi,
     functionName: 'owner',
   });
-  const code = await client.getCode({ address: vault });
-  if (!code || code === '0x')
-    throw new PreflightError('needs_owner', 'Vault code missing');
   if (!same(owner, deployment.owner))
     throw new PreflightError('needs_owner', 'Vault owner mismatch');
   const wallet = createWalletClient({
@@ -215,8 +217,13 @@ export async function connectAgentRpc(
         });
     }
     // Persist event queue before advancing cursor, so no owner event is lost.
+    const acknowledged =
+      (await store.read<{ ownerEvents?: string[] }>('runtime.json'))
+        ?.ownerEvents ?? [];
     await store.write('owner-events.json', [
-      ...((await store.read<typeof rows>('owner-events.json')) ?? []),
+      ...((await store.read<typeof rows>('owner-events.json')) ?? []).filter(
+        (e) => !acknowledged.includes(e.id),
+      ),
       ...rows,
     ]);
     await store.write('owner-cursor.json', {
@@ -297,6 +304,11 @@ export async function connectAgentRpc(
     async send(receipt) {
       await guard();
       const s = await readState();
+      const committed = mandateStateSchema.parse(
+        await store.read(`states/${receipt.mandateCheck.stateHash}.json`),
+      );
+      if (hash(s.mandate) !== hash(committed.mandate))
+        throw Error('Mandate changed before signing');
       if (
         s.head !== receipt.prevHead ||
         s.nextNonce !== receipt.final.nonce ||
