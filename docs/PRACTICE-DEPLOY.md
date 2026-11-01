@@ -1,8 +1,8 @@
 # Task 9 practice deployment status
 
-**Status: BLOCKED — no testnet deployment or owner-signed mandate is confirmed.**
-This report distinguishes read-only testnet observations and local tests from
-transactions. It does not claim that a simulated fork is a live deployment.
+**Status: DEPLOYMENT VERIFIED; mandate, funding, and execution scenarios remain pending.**
+Deployment facts below are confirmed from chain-133 receipts and read-only state
+calls. This is not a claim that the trading workflow is configured or complete.
 
 Rechecked on 1 November 2026.
 
@@ -12,28 +12,43 @@ Rechecked on 1 November 2026.
 |---|---|
 | Network | HSK Testnet |
 | Chain ID | `133` (read-only `eth_chainId` via `https://testnet.hsk.xyz`) |
-| `DEPLOY_COMMIT` | Set in the ignored local `contracts/.env` to the exact committed source revision before deployment |
+| Source commit | `00f79c4ea5fcced27b3e33940a62ba56928f1b7e` |
 | Initial temporary deployment owner | `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927` |
-| Initial owner Testnet balance | `0.1 HSK` (read-only RPC) |
+| Current owner returned by both contracts | `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927` |
 | Final intended owner | Nishanth's Ledger address; not yet supplied or verified |
 | Agent public address from local `.env` | `0x6845a4caCcEaCd6eE5407C9E217610c26964ba2a` |
-| Owner / agent distinct | Yes; Ledger identity must still be independently confirmed with Nishanth |
+| Vault mandate agent | Zero address; mandate has not been configured |
+| Router policy hash | Zero |
 | Deployer public address | `0xee9A370e88385E7f366E1e7c88D73F3a1691fEe1` (configured in local `.env`) |
-| Foundry keystores | `nalvis-deployer` and `nalvis-agent` are present; user reports locally verifying their public addresses against `.env` |
 | Configured owner / agent / deployer addresses distinct | Yes |
-| Deployer / agent / temporary owner native test HSK | Each `0.1 HSK`, confirmed by read-only RPC |
-| Owner / agent / deployer WHSK and test-USDT | All balances `0`; both tokens have 18 decimals |
-| Constructor gas estimates | Vault `3,477,693`; router `810,261`; total `4,287,954` gas by `eth_estimateGas` |
-| Current fee quote | `1.001 gwei` (`cast gas-price`); estimated constructor cost `0.004292241954 HSK`, `0.005365302443 HSK` with 25% margin |
+| Deployment block | `35175424` |
+| Vault gas used | `3,531,069` |
+| Router gas used | `901,698` |
+| Deployer / token balances | Not included here; recheck live before funding or execution |
 | `.env` Git protection | `contracts/.env` is ignored by `.gitignore` and is not tracked |
 
-The user reports both encrypted keystore aliases were unlocked locally and
-their public addresses matched the configured roles; this session did not unlock
-or sign with either account. The temporary initial owner is intentionally not
-the Ledger address. Nishanth's final Ledger address has not been supplied or
-independently verified. No private key, password, or signature was read or
-reported. Gas estimates and fee quotes are read-only RPC estimates, not mined
-measurements; fee quotes may change.
+## Confirmed deployment receipts
+
+Both transactions were mined on chain 133 in block `35175424`, each with
+successful status (`0x1`). Their receipt block hash is
+`0x8ef35ba9695648e91c213a3b9201fb397e4e6a0bf31775cf940389f0b2110e3d`.
+Read-only `eth_getCode` calls returned 15,704 bytes for the vault and 3,680
+bytes for the router.
+
+| Contract | Address | Transaction hash | Gas used | Explorer |
+|---|---|---|---:|---|
+| EdgewiseVault | `0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc` | `0xcb7480c81476eb9eb76f4ef7eab8e872e3d5c94cde4b23173b1ca9ad247c6941` | 3,531,069 | [Contract](https://testnet-explorer.hskchain.net/address/0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc) |
+| ProofTradeRouter | `0xC5Fa869C8423B41696886A7761ec31b3846f4e4B` | `0x24519a67fa5a3f4e050ce73249b0099503fcad08424b106ad8a9fed70cae031f` | 901,698 | [Contract](https://testnet-explorer.hskchain.net/address/0xC5Fa869C8423B41696886A7761ec31b3846f4e4B) |
+
+Both `owner()` calls return the temporary owner address above, and both
+`pendingOwner()` calls return zero. The vault constructor state was verified as
+SwapRouter02 `0xa6914E66690c6794244B5f66a09eAEbf66254237`, pool
+`0xc076FB478b77633736738579c7f48D2539604a50`, WHSK
+`0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6`, test-USDT
+`0x98B6173A8B7DFc52ce8bc88f1184a918A1CCaa4F`, fee 3000, TWAP 600 seconds,
+and oracle zero. Router's immutable SwapRouter02 address was also verified.
+See [`contracts/deployments/133.json`](../contracts/deployments/133.json) for
+the confirmed manifest.
 
 The deployment entrypoint reads all three configured roles, matches the CLI
 sender to `DEPLOYER_ADDRESS`, assigns `OWNER_ADDRESS` as owner of both
@@ -81,13 +96,9 @@ test-USDT both returned `decimals() = 18`. The primary pool returned
 
 ## Deployment, mandate, and funding
 
-No vault or ProofTradeRouter deployment is recorded in this checkout:
-`contracts/deployments/` contains only `.gitkeep`, and there is no Foundry
-broadcast artifact. A deployment elsewhere cannot be ruled out without its
-address or transaction hash. No deployment transaction hash, receipt, mined
-block, gas use, or contract address is available to report. Accordingly,
-`contracts/deployments/133.json` was not created or populated with simulation
-output.
+The deployment is now recorded in `contracts/deployments/133.json` from
+confirmed receipts and read-only state. The vault mandate agent is zero and
+the router policy hash is zero: deployment did not configure either.
 
 The non-broadcast `MandateCalldata.s.sol` script loaded the local environment
 and completed successfully. It produced calldata for the configured agent with
@@ -127,17 +138,17 @@ verified. The Ledger Ethereum app and chain-133 blind-signing setting remain
 
 ## Six requested scenarios
 
-No testnet deployment is confirmed in this record, so none of these scenarios
-has an on-chain transaction or testnet receipt:
+Deployment is confirmed, but the mandate and funding are not ready; none of
+these execution scenarios has an on-chain transaction or testnet receipt:
 
 | Scenario | Testnet result |
 |---|---|
 | TRADE | Not executed — blocked before deployment and funding |
 | RESIZE | Not executed — blocked before deployment and funding |
-| WAIT | Not executed — no live mandate/contract |
-| REJECT | Not executed — no live mandate/contract |
-| PAUSE | Not executed — no deployed vault or owner transaction |
-| REVOKE | Not executed — no deployed vault or owner transaction |
+| WAIT | Not executed — mandate not configured |
+| REJECT | Not executed — mandate not configured |
+| PAUSE | Not executed — no owner transaction |
+| REVOKE | Not executed — no owner transaction |
 
 The verifier CLI passed on one repository-provided **recorded local Anvil
 fixture**. The output explicitly labels it “recorded RPC replay (offline; not
@@ -184,7 +195,8 @@ allowing those contexts on chain 133. The focused Testnet fork suite passes
 4. Have Nishanth connect the Ledger, open the Ethereum app, verify chain-133
    blind-signing support, and review transaction details locally before signing.
    This session did not interact with the Ledger.
-5. First establish whether a prior deployment exists. Then deploy only on chain
-   133 if needed, verify mined receipts and bytecode, configure the mandate, fund
-   the vault, execute scenarios, and write the deployment manifest from confirmed
-   transaction data only.
+5. Deployment and receipt verification are complete. Configure the mandate with
+   the intended agent, complete the separately approved Ledger ownership
+   handover when its address is verified, fund the vault using verified test
+   tokens, then execute and verify scenarios. Record only confirmed transaction
+   data.
