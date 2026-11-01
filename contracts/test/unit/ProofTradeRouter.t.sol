@@ -109,6 +109,54 @@ contract ProofTradeRouterTest is Test {
         assertEq(r.policyHash(), bytes32(uint256(7)));
     }
 
+    function testOwnershipTransferRequiresAcceptance() public {
+        vm.expectEmit(true, true, false, true, address(r));
+        emit ProofTradeRouter.OwnershipTransferStarted(address(this), alice);
+        r.transferOwnership(alice);
+        assertEq(r.owner(), address(this));
+        assertEq(r.pendingOwner(), alice);
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, false, true, address(r));
+        emit ProofTradeRouter.OwnershipTransferred(address(this), alice);
+        r.acceptOwnership();
+
+        assertEq(r.owner(), alice);
+        assertEq(r.pendingOwner(), address(0));
+        vm.prank(alice);
+        r.setPolicy(bytes32(uint256(7)));
+        assertEq(r.policyHash(), bytes32(uint256(7)));
+        vm.expectRevert(ProofTradeRouter.Unauthorized.selector);
+        r.setPolicy(bytes32(uint256(8)));
+    }
+
+    function testRouterOwnerCanCancelPendingOwnershipTransfer() public {
+        r.transferOwnership(alice);
+        r.transferOwnership(address(0));
+        assertEq(r.owner(), address(this));
+        assertEq(r.pendingOwner(), address(0));
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Unauthorized.selector);
+        r.acceptOwnership();
+    }
+
+    function testRouterCannotTransferOwnershipToItself() public {
+        vm.expectRevert(ProofTradeRouter.InvalidOwner.selector);
+        r.transferOwnership(address(this));
+    }
+
+    function testRouterOnlyCurrentOwnerCanNominateOwner() public {
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Unauthorized.selector);
+        r.transferOwnership(bob);
+    }
+
+    function testRouterCannotAcceptWithoutNomination() public {
+        vm.prank(alice);
+        vm.expectRevert(ProofTradeRouter.Unauthorized.selector);
+        r.acceptOwnership();
+    }
+
     function testUnderfill() public {
         router.setUnderfill(true);
         vm.prank(alice);

@@ -109,13 +109,14 @@ Engineer A does **Task 8** (agent, desk, UI). Engineer B does **Task 9** (contra
    - Added mandate field reference section documenting `maxDrawdownBps`, `maxSlippageBps`, `minIntervalSec`, `maxDailyInB`.
    - `MandateCalldata.s.sol` already updated in Phase 1 to read `MAX_DRAWDOWN_BPS` env var (default 2000).
 7. **Full practice deploy on testnet (chain 133), no Ledger** — the dress rehearsal for Nishanth's real run. Do it after your Task 9 contracts are final:
-   - Use **two fresh throwaway testnet wallets** of your own: one as practice *owner*, one as practice *agent*. Fund them from https://hskchain.net/faucet (0.1 HSK/day each; ask Nishanth if you run short). Never use a wallet holding real funds; never commit keys.
-   - Follow `scripts/testnet-bootstrap.md` **exactly as written**, top to bottom, substituting the throwaway owner for the Ledger. Deploy vault / router / ReceiptChain, sign the mandate with the throwaway owner, run the keeper until you get at least one real TRADE, WAIT, RESIZE and REJECT receipt, run `nalvis verify <txHash>` on each (expect PASS), then pause → revoke → confirm an agent trade reverts.
+   - The configured temporary deployment owner is `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927`; the intended final owner is Nishanth's Ledger address, to be supplied and independently verified later.
+   - Both contracts use two-step ownership transfer. After deployment, the temporary owner must call `transferOwnership(LEDGER_ADDRESS)` on each contract, and Nishanth must call `acceptOwnership()` on each contract from the Ledger. These are four separate owner-authorized transactions; verify each `owner()` and cleared `pendingOwner()` before configuring the mandate.
+   - Follow `scripts/testnet-bootstrap.md` only after that ownership blocker is resolved. Never use a wallet holding real funds; never commit keys.
    - Run `scripts/verify-blockscout.sh` against the practice contracts.
    - **Fix the runbook** wherever a step was wrong, missing or confusing, and note gas used + HSK spent per step, so Nishanth's Ledger run is a straight copy.
    - Save results to `deployments/133-practice.json` (clearly labelled PRACTICE, throwaway owner, not the demo deployment) and `docs/PRACTICE-DEPLOY.md` (every tx hash with explorer link https://testnet-explorer.hsk.xyz, verify output, problems hit, fixes made). Only real tx hashes, never invented.
    - Chain 133 only. **Never broadcast on mainnet 177.**
-   - **Status:** PENDING — Requires Nishanth to supply testnet wallet credentials.
+   - **Status:** PENDING — Two-step ownership handover is implemented in both contracts; practice deployment and handover remain pending.
 
 ### Review Resolutions & Implementation Summary
 

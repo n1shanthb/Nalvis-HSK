@@ -29,7 +29,7 @@ The LLM is optional and boxed in:
 ```
 contracts/                 Foundry project (solc 0.8.24, optimizer 200 runs)
   src/ReceiptChain.sol     abstract: seq, head, Receipt event, prevHead check
-  src/EdgewiseVault.sol    owner (Ledger) + mandate + trade() + commitHold() + revoke/withdraw
+  src/EdgewiseVault.sol    owner + mandate + trade() + commitHold() + revoke/withdraw
   src/ProofTradeRouter.sol fallback product: keeper-wallet commitAndSwap()/commitHold() + setPolicy(hash)
   src/interfaces/          minimal ISwapRouter02 (IV3SwapRouter), IUniswapV3Pool, IQuoterV2, IAggregatorV3, IERC20
   src/lib/                 0.8-compatible TickMath/FullMath ports (check license; note it in README)
@@ -55,7 +55,7 @@ TypeScript uses a pnpm workspace, Node 22, TypeScript strict mode, `viem` for ch
 - `event Receipt(uint64 indexed seq, bytes32 indexed receiptHash, bytes32 prevHead, bytes32 policyHash, uint8 kind, address tokenIn, uint256 amountIn, uint256 amountOut, uint256 minOut, uint256 refOut)`. Hold receipts use zeros for the token and amount fields.
 
 **`EdgewiseVault is ReceiptChain`**
-- **Constructor** takes `(owner, router, pool, tokenA=WHSK, tokenB=USDT, fee, twapWindowSec, oracle /*may be 0*/, oracleBandBps, oracleMaxAge)`. Everything structural is immutable.
+- **Constructor** takes `(owner, router, pool, tokenA=WHSK, tokenB=USDT, fee, twapWindowSec, oracle /*may be 0*/, oracleBandBps, oracleMaxAge)`. Router, pool, tokens, fee, TWAP and oracle configuration are immutable; ownership can be handed over with the two-step owner nomination/acceptance flow.
 - **No initializer** and no first-caller setup functions.
 - **Owner-only**:
   - `setMandate(Mandate)` with fields `{agent, expiry, maxTradeInA, maxTradeInB, maxDailyInB, maxExposureBps, maxSlippageBps, minIntervalSec, policyHash}`.
@@ -125,7 +125,7 @@ The evidence hash is `evidenceHash = keccak256(canonical(evidence))`.
    - Tests use anvil's well-known dev keys or `vm.addr`/`makeAddr`.
    - `.env` is gitignored, and you must never print env values.
    - **Codex Cloud tasks never receive private keys.** Testnet broadcasting is done locally by the human.
-4. **Separate keys and roles.** owner (a Ledger address, public), deployer (testnet hot key) and agent/keeper (testnet hot key) must be three different addresses. The deploy script and keeper must refuse to run if any two are equal. The deployer has **no** privileges after deployment.
+4. **Separate keys and roles.** owner, deployer (testnet hot key) and agent/keeper (testnet hot key) must be three different addresses. The final owner is intended to be Nishanth's Ledger address. The current temporary deployment owner is `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927`; both contracts support two-step ownership transfer. After deployment, the temporary owner nominates the Ledger separately on both contracts, and the Ledger accepts each nomination. The deploy script and keeper must refuse to run if any two roles are equal. The deployer has **no** privileges after deployment.
 5. **Fix the known Ledger-Guardian-Agent (LGA) holes.** Do not copy these patterns from https://github.com/n1shanthb/Ledger-gaurd (public reference repo):
    - A permissionless price-feed setter: GuardianPolicyManager `setPriceFeed`. Here the oracle address is a constructor immutable and there is no setter.
    - `approve(type(uint256).max)`: keeper `policyTx.ts`. Use exact-amount approvals, and reset them to 0 after use.

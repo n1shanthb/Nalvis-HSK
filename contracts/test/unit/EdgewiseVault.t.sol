@@ -131,6 +131,62 @@ contract EdgewiseVaultTest is Test {
         v.setMandate(m);
     }
 
+    function testOwnershipTransferRequiresAcceptance() public {
+        vm.expectEmit(true, true, false, true, address(v));
+        emit EdgewiseVault.OwnershipTransferStarted(address(this), stranger);
+        v.transferOwnership(stranger);
+        assertEq(v.owner(), address(this));
+        assertEq(v.pendingOwner(), stranger);
+
+        vm.prank(stranger);
+        vm.expectEmit(true, true, false, true, address(v));
+        emit EdgewiseVault.OwnershipTransferred(address(this), stranger);
+        v.acceptOwnership();
+
+        assertEq(v.owner(), stranger);
+        assertEq(v.pendingOwner(), address(0));
+        vm.prank(stranger);
+        v.pause();
+        assertTrue(v.paused());
+        vm.expectRevert(EdgewiseVault.Unauthorized.selector);
+        v.unpause();
+    }
+
+    function testVaultOwnerCanCancelPendingOwnershipTransfer() public {
+        v.transferOwnership(stranger);
+        v.transferOwnership(address(0));
+        assertEq(v.owner(), address(this));
+        assertEq(v.pendingOwner(), address(0));
+        vm.prank(stranger);
+        vm.expectRevert(EdgewiseVault.Unauthorized.selector);
+        v.acceptOwnership();
+    }
+
+    function testVaultCannotTransferOwnershipToItselfOrAgent() public {
+        vm.expectRevert(EdgewiseVault.InvalidOwner.selector);
+        v.transferOwnership(address(this));
+        vm.expectRevert(EdgewiseVault.InvalidOwner.selector);
+        v.transferOwnership(agent);
+    }
+
+    function testVaultOnlyCurrentOwnerCanNominateOwner() public {
+        vm.prank(stranger);
+        vm.expectRevert(EdgewiseVault.Unauthorized.selector);
+        v.transferOwnership(makeAddr("next owner"));
+    }
+
+    function testVaultAgentCannotAcceptOwnership() public {
+        v.transferOwnership(stranger);
+        v.setMandate(
+            EdgewiseVault.Mandate(
+                stranger, block.timestamp + 30 days, 100e18, 100e18, 150e18, 10000, 100, 0, 0, keccak256("policy")
+            )
+        );
+        vm.prank(stranger);
+        vm.expectRevert(EdgewiseVault.Unauthorized.selector);
+        v.acceptOwnership();
+    }
+
     function testNonOwnerRevoke() public {
         vm.prank(stranger);
         vm.expectRevert(EdgewiseVault.Unauthorized.selector);

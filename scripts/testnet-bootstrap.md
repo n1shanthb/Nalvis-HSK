@@ -6,36 +6,46 @@ no proven edge. Requirements: Foundry, git, Python 3, jq, a Ledger with its Ethe
 app, and enough faucet test HSK for wrapping and gas. All amounts below are raw
 units; **both WHSK and test-USDT have 18 decimals on 133** (mainnet USDT has 6).
 
-## 1. Create two separate testnet wallets
+## 1. Configure the approved local signers
 
 ```bash
 set -euo pipefail
 set +x
-cast wallet new
-cast wallet new
-# Secure the first as deployer, second as agent. Do not paste keys into chat.
-read -rs -p 'Testnet deployer key: ' TESTNET_DEPLOYER_KEY; echo
-export TESTNET_DEPLOYER_KEY
-read -rs -p 'Testnet agent key: ' TESTNET_AGENT_KEY; echo
-export TESTNET_AGENT_KEY
-read -r -p 'Ledger owner PUBLIC address: ' OWNER_ADDRESS
-export OWNER_ADDRESS
-export HSK_TESTNET_RPC=https://testnet.hsk.xyz
-export DEPLOYER_ADDRESS=$(cast wallet address --private-key "$TESTNET_DEPLOYER_KEY")
-export AGENT_ADDRESS=$(cast wallet address --private-key "$TESTNET_AGENT_KEY")
+# Import only the already-approved accounts. Type secrets into Foundry's local
+# interactive prompts; never put them in .env, shell variables, files, or chat.
+cast wallet list | grep -q '^nalvis-deployer' || cast wallet import nalvis-deployer --interactive
+cast wallet list | grep -q '^nalvis-agent' || cast wallet import nalvis-agent --interactive
+set -a
+source contracts/.env
+set +a
+test "$(cast wallet address --account nalvis-deployer)" = "$DEPLOYER_ADDRESS"
+test "$(cast wallet address --account nalvis-agent)" = "$AGENT_ADDRESS"
 test "${OWNER_ADDRESS,,}" != "${DEPLOYER_ADDRESS,,}"
 test "${OWNER_ADDRESS,,}" != "${AGENT_ADDRESS,,}"
 test "${DEPLOYER_ADDRESS,,}" != "${AGENT_ADDRESS,,}"
 assert_testnet() { test "$(cast chain-id --rpc-url "$HSK_TESTNET_RPC")" = 133; }
 send133() { assert_testnet; cast send --rpc-url "$HSK_TESTNET_RPC" "$@"; }
 assert_testnet
+cast wallet list
+cast balance "$DEPLOYER_ADDRESS" --rpc-url "$HSK_TESTNET_RPC"
 ```
 
-Claim test HSK for deployer and agent at https://faucet.hsk.xyz (redirects to
-https://faucet.hashkeychain.net). **UNVERIFIED**: claiming from the faucet has not
-been tested. The agent needs gas only; the deployer funds the vault. Keep the
-Ledger owner distinct, and fund it with test HSK for its mandate transaction.
-Never use real funds. Stop if the faucet or any preflight fails.
+If an approved account is missing, stop and have its owner import that existing
+account locally; do not generate a replacement. The configured temporary initial
+owner is `0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927`; Nishanth's Ledger is the
+intended final owner and its address must be provided and verified separately.
+The temporary owner needs test HSK for two nominations; the final Ledger needs
+test HSK for two acceptances and the later mandate transaction.
+Claim test HSK for deployer and agent at
+https://faucet.hsk.xyz/faucet (redirects to the HSK Chain faucet); it currently
+offers 1 HSK per address every 24 hours. The agent needs gas only; the deployer
+funds the vault. Never use real funds. Stop if the faucet or any preflight fails.
+
+Both contracts support two-step ownership handover. After deployment, the
+temporary owner must nominate the verified Ledger on each contract, and the
+Ledger must accept on each contract. This is four separate transactions total;
+verify each `owner()` and zero `pendingOwner()` afterward. Vault mandate/agent
+configuration remains a separate owner action and is not changed by transfer.
 
 ## 2. Wrap test HSK and acquire test-USDT
 
@@ -52,21 +62,19 @@ export POOL=0xc076FB478b77633736738579c7f48D2539604a50
 assert_testnet
 test "$(cast call "$WHSK" 'decimals()(uint8)' --rpc-url "$HSK_TESTNET_RPC")" = 18
 test "$(cast call "$USDT" 'decimals()(uint8)' --rpc-url "$HSK_TESTNET_RPC")" = 18
-send133 "$WHSK" 'deposit()' --value 0.5ether --private-key "$TESTNET_DEPLOYER_KEY"
+send133 --account nalvis-deployer "$WHSK" 'deposit()' --value 0.5ether
 export SWAP_IN=200000000000000000
 QUOTE=$(cast call "$QUOTER" \
   'quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)' \
   "($WHSK,$USDT,$SWAP_IN,3000,0)" --rpc-url "$HSK_TESTNET_RPC" | sed -n '1s/ .*//p')
 export MIN_OUT=$(python3 -c 'import sys; print(int(sys.argv[1])*99//100)' "$QUOTE")
 python3 -c 'import sys; assert int(sys.argv[1]) > 0' "$MIN_OUT"
-send133 "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" "$SWAP_IN" \
-  --private-key "$TESTNET_DEPLOYER_KEY"
+send133 --account nalvis-deployer "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" "$SWAP_IN"
 DEADLINE=$(( $(date +%s) + 300 ))
 SWAP_DATA=$(cast calldata 'exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))' \
   "($WHSK,$USDT,3000,$DEPLOYER_ADDRESS,$SWAP_IN,$MIN_OUT,0)")
-send133 "$SWAP_ROUTER" 'multicall(uint256,bytes[])(bytes[])' "$DEADLINE" "[$SWAP_DATA]" \
-  --private-key "$TESTNET_DEPLOYER_KEY"
-send133 "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" 0 --private-key "$TESTNET_DEPLOYER_KEY"
+send133 --account nalvis-deployer "$SWAP_ROUTER" 'multicall(uint256,bytes[])(bytes[])' "$DEADLINE" "[$SWAP_DATA]"
+send133 --account nalvis-deployer "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" 0
 cast call "$USDT" 'balanceOf(address)(uint256)' "$DEPLOYER_ADDRESS" --rpc-url "$HSK_TESTNET_RPC"
 ```
 
@@ -83,34 +91,72 @@ export TWAP_WINDOW_SEC=600
 assert_testnet
 cd contracts
 forge script script/Deploy.s.sol --rpc-url "$HSK_TESTNET_RPC" --broadcast \
-  --private-key "$TESTNET_DEPLOYER_KEY" -vvv
+  --account nalvis-deployer --sender "$DEPLOYER_ADDRESS" -vvv
 cd ..
-export VAULT_ADDRESS=$(jq -er '.vault' contracts/deployments/133.json)
-export PROOF_ROUTER_ADDRESS=$(jq -er '.router' contracts/deployments/133.json)
+# Set these from the script's output only after independently verifying both
+# successful mined deployment receipts, chain ID 133, and deployed bytecode.
+read -r -p 'Verified vault address: ' VAULT_ADDRESS
+read -r -p 'Verified router address: ' PROOF_ROUTER_ADDRESS
 cast code "$VAULT_ADDRESS" --rpc-url "$HSK_TESTNET_RPC"
 cast call "$VAULT_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
 cast call "$PROOF_ROUTER_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
-# Compare both owners to the Ledger address; verify BOTH deployment tx receipts.
-send133 "$WHSK" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 100000000000000000 \
-  --private-key "$TESTNET_DEPLOYER_KEY"
-send133 "$USDT" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 5000000000000000000 \
-  --private-key "$TESTNET_DEPLOYER_KEY"
+# Verify both deployment receipts, then have the temporary owner nominate the
+# verified Ledger address on each contract. Ledger acceptance follows in §4.
+send133 --account nalvis-deployer "$WHSK" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 100000000000000000
+send133 --account nalvis-deployer "$USDT" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 5000000000000000000
 ```
 
-The manifest is generated during simulation: its `block` is the simulation block,
-not a mined receipt block. Verify both transactions in
-`contracts/broadcast/Deploy.s.sol/133/run-latest.json`, their successful receipts,
-code and owners before using it. A failed broadcast may leave a stale manifest.
-The deployer has no privileges after deployment. Add the two deployment rows to
-`docs/ADDRESSES.md` with chain, addresses, deployment tx hashes, this commit and
-constructor arguments. Do not add Anvil addresses to that registry.
+The deployment script does not write a manifest: simulation output is not proof
+of deployment and must not overwrite confirmed records. Verify both transactions
+in `contracts/broadcast/Deploy.s.sol/133/run-latest.json`, their successful
+receipts, code and owners. Only then update `contracts/deployments/133.json` and
+add the deployment rows to `docs/ADDRESSES.md`, using mined receipt block numbers
+and transaction hashes. The deployer has no privileges after deployment. Do not
+add Anvil addresses to that registry.
 
-## 4. Build calldata and sign with the Ledger
+## 4. Transfer ownership and configure the mandate
 
 **UNVERIFIED on chain 133:** `cast send --ledger` and dashboard signing. Enable
 **blind signing** in the Ledger Ethereum app; chain 133 has no clear-signing
 descriptor. Review destination, chain, agent, expiry and every cap before signing.
-The dashboard is a later milestone; the command below is an alternative to test.
+The dashboard is a later milestone; the commands below are manual alternatives.
+The temporary owner must have a locally available encrypted Foundry signer.
+Resolve its alias locally and verify that it matches `OWNER_ADDRESS`; never put
+the key or password in `.env`, shell history, or chat. If no matching secure
+signer is available, stop before deployment because ownership cannot be handed
+over.
+
+```bash
+export TEMP_OWNER_ACCOUNT=REPLACE_WITH_ENCRYPTED_FOUNDRY_ACCOUNT_ALIAS
+test "$(cast wallet address --account "$TEMP_OWNER_ACCOUNT" | tr '[:upper:]' '[:lower:]')" = \
+  "${OWNER_ADDRESS,,}"
+export LEDGER_ADDRESS=REPLACE_WITH_VERIFIED_LEDGER_ADDRESS
+test "${LEDGER_ADDRESS,,}" != "${DEPLOYER_ADDRESS,,}"
+test "${LEDGER_ADDRESS,,}" != "${AGENT_ADDRESS,,}"
+send133 "$VAULT_ADDRESS" 'transferOwnership(address)' "$LEDGER_ADDRESS" \
+  --account "$TEMP_OWNER_ACCOUNT"
+send133 "$PROOF_ROUTER_ADDRESS" 'transferOwnership(address)' "$LEDGER_ADDRESS" \
+  --account "$TEMP_OWNER_ACCOUNT"
+cast call "$VAULT_ADDRESS" 'pendingOwner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$PROOF_ROUTER_ADDRESS" 'pendingOwner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+```
+
+Then Nishanth must accept from the Ledger on each contract, using verified
+chain-133 signing. Verify both `owner()` values equal the Ledger and both
+`pendingOwner()` values are zero before continuing:
+
+```bash
+send133 "$VAULT_ADDRESS" --data "$(cast calldata 'acceptOwnership()')" \
+  --ledger --sender "$LEDGER_ADDRESS" --mnemonic-derivation-path "m/44'/60'/0'/0/0"
+send133 "$PROOF_ROUTER_ADDRESS" --data "$(cast calldata 'acceptOwnership()')" \
+  --ledger --sender "$LEDGER_ADDRESS" --mnemonic-derivation-path "m/44'/60'/0'/0/0"
+cast call "$VAULT_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$PROOF_ROUTER_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$VAULT_ADDRESS" 'pendingOwner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+cast call "$PROOF_ROUTER_ADDRESS" 'pendingOwner()(address)' --rpc-url "$HSK_TESTNET_RPC"
+```
+
+Only after verifying handover should the Ledger sign the mandate calldata below.
 
 ```bash
 mkdir -p work
@@ -153,7 +199,7 @@ forge script script/TradeCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" -vv
 forge script script/TradeCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" --json > ../work/trade.json
 cd ..
 TRADE_DATA=$(jq -er '.returns.tradeData.value' work/trade.json)
-send133 "$VAULT_ADDRESS" --data "$TRADE_DATA" --private-key "$TESTNET_AGENT_KEY" --json > work/trade-tx.json
+send133 --account nalvis-agent "$VAULT_ADDRESS" --data "$TRADE_DATA" --json > work/trade-tx.json
 TX_HASH=$(jq -er '.transactionHash' work/trade-tx.json)
 cast receipt "$TX_HASH" --rpc-url "$HSK_TESTNET_RPC" --json > work/trade-receipt.json
 cast call "$VAULT_ADDRESS" 'seq()(uint64)' --rpc-url "$HSK_TESTNET_RPC"

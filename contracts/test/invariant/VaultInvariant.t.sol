@@ -126,7 +126,7 @@ contract VaultInvariantTest is StdInvariant, Test {
         }
     }
 
-    /// @notice Invariant 11: Vault owner is immutable / preserved
+    /// @notice Invariant 11: Vault owner remains unchanged when no transfer is requested.
     function invariant_ownerPreserved() public view {
         assertEq(vault.owner(), owner, "Vault owner mutated");
     }

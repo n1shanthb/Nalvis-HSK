@@ -14,6 +14,14 @@ import {TickMath} from "../../src/lib/TickMath.sol";
 import {FullMath} from "../../src/lib/FullMath.sol";
 
 contract DeployHarness is Deploy {
+    function validateExecutionContext(bool broadcastContext, bool resumeContext) external view {
+        _validateExecutionContext(broadcastContext, resumeContext);
+    }
+
+    function validateDeployerAddress(address deployer, address expectedDeployer) external pure {
+        _validateDeployerAddress(deployer, expectedDeployer);
+    }
+
     function deployForTest(address owner, address agent, address deployer)
         external
         returns (EdgewiseVault, ProofTradeRouter)
@@ -23,10 +31,11 @@ contract DeployHarness is Deploy {
 }
 
 contract DeployTestnetForkTest is Test {
+    address constant INITIAL_OWNER = 0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927;
     EdgewiseVault deployed;
     address deployedAgent;
 
-    /// @notice Exercise the actual CLI deployment entrypoint and real testnet swap.
+    /// @notice Exercise deployment wiring and a real Testnet-fork swap.
     function testDeployAndRealTestnetTrade() public {
         string memory rpc = vm.envOr("HSK_TESTNET_RPC", string(""));
         if (bytes(rpc).length == 0) {
@@ -40,7 +49,7 @@ contract DeployTestnetForkTest is Test {
         }
         assertEq(block.chainid, 133);
         console2.log("Testnet fork block", block.number);
-        address owner = makeAddr("testnet owner");
+        address owner = INITIAL_OWNER;
         address agent = makeAddr("testnet agent");
         address deployer = makeAddr("testnet deployer");
         vm.setEnv("OWNER_ADDRESS", vm.toString(owner));
@@ -56,6 +65,7 @@ contract DeployTestnetForkTest is Test {
         assertEq(v.twapWindowSec(), 600);
         vm.prank(owner);
         v.setMandate(EdgewiseVault.Mandate(agent, block.timestamp + 7 days, 2e18, 100e18, 500e18, 8000, 100, 0, 300, 0));
+        _assertMandateAgent(v, agent);
         deal(Addresses.USDT_133, address(v), 500e18);
         uint32[] memory times = new uint32[](2);
         times[0] = 600;
@@ -67,22 +77,8 @@ contract DeployTestnetForkTest is Test {
         uint256 refOut = FullMath.mulDiv(uint256(sqrt) * sqrt, 10e18, 1 << 192);
         uint256 minOut = refOut * 99 / 100;
         bytes32 hash = keccak256("T3 real testnet receipt");
-        // amountOut comes from the real router; verify the full emitted payload.
         vm.recordLogs();
-        vm.prank(agent);
-        uint256 out = v.trade(
-            EdgewiseVault.TradeParams(
-                Addresses.USDT_133,
-                10e18,
-                minOut,
-                block.timestamp,
-                block.timestamp + 60,
-                v.nextNonce(),
-                hash,
-                0,
-                ReceiptChain.Kind.TRADE
-            )
-        );
+        uint256 out = _submitTrade(v, agent, minOut, hash);
         assertGe(out, minOut);
         assertEq(v.seq(), 1);
         assertEq(v.head(), keccak256(abi.encode(bytes32(0), hash, uint64(0))));
@@ -109,6 +105,27 @@ contract DeployTestnetForkTest is Test {
         assertTrue(found, "Receipt missing");
     }
 
+    function _assertMandateAgent(EdgewiseVault v, address expectedAgent) internal view {
+        (address mandateAgent,,,,,,,,,) = v.mandate();
+        assertEq(mandateAgent, expectedAgent);
+    }
+
+    function _submitTrade(EdgewiseVault v, address agent, uint256 minOut, bytes32 hash) internal returns (uint256) {
+        EdgewiseVault.TradeParams memory params = EdgewiseVault.TradeParams({
+            tokenIn: Addresses.USDT_133,
+            amountIn: 10e18,
+            minOut: minOut,
+            deadline: block.timestamp,
+            validUntil: block.timestamp + 60,
+            nonce: v.nextNonce(),
+            receiptHash: hash,
+            prevHead: bytes32(0),
+            kind: ReceiptChain.Kind.TRADE
+        });
+        vm.prank(agent);
+        return v.trade(params);
+    }
+
     function testTradeHelperRealSell() public {
         testDeployAndRealTestnetTrade();
         _sellWithHelper(deployed, deployedAgent);
@@ -131,6 +148,41 @@ contract DeployTestnetForkTest is Test {
         Deploy script = new Deploy();
         vm.expectRevert("Deploy: only chains 133/31337");
         script.run();
+    }
+
+    function testRejectSignerAddressMismatch() public {
+        DeployHarness script = new DeployHarness();
+        vm.expectRevert("Deploy: signer address mismatch");
+        script.validateDeployerAddress(makeAddr("actual deployer"), makeAddr("configured deployer"));
+    }
+
+    function testAllowConfiguredSignerAddress() public {
+        address deployer = makeAddr("configured deployer");
+        new DeployHarness().validateDeployerAddress(deployer, deployer);
+    }
+
+    function testRejectBroadcastContextOn31337() public {
+        vm.chainId(31337);
+        DeployHarness script = new DeployHarness();
+        vm.expectRevert("Deploy: broadcasts only on HSK Testnet");
+        script.validateExecutionContext(true, false);
+    }
+
+    function testRejectResumeContextOn31337() public {
+        vm.chainId(31337);
+        DeployHarness script = new DeployHarness();
+        vm.expectRevert("Deploy: broadcasts only on HSK Testnet");
+        script.validateExecutionContext(false, true);
+    }
+
+    function testAllowDryRunOn31337() public {
+        vm.chainId(31337);
+        new DeployHarness().validateExecutionContext(false, false);
+    }
+
+    function testAllowBroadcastAndResumeOn133() public {
+        vm.chainId(133);
+        new DeployHarness().validateExecutionContext(true, true);
     }
 
     function testRejectDeployerEqualsAgent() public {

@@ -77,21 +77,31 @@ Do **not** add `api.openai.com` or any LLM endpoint. Tests must never call an LL
 | `FORK_BLOCK_133` | leave unset (latest) until Task 3 pins one |
 | `CHAIN_ALLOWLIST` | `133,31337` |
 
-## 5. Secrets
+## 5. Local signing
 
-**Set none in Codex.** The table below is a local-only `.env` on Nishanth's machine. It is gitignored, and the repo has a `.env.example` with empty values.
+**Set no wallet secrets in Codex or `.env`.** Import the already-approved
+deployer and agent accounts into encrypted Foundry keystores using interactive
+local prompts. The aliases are `nalvis-deployer` and `nalvis-agent`. Verify each
+account's public address against `DEPLOYER_ADDRESS` and `AGENT_ADDRESS` from
+the local `.env`; do not generate replacements or change the configured roles.
+Keystore passwords are entered only at Foundry's local prompt.
 
-| Name | Where | Notes |
-|---|---|---|
-| `TESTNET_DEPLOYER_KEY` | local only | A fresh testnet-only key. It has no role after deploy. |
-| `TESTNET_AGENT_KEY` | local only | A fresh testnet-only key, ≠ deployer. It holds no funds beyond gas. |
-| `OWNER_ADDRESS` | local; may also be a Codex env var because it is public | The Ledger's address (derivation `44'/60'/0'/0/0` unless changed). It must differ from both keys. |
-| `LLM_API_KEY` | local only, optional | Only for the optional explanation feature. The app works without it. |
+`OWNER_ADDRESS` is currently the temporary deployment address
+`0x82437E9Bb58cFf40B996818CCcdF1523fC5cE927`; Nishanth's Ledger is the intended
+final owner and its address must be supplied and verified later. Both contracts
+support two-step ownership transfer: the current owner calls
+`transferOwnership(ledgerAddress)`, then the Ledger calls `acceptOwnership()`.
+Perform these as separate transactions for each contract and verify both
+`owner()` values before using owner-only actions. Before handover, the temporary
+owner must have a locally available encrypted Foundry signer matching
+`OWNER_ADDRESS` so it can nominate the Ledger; the Ledger signing path on chain
+133 requires local verification.
+`LLM_API_KEY`, if used, is optional and local; the application works without it.
 
 **There is never a mainnet key anywhere.** No mainnet RPC write path exists.
 
 ## 6. One-time steps for Nishanth (outside Codex)
 
 1. In Codex: sign in with ChatGPT, connect GitHub, and grant access to `n1shanthb/Nalvis-HSK`. Then create the environment with the settings above.
-2. Generate two fresh testnet keys locally, e.g. `cast wallet new` twice. Fund them with test HSK from the faucet (https://faucet.hsk.xyz, which redirects to https://faucet.hashkeychain.net/; **UNVERIFIED** in use).
+2. Import only the existing approved deployer and agent accounts into encrypted Foundry keystores using local interactive prompts. Fund them with test HSK only through a verified faucet route (https://faucet.hsk.xyz redirects to https://faucet.hashkeychain.net/; **UNVERIFIED** in use). Do not generate replacement wallets.
 3. On the Ledger's Ethereum app, enable **Blind signing**. Chain 133 has no clear-signing metadata.

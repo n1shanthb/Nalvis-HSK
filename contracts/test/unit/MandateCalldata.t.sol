@@ -20,6 +20,8 @@ contract MandateCalldataTest is Test {
         MockERC20 token = new MockERC20(18);
         vm.etch(Addresses.WHSK_133, address(token).code);
         vm.etch(Addresses.USDT_133, address(token).code);
+        // Ensure AGENT_ADDRESS env var is still set to the original test agent
+        vm.setEnv("AGENT_ADDRESS", vm.toString(agent));
         helper = new MandateCalldata();
     }
 
@@ -33,6 +35,7 @@ contract MandateCalldataTest is Test {
 
         // 1. Default drawdown (2000 bps)
         vm.setEnv("MAX_DRAWDOWN_BPS", "");
+        vm.setEnv("AGENT_ADDRESS", vm.toString(agent));
         (bytes memory setData, bytes memory revokeData) = helper.run();
         bytes32 policy;
         string memory path = string.concat(vm.projectRoot(), "/../policy/default.json");
@@ -71,6 +74,8 @@ contract MandateCalldataTest is Test {
         // 6. Reject wrong decimals
         MockERC20 token = new MockERC20(6);
         vm.etch(Addresses.USDT_133, address(token).code);
+        // Ensure AGENT_ADDRESS env var is still set to the original test agent
+        vm.setEnv("AGENT_ADDRESS", vm.toString(agent));
         vm.expectRevert("Mandate: unexpected testnet decimals");
         helper.run();
     }
