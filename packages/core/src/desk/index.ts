@@ -52,7 +52,7 @@ export function parseIntent(input: string): DeskIntent {
       ...(why[2]?.startsWith('#') ? { seq: Number(why[2].slice(1)) } : {}),
     };
   if (
-    /^(set cap to \d+(?:\.\d+)?(?: usdt)?|slippage \d+ bps|pause|revoke|band karo|mat karo|cap \d+(?:\.\d+)?(?: usdt)? karo|slippage \d+ bps karo|rok do|mandate revoke karo)$/.test(
+    /^(set cap to \d+(?:\.\d+)?(?: usdt)?|slippage \d+ bps|pause|revoke|band karo|cap \d+(?:\.\d+)?(?: usdt)? karo|slippage \d+ bps karo|rok do|mandate revoke karo)$/.test(
       t,
     )
   )
@@ -165,6 +165,23 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
       : 'revoked' in proposal.diff
         ? 'revoke'
         : 'setMandate';
+  const revoked = m.revoked || /^0x0{40}$/i.test(context.agent ?? '');
+  if (action === 'revoke' && revoked)
+    return answer(
+      'The mandate is already revoked. No revoke proposal was created.',
+    );
+  if (action === 'pause' && context.paused)
+    return answer(
+      'The vault is already paused. No pause proposal was created.',
+    );
+  if (action === 'setMandate' && revoked)
+    return answer(
+      'The mandate is revoked. Set a nonzero agent in a new manual Ledger mandate review first.',
+    );
+  if (action === 'setMandate' && context.paused)
+    return answer(
+      'The vault is paused. Review its state and create a new manual Ledger mandate review before changing limits.',
+    );
   if (!context.agent || m.maxDrawdownBps === undefined)
     return answer(
       'Exact owner calldata unavailable: agent and Task 9 drawdown cap must be read from the signed mandate.',

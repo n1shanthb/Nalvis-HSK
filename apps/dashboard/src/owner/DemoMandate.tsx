@@ -1,3 +1,4 @@
+import { DemoLimits } from '../components/charts/DemoLimits.js';
 import { useCallback } from 'react';
 import { zeroAddress } from 'viem';
 import { demoContext, demoReceipts } from '../lib/demo.js';
@@ -10,6 +11,7 @@ export function DemoMandate() {
   return (
     <section>
       <h2>Recorded mandate preview</h2>
+      <DemoLimits />
       <p>Owner unavailable in this recording. Signing disabled.</p>
       <MandateWizard
         chain={133}

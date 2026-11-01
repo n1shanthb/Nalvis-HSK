@@ -89,6 +89,7 @@ export default defineConfig({
                   ? { body: Buffer.concat(chunks).toString('utf8') }
                   : {}),
               }),
+              req.socket.remoteAddress,
             );
             res.statusCode = response.status;
             response.headers.forEach((value, key) => res.setHeader(key, value));
@@ -105,6 +106,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Share view markup and the fixture loader; the canvas library remains lazy.
+          if (
+            /components\/charts\/(PriceChart|BasisChart|VaultChart)\.tsx$/.test(
+              id,
+            ) ||
+            id.endsWith('/lib/recorded-history.ts')
+          )
+            return 'chart-views';
           if (id.includes('@ledgerhq/device-management-kit'))
             return 'ledger-device';
           if (id.includes('@ledgerhq/device-signer-kit-ethereum'))

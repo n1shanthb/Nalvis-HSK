@@ -2788,3 +2788,49 @@ h2 {
 .mandate-wizard th:first-child {
   width: 25%;
 }
+
+.landing-nav .live-console-link {
+  color: #ccc6bd;
+  font-size: 11px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .landing-nav {
+    flex-wrap: wrap;
+  }
+  .landing-nav .live-console-link {
+    order: 3;
+    width: 100%;
+    text-align: right;
+    font-size: 10px;
+    margin-top: 2px;
+  }
+  .landing-hero {
+    padding-top: 115px;
+  }
+}
+
+@media (max-width: 950px) {
+  .landing-nav nav {
+    display: none;
+  }
+}
+
+.chart-table { max-height: 20rem; overflow: auto; }
+.chart details { margin-top: .75rem; }
+.chart [role="img"]:focus-visible { outline: 2px solid var(--accent, #75baff); outline-offset: 3px; }
+.chart-heading { gap: .75rem; flex-wrap: wrap; }
+.limit-row { margin: 1rem 0; display: grid; gap: .35rem; }
+.limit-row > span { overflow-wrap: anywhere; }
+.limit-track { height: .7rem; position: relative; background: #8b919922; border-radius: .2rem; }
+.limit-track > span { display: block; height: 100%; background: #47a878; }
+.limit-track > i { position: absolute; right: 0; top: -.15rem; height: 1rem; border-right: 2px dashed currentColor; }
+.limit-row.warning .limit-track > span { background: #c38924; }
+.limit-row.danger .limit-track > span { background: #cd5353; }
+.chart .danger { color: #cd5353; }
+@media (prefers-reduced-motion: reduce) { .chart *, .limit-track > span { transition: none; animation: none; } }
+.time-series-host { position: relative; }
+.live-divider { display: none; position: absolute; top: 0; bottom: 28px; border-left: 1px dashed #75baff; padding-left: .3rem; pointer-events: none; font-size: .65rem; color: #75baff; }
+.chart-summary:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.chart-summary:focus { padding: .5rem; font-size: .8rem; }

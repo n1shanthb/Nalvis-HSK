@@ -54,6 +54,7 @@ export interface ActionView {
   receiptHash?: string;
 }
 export interface AgentFeed {
+  spendByDay?: { day: string; usd: number }[];
   state: AgentState;
   watches: WatchView[];
   history: WatchChangeView[];

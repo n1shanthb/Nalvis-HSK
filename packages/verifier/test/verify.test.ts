@@ -210,6 +210,7 @@ describe('T8 decision expiry', () => {
   const modernHold = () => {
     const r = structuredClone(wait);
     r.version = 2;
+    r.evidence.executionBlockNumber = r.evidence.sources.replay.blockNumber;
     r.evidence.decisionTime = r.evidence.now;
     const until = r.evidence.now + 120;
     r.evidence.validUntil = until;
@@ -236,7 +237,10 @@ describe('T8 decision expiry', () => {
     const r = modernHold();
     const reader = {
       ...recordedReader(chain),
-      timestamp: async () => r.evidence.validUntil + 1,
+      timestamp: async (block: bigint) =>
+        block === BigInt(r.evidence.executionBlockNumber)
+          ? r.evidence.decisionTime
+          : r.evidence.validUntil + 1,
     };
     const result = await verify(r, reader);
     expect(result.checks.find((c) => c.name === 'decision_expiry')?.pass).toBe(
@@ -280,26 +284,36 @@ describe('v2 cannot opt out of required guards', () => {
       );
     },
   );
-  test('five seconds of server-ahead skew does not invalidate chain-time expiry', async () => {
-    const r = structuredClone(wait);
-    r.version = 2;
-    r.evidence.decisionTime = r.evidence.now - 5;
-    r.evidence.validUntil = r.evidence.decisionTime + 120;
-    r.decision.validUntil = r.evidence.validUntil;
-    r.tx.validUntil = r.evidence.validUntil;
-    r.tx.deadline = r.evidence.validUntil;
-    r.evidence.riskInput = {
-      sigma: 0,
-      observations: 719,
-      historyHash: '0x' + 'a'.repeat(64),
-    };
-    rehash(r);
-    const result = await verify(r, {
-      ...recordedReader(chain),
-      timestamp: async () => r.evidence.decisionTime + 1,
-    });
-    expect(
-      result.checks.find((c) => c.name === 'mined_before_expiry')?.pass,
-    ).toBe(true);
-  });
+  test.each([0, -5, 5])(
+    'binds decisionTime to the snapshot block despite server-ahead wall time (tamper %s)',
+    async (tamper) => {
+      const r = structuredClone(wait);
+      r.version = 2;
+      r.evidence.executionBlockNumber = r.evidence.sources.replay.blockNumber;
+      const blockTime = r.evidence.now - 5;
+      r.evidence.decisionTime = blockTime + tamper;
+      r.evidence.validUntil = r.evidence.decisionTime + 120;
+      r.decision.validUntil = r.evidence.validUntil;
+      r.tx.validUntil = r.evidence.validUntil;
+      r.tx.deadline = r.evidence.validUntil;
+      r.evidence.riskInput = {
+        sigma: 0,
+        observations: 719,
+        historyHash: '0x' + 'a'.repeat(64),
+      };
+      rehash(r);
+      const result = await verify(r, {
+        ...recordedReader(chain),
+        timestamp: async (block: bigint) =>
+          block === BigInt(r.evidence.executionBlockNumber)
+            ? blockTime
+            : blockTime + 1,
+      });
+      expect(
+        result.checks.find((c) => c.name === 'decision_time_binding')?.pass,
+      ).toBe(tamper === 0);
+      if (tamper !== 0)
+        expect(failures(result)).toContain('decision_time_binding');
+    },
+  );
 });

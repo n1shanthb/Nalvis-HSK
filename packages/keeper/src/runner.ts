@@ -138,6 +138,8 @@ export async function tick(
   // Run even for holds: a revoked agent must not submit anything.
   await execution.check(snapshot);
   const evidence = await execution.collect(snapshot);
+  evidence.executionBlockNumber =
+    snapshot.blockNumber ?? evidence.executionBlockNumber;
   evidence.decisionTime = snapshot.now;
   evidence.validUntil = snapshot.now + (policy.decisionTtlSec ?? 120);
   const history = JSON.parse(

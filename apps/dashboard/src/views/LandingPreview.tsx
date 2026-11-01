@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
-import { demoContext, demoEvidence, demoReceipts } from '../lib/demo.js';
+import { demoContext, demoReceipts } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
-import { MarketChart } from './MarketChart.js';
+import { lazy, Suspense } from 'react';
+const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
 export default function LandingPreview() {
   const r = useResource(useCallback(demoContext, []));
   const last = demoReceipts.at(-1)!;
@@ -43,7 +44,9 @@ export default function LandingPreview() {
             </strong>
           </div>
         </div>
-        <MarketChart points={demoEvidence} />
+        <Suspense fallback={<p>Loading recorded mainnet history…</p>}>
+          <BasisChart />
+        </Suspense>
       </div>
       <aside className="preview-receipt">
         <span className="micro-label">LAST RECORDED DECISION</span>

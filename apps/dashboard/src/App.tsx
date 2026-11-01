@@ -71,7 +71,12 @@ function AppContent({
     }
   }, [route]);
   useEffect(() => {
-    const change = () => setRoute(readRoute());
+    const change = () => {
+      const next = readRoute();
+      setRoute(next);
+      if (next !== 'mandate') setProposal(undefined);
+      setDeskOpen(false);
+    };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -82,7 +87,10 @@ function AppContent({
         <Header
           activeRoute={route}
           demo={demo}
-          onDesk={() => setDeskOpen(true)}
+          onDesk={() => {
+            setProposal(undefined);
+            setDeskOpen(true);
+          }}
         />
         {demo && (
           <div className="banner" role="note">
@@ -147,13 +155,19 @@ function AppContent({
                                 chain={chain}
                                 vault={d.vault}
                                 snapshot={s}
-                                onConfirmed={reload}
+                                onConfirmed={() => {
+                                  setProposal(undefined);
+                                  return reload();
+                                }}
                               />
                               <OwnerActions
                                 chain={chain}
                                 vault={d.vault}
                                 snapshot={s}
-                                onConfirmed={reload}
+                                onConfirmed={() => {
+                                  setProposal(undefined);
+                                  return reload();
+                                }}
                               />
                               {proposal && (
                                 <OwnerPanel
@@ -161,6 +175,8 @@ function AppContent({
                                   vault={d.vault}
                                   snapshot={s}
                                   proposal={proposal}
+                                  proposalOnly
+                                  onProposalClear={() => setProposal(undefined)}
                                 />
                               )}
                             </Suspense>
@@ -177,8 +193,20 @@ function AppContent({
         </main>
       </div>
       {deskOpen && (
-        <DeskDrawer onClose={() => setDeskOpen(false)}>
-          <button onClick={() => setDeskOpen(false)}>Close desk</button>
+        <DeskDrawer
+          onClose={() => {
+            setDeskOpen(false);
+            setProposal(undefined);
+          }}
+        >
+          <button
+            onClick={() => {
+              setDeskOpen(false);
+              setProposal(undefined);
+            }}
+          >
+            Close desk
+          </button>
           <Suspense fallback={<p>Loading desk…</p>}>
             <DeskView
               demo={demo}
