@@ -121,7 +121,10 @@ Add verified vault **and** ProofTradeRouter rows to
 commit and constructor arguments. This is required before dashboard/service
 address authorization; do not invent deployment rows. Record first-wake/anchor
 transaction evidence alongside them after confirmation. Keep the verified 133
-manifest and canonical policy in the reviewed deployment checkout.
+manifest and canonical policy in the reviewed deployment checkout. Commit these
+public generated files and the verified registry through a reviewed change before
+selecting that revision in Railway; the GitHub Docker build needs those files.
+Never include runtime keys or provider credentials.
 
 Set server-only `OPENROUTER_API_KEY` and `AGENT_PRIVATE_KEY` via the host's env UI.
 See [Railway kit](../deploy/agent/README.md) for the volume, variables and HTTPS

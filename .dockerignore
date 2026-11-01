@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+.agent-state
+work
+receipts
+contracts/out
+contracts/cache
+contracts/broadcast
+attachments
