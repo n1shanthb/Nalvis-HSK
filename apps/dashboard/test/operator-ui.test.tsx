@@ -48,7 +48,7 @@ test('skip link focuses the workspace without changing hash routing', async () =
 test('readiness precedes charts and disconnected state never presents fixture status', () => {
   window.history.replaceState(null, '', '?#/agent');
   const { container } = render(<AgentView />);
-  const readiness = screen.getByRole('heading', { name: 'Agent status' });
+  const readiness = screen.getByLabelText('System readiness');
   const chart = container.querySelector('.chart');
   expect(chart).toBeTruthy();
   expect(

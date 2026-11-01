@@ -15,6 +15,7 @@ export type Series = {
   color: string;
   points: Point[];
   precision?: number;
+  area?: boolean;
 };
 export type Marker = {
   time: number;
@@ -42,16 +43,27 @@ export default function TimeSeriesChart({
   const divider = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | undefined>(undefined);
-  const handles = useRef<ISeriesApi<'Line'>[]>([]);
+  const handles = useRef<ISeriesApi<'Line' | 'Area'>[]>([]);
   const previous = useRef<Point[][]>([]);
   useEffect(() => {
     if (!host.current || typeof window.CanvasRenderingContext2D === 'undefined')
       return;
     const c = createChart(host.current, {
-      height: 220,
+      height: 280,
       width: host.current.clientWidth || 320,
-      layout: { background: { color: 'transparent' }, textColor: '#a4ada0' },
+      layout: {
+        background: { color: 'transparent' },
+        textColor: '#8a9388',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 10,
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.04)' },
+        horzLines: { color: 'rgba(255,255,255,0.04)' },
+      },
+      rightPriceScale: { borderVisible: false },
       timeScale: {
+        borderVisible: false,
         timeVisible: true,
         tickMarkFormatter: (time: Time) =>
           `${new Date((Number(time) + 19800) * 1000).toISOString().slice(11, 16)} IST`,
@@ -69,18 +81,25 @@ export default function TimeSeriesChart({
       );
       setSelected(marker);
     });
-    handles.current = series.map((s) =>
-      c.addLineSeries({
-        color: s.color,
+    handles.current = series.map((s) => {
+      const options = {
         title: s.name,
-        lineWidth: 2,
+        lineWidth: 2 as const,
         priceFormat: {
-          type: 'price',
+          type: 'price' as const,
           precision: s.precision ?? 2,
           minMove: 10 ** -(s.precision ?? 2),
         },
-      }),
-    );
+      };
+      return s.area
+        ? c.addAreaSeries({
+            ...options,
+            lineColor: s.color,
+            topColor: s.color + '40',
+            bottomColor: s.color + '00',
+          })
+        : c.addLineSeries({ ...options, color: s.color });
+    });
     const resize =
       typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(() =>
@@ -155,7 +174,7 @@ export default function TimeSeriesChart({
       api.createPriceLine({
         price: l.value,
         title: l.title,
-        color: '#a4ada0',
+        color: '#8a9388',
         lineStyle: LineStyle.Dashed,
         lineWidth: 1,
       }),
@@ -174,7 +193,7 @@ export default function TimeSeriesChart({
                 time: liveFrom,
                 position: 'belowBar' as const,
                 shape: 'arrowUp' as const,
-                color: '#a8c7b3',
+                color: '#a3e635',
                 text: 'Live from here',
               },
             ]

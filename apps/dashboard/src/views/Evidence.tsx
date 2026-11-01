@@ -200,7 +200,7 @@ export function EvidenceView({
   return (
     <section>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
-      <h2>Live market evidence</h2>
+      <h1>Live market evidence</h1>
       <p>
         Read-only observations. Refreshes 30 seconds after each completed poll.
         No proven edge.

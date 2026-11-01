@@ -20,14 +20,23 @@ import { vaultAbi } from '../../../packages/core/src/abi/index.js';
 import { addresses } from '../../../packages/core/src/addresses.js';
 import { createMarketHandler } from '../server/market.js';
 import { owner, vault, snapshot } from './ux-fixtures.js';
-test('header has the three navigation items and Ledger affordance', () => {
+test('header exposes workspace pages and advanced verification', () => {
   render(<Header demo={false} onDesk={() => {}} />);
-  for (const name of ['Mandate', 'Agent', 'Verify'])
+  for (const name of ['Overview', 'Mandate', 'Activity', 'Agent'])
     expect(screen.getByRole('link', { name }).getAttribute('href')).toBe(
       `#/${name.toLowerCase()}`,
     );
-  expect(screen.getByRole('button', { name: 'Connect Ledger' })).toBeTruthy();
+  expect(
+    screen
+      .getAllByRole('link', { name: 'Set mandate' })[0]
+      .getAttribute('href'),
+  ).toBe('#/setup');
+  fireEvent.click(screen.getByText('Advanced'));
+  expect(
+    screen.getByRole('link', { name: 'Verify receipt' }).getAttribute('href'),
+  ).toBe('#/verify');
 });
+
 test.each([true, false])('Ledger ownership is checked (%s)', async (same) => {
   const disconnect = vi.fn(async () => {});
   const signerFactory = vi.fn(async () => ({

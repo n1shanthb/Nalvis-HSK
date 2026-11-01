@@ -1,3 +1,5 @@
+import { demoReceipts } from '../lib/demo.js';
+import demoRecording from '../../../../packages/verifier/test/fixtures/t8/chain.json';
 import { useEffect, useRef, useState } from 'react';
 import { type Hex } from 'viem';
 import {
@@ -13,9 +15,11 @@ import { clientFor, type DashboardChain } from '../lib/clients.js';
 export const recordedTrade = trade;
 export function VerifyView({
   chain,
+  demo = false,
   runRecorded = (input: unknown) => verify(input, recordedReader(recording)),
 }: {
   chain: DashboardChain;
+  demo?: boolean;
   runRecorded?: (input: unknown) => Promise<Verification>;
 }) {
   const autoRun = useRef(false);
@@ -35,7 +39,7 @@ export function VerifyView({
     setError('');
     setResult(undefined);
     setMode(
-      recorded
+      recorded || demo
         ? 'Recorded local anvil — prices not real. Offline RPC replay; not live chain verification.'
         : `Live chain ${chain}`,
     );
@@ -46,7 +50,7 @@ export function VerifyView({
           throw Error('Enter a 32-byte transaction hash');
         const input: unknown = json.trim()
           ? JSON.parse(json)
-          : (await localReceipts()).find(
+          : (demo ? demoReceipts : await localReceipts()).find(
               (r) =>
                 r.executionChainId === chain &&
                 r.settlement?.transactionHash.toLowerCase() ===
@@ -57,7 +61,13 @@ export function VerifyView({
             'Matching receipt JSON unavailable. Paste the keeper receipt below.',
           );
         const url = clientFor(chain).chain.rpcUrls.default.http[0];
-        setResult(await verify(input, rpcReader(url), { txHash: hash as Hex }));
+        setResult(
+          await verify(
+            input,
+            demo ? recordedReader(demoRecording) : rpcReader(url),
+            { txHash: hash as Hex },
+          ),
+        );
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed');
@@ -74,7 +84,7 @@ export function VerifyView({
   return (
     <section className="verify-view">
       <p className="eyebrow">04 / INDEPENDENT REPLAY</p>
-      <h2>Verify a receipt</h2>
+      <h1>Verify a receipt</h1>
       <p>
         Re-hash evidence, replay the deterministic engine, then match calldata,
         Receipt events and chain links.
@@ -102,7 +112,11 @@ export function VerifyView({
           </label>
         </details>
         <button disabled={busy} type="submit">
-          {busy ? 'Verifying…' : 'Verify on selected chain'}
+          {busy
+            ? 'Verifying…'
+            : demo
+              ? 'Verify recorded receipt'
+              : 'Verify on selected chain'}
         </button>
       </form>
       <aside className="recorded-replay">

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { ConnectLedger } from '../owner/ConnectLedger.js';
 export function Header({
   demo,
   onDesk,
@@ -20,26 +19,43 @@ export function Header({
     setMenu(false);
     trigger.current?.focus();
   };
+  const entries = [
+    ['overview', 'Overview'],
+    ['setup', 'Set mandate'],
+    ['mandate', 'Mandate'],
+    ['activity', 'Activity'],
+    ['agent', 'Agent'],
+  ];
   const links = (
     <>
-      <span className="nav-label">WORKSPACE</span>
-      {['Agent', 'Mandate', 'Verify'].map((label, i) => (
+      {entries.map(([route, label]) => (
         <a
-          aria-current={
-            activeRoute === label.toLowerCase() ? 'page' : undefined
-          }
-          key={label}
-          href={`#/${label.toLowerCase()}`}
+          key={route}
+          href={`#/${route}`}
+          aria-current={activeRoute === route ? 'page' : undefined}
           onClick={close}
         >
-          <span className="nav-number" aria-hidden="true">
-            0{i + 1}
-          </span>
           {label}
         </a>
       ))}
+      <details className="advanced-nav">
+        <summary>Advanced</summary>
+        <div>
+          <a href="#/evidence" onClick={close}>
+            Market evidence
+          </a>
+          <a href="#/verify" onClick={close}>
+            Verify receipt
+          </a>
+          <a href="#/desk" onClick={close}>
+            AI desk
+          </a>
+        </div>
+      </details>
     </>
   );
+  const modeUrl = new URL(window.location.href);
+  modeUrl.searchParams.set('demo', demo ? '0' : '1');
   return (
     <header className="workspace-header">
       <a
@@ -54,47 +70,39 @@ export function Header({
       >
         Skip to content
       </a>
-      <aside className="workspace-sidebar">
-        <a className="wordmark" href="#/home">
-          <span className="brand-mark">N</span>NALVIS
-        </a>
-        <nav aria-label="Dashboard views">{links}</nav>
-        <div className="sidebar-note">
-          <span className="nav-label">BOUNDED BY YOU</span>
-          <p>
-            Owner authority.
-            <br />
-            Verifiable execution.
-          </p>
-        </div>
-        <a className="sidebar-home" href="#/home">
-          About the protocol ↗
-        </a>
-      </aside>
       <div className="workspace-topbar">
-        <button
-          className="secondary mobile-menu"
-          ref={trigger}
-          aria-expanded={menu}
-          aria-controls="workspace-navigation"
-          onClick={() => setMenu(true)}
-        >
-          Menu
-        </button>
-        <div className="workspace-context">
-          <span className="micro-label">WORKSPACE / {activeRoute}</span>
-          <span className="environment-label">
-            {demo ? 'Recorded demo · 31337' : 'Testnet · 133'}
-          </span>
-        </div>
+        <a className="wordmark" href="#/home">
+          NALVIS
+        </a>
+        <nav className="desktop-navigation" aria-label="Dashboard views">
+          {links}
+        </nav>
         <div className="workspace-tools">
-          <a className="mode-link" href={demo ? '?#/agent' : '?demo=1#/agent'}>
+          <a
+            className="mode-link"
+            href={modeUrl.pathname + modeUrl.search + modeUrl.hash}
+          >
             {demo ? 'Switch to Live' : 'Watch Demo'}
           </a>
-          <button className="secondary" data-desk-trigger onClick={onDesk}>
+          <button
+            className="text-action desk-top"
+            data-desk-trigger
+            onClick={onDesk}
+          >
             AI desk
           </button>
-          {!demo && <ConnectLedger />}
+          <a className="button primary-setup" href="#/setup">
+            Set mandate
+          </a>
+          <button
+            className="secondary mobile-menu"
+            ref={trigger}
+            aria-expanded={menu}
+            aria-controls="workspace-navigation"
+            onClick={() => setMenu(true)}
+          >
+            Menu
+          </button>
         </div>
       </div>
       <dialog

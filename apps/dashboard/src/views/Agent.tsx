@@ -1,10 +1,6 @@
-import { addresses } from '../../../../packages/core/src/addresses.js';
 import { CostChart } from '../components/charts/CostChart.js';
-import { DemoLimits } from '../components/charts/DemoLimits.js';
-import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
-import { lazy, Suspense, useState } from 'react';
-const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
-const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
+import { useState } from 'react';
+import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
@@ -12,51 +8,24 @@ import {
   explorerLink,
   type DashboardChain,
 } from '../lib/clients.js';
-import { EvidenceView, EvidenceDetails } from './Evidence.js';
-import { Portfolio } from './Portfolio.js';
-import { demoEvidence, demoReceipts } from '../lib/demo.js';
+import { DeskView } from './Desk.js';
+import type { OwnerProposal } from '../../../../packages/core/src/desk/proposal.js';
+import { OperationView } from '../components/operations/OperationView.js';
 const at = (time: number | null | undefined) =>
   time ? displayTime(time) : 'Not scheduled';
-export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
+export function AgentView({
+  chain = 133,
+  enableOwner = true,
+  onProposal,
+}: {
+  chain?: DashboardChain;
+  enableOwner?: boolean;
+  onProposal?: (p: OwnerProposal) => void;
+}) {
   const feed = useAgentFeed();
   const receipts = useReceiptEvents(chain, !feed);
   const [history, setHistory] = useState(false);
   const state = feed?.state;
-  const demoActions = demoReceipts.map((r, i) => ({
-    at: demoEvidence[i].now,
-    intent: { type: r.decision.kind, notionalB: 0 },
-    final: { kind: r.decision.kind },
-    trail: 'Recorded receipt',
-    rounds: [],
-    violations: [],
-    txHash: r.settlement?.transactionHash,
-    receiptHash: r.receiptHash,
-  }));
-  const liveActions =
-    feed?.actions ??
-    receipts.data?.map((r) => ({
-      at: r.at,
-      intent: { type: 'Receipt', notionalB: 0 },
-      final: { kind: ['TRADE', 'RESIZE', 'WAIT', 'REJECT'][r.args.kind ?? 3] },
-      trail: 'On-chain receipt',
-      rounds: [],
-      violations: [],
-      txHash: r.transactionHash,
-      receiptHash: r.args.receiptHash,
-    })) ??
-    [];
-  const lastTrade = receipts.data?.find(
-    (r) => r.args.kind === 0 || r.args.kind === 1,
-  );
-  const lastTradeB = lastTrade
-    ? Number(
-        lastTrade.args.tokenIn?.toLowerCase() ===
-          addresses[chain === 133 ? 133 : 177].usdt.address.toLowerCase()
-          ? lastTrade.args.amountIn
-          : lastTrade.args.refOut,
-      ) /
-      10 ** addresses[chain === 133 ? 133 : 177].usdt.decimals
-    : undefined;
   const mode = !state
     ? 'Agent feed not connected yet'
     : state.mode === 'demo'
@@ -69,107 +38,116 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
         }[state.state];
   return (
     <section className="agent-view">
-      <p className="eyebrow">AUTONOMOUS AGENT / BOUNDED EXECUTION</p>
-      <h2>Agent overview</h2>
+      <p className="eyebrow">AGENT</p>
+      <h1>Agent room</h1>
       <p className="page-description">
-        Monitor authority, evidence and every execution decision.
+        Strategist and Fitter propose. Deterministic checks bound execution.
+        Every outcome leaves evidence.
       </p>
-      <article className="agent-card">
-        <div className="readiness-heading">
-          <span className="eyebrow">EXECUTION READINESS</span>
-          <a href="#/mandate">Review mandate ↗</a>
-        </div>
-        <h3>Agent status</h3>
-        <strong className="readiness-status">{mode}</strong>
-        {!state && (
+      <Readiness feed={feed} demo={state?.mode === 'demo'} chain={chain} />
+      <OperationView feed={feed} />
+      <div className="agent-workspace">
+        <section className="agent-chat">
+          <p className="eyebrow">EXPLANATION DESK</p>
+          <DeskView
+            demo={state?.mode === 'demo'}
+            chain={chain}
+            onProposal={
+              enableOwner && state?.mode !== 'demo' && chain === 133
+                ? onProposal
+                : undefined
+            }
+          />
+        </section>
+        <aside className="agent-events">
+          <p className="eyebrow">LATEST DECISIONS</p>
           <p>
-            Live agent status and decisions are unavailable. Review the mandate
-            and deployment, or{' '}
-            <a href="?demo=1#/agent">explore the recorded demo</a>. Market
-            observations below remain read-only.
+            Intent, fitted proposal and final verdict remain separate.{' '}
+            <a href="#/activity">Open Activity →</a>
           </p>
-        )}
-        {state && (
-          <details className="agent-diagnostics">
-            <summary>Agent diagnostics & scheduling</summary>
-            <dl>
-              {Object.entries({
-                Provider: state.provider,
-                Strategist: state.models.strategist,
-                Fitter: state.models.fitter,
-                'Last wake': at(state.lastWakeAt),
-                'Next scheduled wake': at(state.nextWakeAt),
-                'Wakes today': state.wakesToday,
-                'LLM calls today': state.llmCallsToday,
-                'Spend / budget (USD)': `${state.spendTodayUsd} / ${state.budgetUsd}`,
-                'Policy hash': state.policyHashOk ? 'Matches' : 'Needs owner',
-                'Journal head': state.journalHead ?? 'No journal in fixture',
-              }).map(([k, v]) => (
-                <div key={k}>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-        )}
-      </article>
-      {state?.mode === 'demo' ? (
-        <>
-          <Suspense fallback={<p>Loading recorded chart…</p>}>
-            <PriceChart points={demoEvidence} demo actions={demoActions} />
-          </Suspense>
-          <Suspense fallback={<p>Loading basis history…</p>}>
-            <BasisChart points={demoEvidence} demo />
-          </Suspense>
-          <EvidenceDetails e={demoEvidence[0]} compact />
-          <RecordedVaultValue />
-          <DemoLimits />
-        </>
-      ) : (
-        <>
-          <EvidenceView compact actions={liveActions} lastTradeB={lastTradeB} />
-          <Portfolio chain={chain} />
-        </>
-      )}
-      <article className="agent-card">
-        <h3>On-chain decisions timeline</h3>
-        {receipts.range && !feed && (
-          <p>Showing receipts from block {receipts.range}</p>
-        )}
-        {receipts.hasOlder && (
-          <button onClick={() => void receipts.loadOlder()}>
-            Load older receipts
-          </button>
-        )}
-        <p>Refreshes every 30 seconds.</p>
-        {receipts.error && (
-          <p>
-            Receipts unavailable. Check the testnet deployment and RPC
-            connection.
-          </p>
-        )}
-        {receipts.data?.map((l) => (
-          <p key={l.transactionHash + l.logIndex}>
-            {displayTime(l.at)} ·{' '}
-            {['TRADE', 'RESIZE', 'WAIT', 'REJECT'][l.args.kind ?? 3]} ·{' '}
-            <a href={explorerLink(chain, 'tx', l.transactionHash)}>
-              Transaction ↗
-            </a>{' '}
-            ·{' '}
-            <a href={`#/verify?tx=${l.transactionHash}`}>
-              Verify receipt {String(l.args.seq)}
-            </a>
-          </p>
-        ))}
-        {!receipts.data?.length && (
-          <p>
-            {feed
-              ? 'Recorded UI fixtures; no live transaction activity.'
-              : 'Waiting for agent receipts.'}
-          </p>
-        )}
-      </article>
+          <article className="agent-card">
+            <h3>On-chain decisions timeline</h3>
+            {receipts.range && !feed && (
+              <p>Showing receipts from block {receipts.range}</p>
+            )}
+            {receipts.hasOlder && (
+              <button onClick={() => void receipts.loadOlder()}>
+                Load older receipts
+              </button>
+            )}
+            <p>Refreshes every 30 seconds.</p>
+            {receipts.error && (
+              <p>
+                Receipts unavailable. Check the testnet deployment and RPC
+                connection.
+              </p>
+            )}
+            {receipts.data?.map((l) => (
+              <p key={l.transactionHash + l.logIndex}>
+                {displayTime(l.at)} ·{' '}
+                {['TRADE', 'RESIZE', 'WAIT', 'REJECT'][l.args.kind ?? 3]} ·{' '}
+                <a href={explorerLink(chain, 'tx', l.transactionHash)}>
+                  Transaction ↗
+                </a>{' '}
+                ·{' '}
+                <a href={`#/verify?tx=${l.transactionHash}`}>
+                  Verify receipt {String(l.args.seq)}
+                </a>
+              </p>
+            ))}
+            {!receipts.data?.length && (
+              <p>
+                {feed
+                  ? 'Recorded UI fixtures; no live transaction activity.'
+                  : 'Waiting for agent receipts.'}
+              </p>
+            )}
+          </article>
+        </aside>
+      </div>
+      <details className="secondary-section">
+        <summary>Agent status & scheduling</summary>
+        <article className="agent-card agent-status-line">
+          <div className="readiness-heading">
+            <span className="eyebrow">EXECUTION READINESS</span>
+            <a href="#/mandate">Review mandate ↗</a>
+          </div>
+          <h3>Agent status</h3>
+          <strong className="readiness-status">{mode}</strong>
+          {!state && (
+            <p>
+              Live agent status and decisions are unavailable. Review the
+              mandate and deployment, or{' '}
+              <a href="?demo=1#/agent">explore the recorded demo</a>.{' '}
+              <a href="#/evidence">Market observations</a> remain read-only.
+            </p>
+          )}
+          {state && (
+            <details className="agent-diagnostics">
+              <summary>Agent diagnostics & scheduling</summary>
+              <dl>
+                {Object.entries({
+                  Provider: state.provider,
+                  Strategist: state.models.strategist,
+                  Fitter: state.models.fitter,
+                  'Last wake': at(state.lastWakeAt),
+                  'Next scheduled wake': at(state.nextWakeAt),
+                  'Wakes today': state.wakesToday,
+                  'LLM calls today': state.llmCallsToday,
+                  'Spend / budget (USD)': `${state.spendTodayUsd} / ${state.budgetUsd}`,
+                  'Policy hash': state.policyHashOk ? 'Matches' : 'Needs owner',
+                  'Journal head': state.journalHead ?? 'No journal in fixture',
+                }).map(([k, v]) => (
+                  <div key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
+        </article>
+      </details>
       <details className="secondary-section" open={!!feed}>
         <summary>Watches & activity</summary>
         <article className="agent-card">

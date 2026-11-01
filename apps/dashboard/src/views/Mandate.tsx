@@ -1,3 +1,4 @@
+import { ConnectLedger } from '../owner/ConnectLedger.js';
 import { LimitChart } from '../components/charts/LimitChart.js';
 import { Portfolio } from './Portfolio.js';
 import { useCallback, useEffect, useState } from 'react';
@@ -131,9 +132,11 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
 }
 export function MandateView({
   chain,
+  setup = false,
   onOwner,
 }: {
   chain: DashboardChain;
+  setup?: boolean;
   onOwner?: (
     d: Deployment,
     s: VaultSnapshot,
@@ -156,12 +159,35 @@ export function MandateView({
   const cfg = addresses[chain === 133 ? 133 : 177];
   return (
     <section>
-      <p className="eyebrow">01 / AUTHORITY</p>
-      <h2>The signed mandate</h2>
+      <p className="eyebrow">{setup ? 'SET MANDATE' : 'MANDATE'}</p>
+      <h1>
+        {setup ? 'Define your execution boundaries' : 'The signed mandate'}
+      </h1>
       <p>
         Execution limits set by the owner. Every trade stays within this
         envelope.
       </p>
+      {setup && !resource.data && (
+        <ol className="wizard-steps" aria-label="Mandate setup stages">
+          {[
+            'Connect',
+            'Preset',
+            'Tune limits',
+            'Compare',
+            'Review & sign',
+            'First decision',
+            'Verify',
+          ].map((label, i) => (
+            <li key={label} aria-current={i === 0 ? 'step' : undefined}>
+              {String(i + 1).padStart(2, '0')} {label}
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="mandate-connection">
+        <ConnectLedger />
+        <span className="micro-label">Testnet 133 · Ledger blind signing</span>
+      </div>
       {resource.loading && (
         <p className="skeleton" role="status">
           Reading deployment and mandate…

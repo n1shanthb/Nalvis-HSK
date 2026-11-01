@@ -34,7 +34,8 @@ export default function VaultChart({
           <TimeSeries
             series={(['vault', 'hold'] as const).map((k, i) => ({
               name: k,
-              color: i ? '#a8c7b3' : '#b6bcae',
+              area: k === 'vault',
+              color: i ? '#a3e635' : '#5eead4',
               points: rows.map((r) => ({ time: r.time, value: r[k] })),
             }))}
           />

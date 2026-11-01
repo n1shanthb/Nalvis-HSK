@@ -135,7 +135,8 @@ export default function PriceChart({
           series={['dex', 'cex'].map((k, i) => ({
             name: k.toUpperCase(),
             precision: 6,
-            color: i ? '#b6bcae' : '#a8c7b3',
+            area: i === 0,
+            color: i ? '#5eead4' : '#a3e635',
             points: rows.map((r) => ({
               time: r.time,
               value: r[k as 'dex' | 'cex'],
