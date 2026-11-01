@@ -51,6 +51,11 @@ export function useAgentFeed(): {
           );
           if (saved.state.mode !== 'live')
             throw Error('No production demo data');
+          if (
+            import.meta.env.VITE_EXECUTION_CHAIN === '177' &&
+            saved.state.executionChainId !== 177
+          )
+            throw Error('Snapshot execution chain mismatch');
           if (live) setFeed(saved);
         } catch {
           if (live) setFeed(null);

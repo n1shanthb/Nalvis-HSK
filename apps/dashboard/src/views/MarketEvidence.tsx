@@ -39,7 +39,7 @@ export default function MarketEvidence({
     : undefined;
   return (
     <>
-      <EvidenceView actions={actions} lastTradeB={lastTradeB} />
+      <EvidenceView chain={chain} actions={actions} lastTradeB={lastTradeB} />
       <Portfolio chain={chain} />
     </>
   );

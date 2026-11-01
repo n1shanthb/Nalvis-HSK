@@ -163,7 +163,9 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
               <p>
                 {chain === 31337
                   ? 'local anvil — prices not real'
-                  : 'Testnet — pool prices are not real'}{' '}
+                  : chain === 177
+                    ? 'Mainnet — real funds'
+                    : 'Testnet — pool prices are not real'}{' '}
                 · on-chain match UNVERIFIED
               </p>
               <p>{r.llm.explanation}</p>

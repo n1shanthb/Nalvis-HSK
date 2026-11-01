@@ -14,14 +14,18 @@ import {
 } from '../../../../packages/core/src/evidence.js';
 import { policySchema } from '../../../../packages/core/src/policy.js';
 import policyJSON from '../../../../policy/default.json';
-import { clientFor, displayTime, loadDeployment } from '../lib/clients.js';
+import {
+  clientFor,
+  displayTime,
+  loadDeployment,
+  type DashboardChain,
+} from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
 const policy = policySchema.parse(policyJSON);
 const sizes = [
   ...new Set(Object.values(policy.presets).flatMap((p) => p.sizeGridB)),
 ].sort((a, b) => a - b);
-const market = clientFor(177),
-  execution = clientFor(133);
+const market = clientFor(177);
 export const evidenceFetcher: typeof fetch = (input, init) => {
   let url = String(input);
   if (import.meta.env.DEV && import.meta.env.VITE_CEX_PROXY === 'true') {
@@ -160,18 +164,25 @@ export function EvidenceDetails({
   );
 }
 export function EvidenceView({
+  chain = 133,
   compact = false,
   actions = [],
   lastTradeB,
-}: { compact?: boolean; actions?: ActionView[]; lastTradeB?: number } = {}) {
+}: {
+  chain?: DashboardChain;
+  compact?: boolean;
+  actions?: ActionView[];
+  lastTradeB?: number;
+} = {}) {
   const resource = useResource(
     useCallback(async () => {
-      const deployment = await loadDeployment(133).catch(() => undefined);
+      const execution = clientFor(chain);
+      const deployment = await loadDeployment(chain).catch(() => undefined);
       const evidence = await collectEvidence({
         vault: deployment?.vault,
         marketClient177: market,
         execClient: execution,
-        sizes,
+        sizes: chain === 177 ? [0.1, 0.5, 1] : sizes,
         decisionTtlSec: policy.decisionTtlSec ?? 120,
         fetcher: evidenceFetcher,
       });
@@ -185,7 +196,7 @@ export function EvidenceView({
             ).catch(() => undefined)
           : undefined;
       return { ...evidence, chartRisk };
-    }, []),
+    }, [chain]),
   );
   const [history, setHistory] = useState<Evidence[]>([]);
   useEffect(() => {
@@ -240,7 +251,7 @@ export function EvidenceView({
             : undefined
         }
       />
-      <VaultValue price={resource.data?.dexMid} />
+      <VaultValue chain={chain} price={resource.data?.dexMid} />
       <Suspense fallback={<p>Loading market chart…</p>}>
         <PriceChart
           points={history}

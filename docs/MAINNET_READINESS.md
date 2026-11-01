@@ -43,10 +43,14 @@ remains enabled. See PR checks for full suite results.
 Local validation: 143 Foundry tests passed / 6 RPC-dependent skipped; the dedicated
 pinned mainnet fork passed separately without a skip. Core 186 passed / 1 skipped,
 including 240 seeded local contract-parity cases; verifier 63 passed, including both
-v3 chain identities. Dashboard 170 passed, including default mainnet rejection and
+v3 chain identities. Dashboard 171 passed, including default mainnet rejection and
 opt-in chain-177 EIP-155 owner serialization. Keeper platform-independent regressions
 20 passed; policy/activation tests 3 passed (activation included in the 20).
 Full Linux service/flock/shell tests require CI; Windows has no working Linux daemon.
+
+Market evidence and vault valuation follow the selected execution chain. A mainnet
+dashboard rejects live feeds/snapshots without executionChainId=177, preventing a
+misconfigured testnet feed from being presented as mainnet activity.
 
 ## Human deployment after approval
 

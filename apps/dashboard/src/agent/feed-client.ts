@@ -4,6 +4,9 @@ const finite = z.number().finite(),
   time = finite.nonnegative(),
   nullable = time.nullable();
 export const stateSchema = z.object({
+  executionChainId: z
+    .union([z.literal(133), z.literal(177), z.literal(31337)])
+    .optional(),
   mode: z.enum(['live', 'demo']),
   state: z.enum(['online', 'offline', 'budget_paused', 'needs_owner']),
   provider: z.string(),
@@ -101,6 +104,11 @@ export async function fetchFeed(
   const state = stateSchema.parse(
     await readFeedJSON(base, '/feed/state', signal),
   );
+  if (
+    import.meta.env.VITE_EXECUTION_CHAIN === '177' &&
+    state.executionChainId !== 177
+  )
+    throw Error('Agent execution chain mismatch');
   const w = z
     .object({ active: z.array(watch), history: z.array(history) })
     .parse(await readFeedJSON(base, '/feed/watches', signal));

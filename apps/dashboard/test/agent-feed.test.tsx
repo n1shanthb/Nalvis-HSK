@@ -2,7 +2,7 @@ import { it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { AgentView } from '../src/views/Agent.js';
 import { fixture } from '../src/agent/fixture.js';
-import { fallbackMessage } from '../src/agent/feed-client.js';
+import { fallbackMessage, fetchFeed } from '../src/agent/feed-client.js';
 import { verificationStore } from '../src/agent/verify-store.js';
 vi.mock('../src/views/Evidence.js', () => ({
   EvidenceView: () => <p>Live market chart retained</p>,
@@ -31,6 +31,16 @@ const live = {
   spendByDay: [{ day: '2026-11-01', usd: 0.2 }],
   stats: { calls24h: 5, estimatedSpendUsd: 0.2, averageLatencyMs: 125 },
 };
+it('mainnet build rejects a testnet agent feed before reading its actions', async () => {
+  vi.stubEnv('VITE_EXECUTION_CHAIN', '177');
+  const send = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(Response.json({ ...live.state, executionChainId: 133 }));
+  await expect(fetchFeed('https://agent.example')).rejects.toThrow(
+    'execution chain mismatch',
+  );
+  expect(send).toHaveBeenCalledTimes(1);
+});
 it('production demo stays offline and never fetches the live agent', async () => {
   window.history.replaceState(null, '', '/?demo=1#/agent');
   vi.stubEnv('DEV', false);

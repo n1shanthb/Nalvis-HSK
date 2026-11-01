@@ -115,6 +115,7 @@ export async function startAgentService(options: {
       return [];
     });
     const state: AgentState = {
+      executionChainId: chain,
       mode: 'live',
       state:
         forced ??
