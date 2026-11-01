@@ -75,4 +75,22 @@ contract MandateCalldataTest is Test {
         vm.expectRevert("Mandate: unexpected testnet decimals");
         helper.build(owner, agent, drawdown);
     }
+
+    function testV3GeneratedPolicyUsesExactBytesAndComputedCaps() public view {
+        string memory policy =
+            '{"mandate":{"expiry":9999999,"maxDailyInB":"200000000000000000000","maxDrawdownBps":2000,"maxExposureBps":8000,"maxSlippageBps":100,"maxTradeInA":"468750000000000000","maxTradeInB":"25000000000000000000","minIntervalSec":300},"strategyHash":"0x1111111111111111111111111111111111111111111111111111111111111111","version":3}';
+        (bytes memory data, bytes memory revokeData) = helper.buildV3FromPolicy(owner, agent, policy);
+        EdgewiseVault.Mandate memory m = EdgewiseVault.Mandate(
+            agent, 9999999, 468750000000000000, 25e18, 200e18, 8000, 100, 2000, 300, keccak256(bytes(policy))
+        );
+        assertEq(data, abi.encodeCall(EdgewiseVault.setMandate, (m)));
+        assertEq(revokeData, abi.encodeCall(EdgewiseVault.revoke, ()));
+    }
+
+    function testV3RefusesTruncatedOversizedCaps() public {
+        string memory policy =
+            '{"mandate":{"maxDrawdownBps":2000,"maxExposureBps":73536,"maxSlippageBps":100},"strategyHash":"0x1111111111111111111111111111111111111111111111111111111111111111","version":3}';
+        vm.expectRevert("Mandate: invalid generated caps");
+        helper.buildV3FromPolicy(owner, agent, policy);
+    }
 }

@@ -1,205 +1,165 @@
-# Human testnet bootstrap (chain 133 only)
+# Human bootstrap: chain 133 execution, chain 177 read-only evidence
 
-Run locally from the repository root after reviewing this commit. Codex never
-receives these keys or broadcasts to 133/177. Testnet prices are fake. There is
-no proven edge. Requirements: Foundry, git, Python 3, jq, a Ledger with its Ethereum
-app, and enough faucet test HSK for wrapping and gas. All amounts below are raw
-units; **both WHSK and test-USDT have 18 decimals on 133** (mainnet USDT has 6).
+Nishanth runs these steps locally after all task PRs merge. Codex never receives
+keys, deploys, or broadcasts to testnet/mainnet. Use Node 22, pnpm 9, Foundry,
+Python 3, jq and a Ledger Ethereum app with **blind signing enabled**. Chain 133
+has no clear-signing descriptor. Faucet claims and Ledger support on 133 remain
+**UNVERIFIED** until the human records actual successful transactions.
 
-## 1. Create two separate testnet wallets
+**Honest framing:** prices/evidence are real mainnet data; execution is a testnet
+sandbox pool with its own price (roughly 54 USDT/WHSK on 31 October, versus real
+mainnet roughly 0.0875). Read the execution price at setup; never use the mainnet
+price to size testnet caps or claim real P&L. There is **no proven edge**.
 
-```bash
-set -euo pipefail
-set +x
-cast wallet new
-cast wallet new
-# Secure the first as deployer, second as agent. Do not paste keys into chat.
-read -rs -p 'Testnet deployer key: ' TESTNET_DEPLOYER_KEY; echo
-export TESTNET_DEPLOYER_KEY
-read -rs -p 'Testnet agent key: ' TESTNET_AGENT_KEY; echo
-export TESTNET_AGENT_KEY
-read -r -p 'Ledger owner PUBLIC address: ' OWNER_ADDRESS
-export OWNER_ADDRESS
-export HSK_TESTNET_RPC=https://testnet.hsk.xyz
-export DEPLOYER_ADDRESS=$(cast wallet address --private-key "$TESTNET_DEPLOYER_KEY")
-export AGENT_ADDRESS=$(cast wallet address --private-key "$TESTNET_AGENT_KEY")
-test "${OWNER_ADDRESS,,}" != "${DEPLOYER_ADDRESS,,}"
-test "${OWNER_ADDRESS,,}" != "${AGENT_ADDRESS,,}"
-test "${DEPLOYER_ADDRESS,,}" != "${AGENT_ADDRESS,,}"
-assert_testnet() { test "$(cast chain-id --rpc-url "$HSK_TESTNET_RPC")" = 133; }
-send133() { assert_testnet; cast send --rpc-url "$HSK_TESTNET_RPC" "$@"; }
-assert_testnet
+## 1. Local environment and funding
+
+Create distinct owner (Ledger), deployer and agent roles. Keep keys only in
+runtime environment variables. Do not put them in shell history, chat, git,
+Docker build arguments or frontend variables. Disable shell tracing before any
+secret input. Use secure local entry for `TESTNET_DEPLOYER_KEY` and
+`AGENT_PRIVATE_KEY`; the agent has gas only. `TESTNET_AGENT_KEY` is the legacy
+keeper variable, not the always-on service's signer variable.
+
+Set public `OWNER_ADDRESS`, `DEPLOYER_ADDRESS`, `AGENT_ADDRESS`, and the documented
+`HSK_TESTNET_RPC`/`HSK_MAINNET_RPC`. All token, pool, quoter and router addresses
+come from the single config backed by [ADDRESSES](../docs/ADDRESSES.md).
+
+Claim test HSK from https://faucet.hsk.xyz (redirects to
+https://faucet.hashkeychain.net). Faucet remains **UNVERIFIED**. Before setup:
+
+- Deployer: **at least 3 test HSK** for acquisition, wrapping and deployment gas.
+- Agent: **at least 0.5 test HSK** for execution gas.
+- Ledger owner: sufficient test HSK for mandate/Pause/revoke gas.
+
+Stop if short; scripts do not invent funding or bypass the faucet. Top the deployer
+back to the preflight threshold after setup if needed. No real funds.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter @nalvis/keeper build
+# Set both models before generating the policy:
+export STRATEGIST_MODEL=anthropic/claude-haiku-5.5
+export FITTER_MODEL=xiaomi/mimo-v2.6-flash
+scripts/testnet-setup.sh --dry-run
 ```
 
-Claim test HSK for deployer and agent at https://faucet.hsk.xyz (redirects to
-https://faucet.hashkeychain.net). **UNVERIFIED**: claiming from the faucet has not
-been tested. The agent needs gas only; the deployer funds the vault. Keep the
-Ledger owner distinct, and fund it with test HSK for its mandate transaction.
-Never use real funds. Stop if the faucet or any preflight fails.
+Dry run reads chain 133, pool `slot0` and token0/decimals, computes the WHSK input
+and prints every mandate raw value beside a human summary. It does not deploy,
+sign or write a policy. For a local fork/mock dry-run the endpoint must still
+report 133; the script refuses any other chain, including 177.
 
-## 2. Wrap test HSK and acquire test-USDT
+## 2. Deploy, acquire tokens, fund, generate policy and build calldata
 
-These addresses come only from docs/ADDRESSES.md / contracts/script/Addresses.sol.
-The quote is an `eth_call`; SwapRouter02's tuple has **no deadline**. Its
-`multicall(uint256,bytes[])` wrapper supplies the bootstrap swap's deadline.
+Run locally, once the plan and role addresses have been reviewed:
 
-```bash
-export WHSK=0xCA8aAceEC5Db1e91B9Ed3a344bA026c4a2B3ebF6
-export USDT=0x98B6173A8B7DFc52ce8bc88f1184a918A1CCaa4F
-export SWAP_ROUTER=0xa6914E66690c6794244B5f66a09eAEbf66254237
-export QUOTER=0x73820d9eE5Bf1BfcD429580320FC7A374E8fa1cC
-export POOL=0xc076FB478b77633736738579c7f48D2539604a50
-assert_testnet
-test "$(cast call "$WHSK" 'decimals()(uint8)' --rpc-url "$HSK_TESTNET_RPC")" = 18
-test "$(cast call "$USDT" 'decimals()(uint8)' --rpc-url "$HSK_TESTNET_RPC")" = 18
-send133 "$WHSK" 'deposit()' --value 0.5ether --private-key "$TESTNET_DEPLOYER_KEY"
-export SWAP_IN=200000000000000000
-QUOTE=$(cast call "$QUOTER" \
-  'quoteExactInputSingle((address,address,uint256,uint24,uint160))(uint256,uint160,uint32,uint256)' \
-  "($WHSK,$USDT,$SWAP_IN,3000,0)" --rpc-url "$HSK_TESTNET_RPC" | sed -n '1s/ .*//p')
-export MIN_OUT=$(python3 -c 'import sys; print(int(sys.argv[1])*99//100)' "$QUOTE")
-python3 -c 'import sys; assert int(sys.argv[1]) > 0' "$MIN_OUT"
-send133 "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" "$SWAP_IN" \
-  --private-key "$TESTNET_DEPLOYER_KEY"
-DEADLINE=$(( $(date +%s) + 300 ))
-SWAP_DATA=$(cast calldata 'exactInputSingle((address,address,uint24,address,uint256,uint256,uint160))' \
-  "($WHSK,$USDT,3000,$DEPLOYER_ADDRESS,$SWAP_IN,$MIN_OUT,0)")
-send133 "$SWAP_ROUTER" 'multicall(uint256,bytes[])(bytes[])' "$DEADLINE" "[$SWAP_DATA]" \
-  --private-key "$TESTNET_DEPLOYER_KEY"
-send133 "$WHSK" 'approve(address,uint256)' "$SWAP_ROUTER" 0 --private-key "$TESTNET_DEPLOYER_KEY"
-cast call "$USDT" 'balanceOf(address)(uint256)' "$DEPLOYER_ADDRESS" --rpc-url "$HSK_TESTNET_RPC"
+```sh
+scripts/testnet-setup.sh --execute
 ```
 
-This is a mechanics exercise; the faucet and **live testnet** acquisition procedure
-remain UNVERIFIED. Quote/liquidity may change: rebuild a fresh quote on failure;
-never use zero minOut. If the swap fails, revoke its outstanding approval with the
-last `approve(...,0)` command before retrying.
+This script asserts chain 133 before every write and prints each mined transaction
+hash. It deploys only if `contracts/deployments/133.json` is absent. If a manifest
+exists, it validates code and owner rather than redeploying. After a failed deploy,
+inspect successful receipts before removing a stale simulation manifest. The
+manifest records the simulation block: verify both actual deployment receipts in
+`contracts/broadcast/Deploy.s.sol/133/run-latest.json`, code, owners and constructors.
 
-## 3. Deploy and fund (human broadcast)
+Acquisition reads the **execution pool** price and current balances, computes
+WHSK needed to reach **at least 60 test USDT**, and wraps that plus the WHSK vault
+top-up. It adds a 3% planning buffer, then requires a fresh QuoterV2 quote whose
+99% minOut still covers the target. If not, STOP/replan; do not lower minOut.
+It uses exact approvals and resets approval after swap (including a best-effort
+reset on failure). The router tuple has no deadline; `multicall` supplies one.
+No fixed 0.5 HSK acquisition amount is used.
 
-```bash
-export DEPLOY_COMMIT=$(git rev-parse HEAD)
-export TWAP_WINDOW_SEC=600
-assert_testnet
-cd contracts
-forge script script/Deploy.s.sol --rpc-url "$HSK_TESTNET_RPC" --broadcast \
-  --private-key "$TESTNET_DEPLOYER_KEY" -vvv
-cd ..
+The vault receives only missing amounts to reach **50 test USDT and 0.5 WHSK**.
+The old 5 USDT/0.1 WHSK funding could not cover the smallest trade. Token decimals
+are read; 133 USDT has 18 decimals while 177 USDT has 6.
+
+The script writes exact canonical sorted-key `policy/agent-v3.json` with
+`strategyHash`, signed model/prompt definitions and execution-price-based mandate:
+
+| Field | Default |
+| --- | --- |
+| `maxTradeInB` | 25 test USDT |
+| `maxDailyInB` | 200 test USDT per rolling 24h |
+| `maxTradeInA` | ceil in raw WHSK units of `1.2 × 25 / executionPrice` (about 0.56 at 54) |
+| `maxSlippageBps` | 100 bps = 1% |
+| `maxExposureBps` | 8000 bps = 80% |
+| `maxDrawdownBps` | 2000 bps = 20% |
+| `minIntervalSec` | 300 seconds |
+| `expiry` | execution block timestamp + 7 days |
+
+It prints the hash and invokes `MandateCalldata.s.sol`, which hashes those exact
+v3 policy bytes and builds the matching mandate. Output is `work/mandate.json`
+and `work/set-mandate-calldata.txt`. It **stops before Ledger signing**. Keep the
+same policy bytes and model identifiers on the service. Regeneration changes
+expiry/hash, requiring a new owner signature. No APRO exists on 133; deployment
+uses zero on-chain oracle. Mainnet APRO remains evidence only.
+
+## 3. Nishanth signs setMandate on the Ledger
+
+Review destination, chain 133, agent, expiry, every cap and policy hash. The
+read-only calldata builder never broadcasts. Use the dashboard wizard if it can
+reproduce the exact generated fields/hash; otherwise use the reviewed calldata:
+
+```sh
 export VAULT_ADDRESS=$(jq -er '.vault' contracts/deployments/133.json)
-export PROOF_ROUTER_ADDRESS=$(jq -er '.router' contracts/deployments/133.json)
-cast code "$VAULT_ADDRESS" --rpc-url "$HSK_TESTNET_RPC"
-cast call "$VAULT_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
-cast call "$PROOF_ROUTER_ADDRESS" 'owner()(address)' --rpc-url "$HSK_TESTNET_RPC"
-# Compare both owners to the Ledger address; verify BOTH deployment tx receipts.
-send133 "$WHSK" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 100000000000000000 \
-  --private-key "$TESTNET_DEPLOYER_KEY"
-send133 "$USDT" 'transfer(address,uint256)(bool)' "$VAULT_ADDRESS" 5000000000000000000 \
-  --private-key "$TESTNET_DEPLOYER_KEY"
+SET_DATA=$(cat work/set-mandate-calldata.txt)
+test "$(cast chain-id --rpc-url "$HSK_TESTNET_RPC")" = 133
+cast send "$VAULT_ADDRESS" --data "$SET_DATA" --ledger --sender "$OWNER_ADDRESS" \
+  --rpc-url "$HSK_TESTNET_RPC" --mnemonic-derivation-path "m/44'/60'/0'/0/0"
 ```
 
-The manifest is generated during simulation: its `block` is the simulation block,
-not a mined receipt block. Verify both transactions in
-`contracts/broadcast/Deploy.s.sol/133/run-latest.json`, their successful receipts,
-code and owners before using it. A failed broadcast may leave a stale manifest.
-The deployer has no privileges after deployment. Add the two deployment rows to
-`docs/ADDRESSES.md` with chain, addresses, deployment tx hashes, this commit and
-constructor arguments. Do not add Anvil addresses to that registry.
+Never use the deployer or agent key for owner actions. Save the mandate tx hash.
+Read back `mandate()` and confirm exact hash/caps. A stale expiry, policy mismatch,
+paused/revoked mandate or wrong signer shows NEEDS_OWNER and prevents execution.
 
-## 4. Build calldata and sign with the Ledger
+## 4. Register, start, confirm first wake/anchor and verify
 
-**UNVERIFIED on chain 133:** `cast send --ledger` and dashboard signing. Enable
-**blind signing** in the Ledger Ethereum app; chain 133 has no clear-signing
-descriptor. Review destination, chain, agent, expiry and every cap before signing.
-The dashboard is a later milestone; the command below is an alternative to test.
+Add verified vault **and** ProofTradeRouter rows to
+[ADDRESSES](../docs/ADDRESSES.md) with chain, addresses, mined deployment tx hashes,
+commit and constructor arguments. This is required before dashboard/service
+address authorization; do not invent deployment rows. Record first-wake/anchor
+transaction evidence alongside them after confirmation. Keep the verified 133
+manifest and canonical policy in the reviewed deployment checkout.
 
-```bash
-mkdir -p work
-cd contracts
-forge script script/MandateCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" -vv
-forge script script/MandateCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" --json > ../work/mandate.json
-cd ..
-export SET_DATA=$(jq -er '.returns.setData.value' work/mandate.json)
-export REVOKE_DATA=$(jq -er '.returns.revokeData.value' work/mandate.json)
-# Rebuild if the printed expiry is stale. Confirm the destination is the vault.
-send133 "$VAULT_ADDRESS" --data "$SET_DATA" --ledger --sender "$OWNER_ADDRESS" \
-  --mnemonic-derivation-path "m/44'/60'/0'/0/0"
-cast call "$VAULT_ADDRESS" \
-  'mandate()(address,uint256,uint256,uint256,uint256,uint16,uint16,uint16,uint256,bytes32)' \
-  --rpc-url "$HSK_TESTNET_RPC"
+Set server-only `OPENROUTER_API_KEY` and `AGENT_PRIVATE_KEY` via the host's env UI.
+See [Railway kit](../deploy/agent/README.md) for the volume, variables and HTTPS
+feed. For a local always-on process use persistent state, or explicitly opt into
+local storage with `AGENT_ALLOW_EPHEMERAL=1`:
+
+```sh
+pnpm keeper agent --exec testnet
 ```
 
-Default: 2 WHSK/trade, 100 test-USDT/trade, 500 test-USDT per UTC calendar day,
-80% exposure cap (strict exposure reduction allowed), 100 bps slippage,
-2000 bps (20%) max drawdown from high-water mark before circuit breaker triggers,
-300-second cooldown, expiry at the RPC block timestamp + 7 days. Missing
-`policy/default.json` prints a WARNING and uses zero policyHash. If present, it
-must contain canonical sorted-key JSON with no whitespace; the helper hashes its
-exact file bytes. Review the same bytes/hash before signing. No APRO exists on
-133: oracle, band and age are all zero.
+No key means OFFLINE and zero sends. `tick` polls watches; it wakes only on eligible
+conditions, including heartbeat/owner events. Confirm `/feed/state`, active watches,
+journal entries and the first wake/WAIT anchor or trade. Stop cleanly before freeze:
 
-Mandate field reference (T9 guardrails):
-- `maxDrawdownBps`: set via `MAX_DRAWDOWN_BPS` env var (default 2000 = 20%).
-  Agent trades halt if total vault value drops > `maxDrawdownBps` bps below its
-  high-water mark; owner must re-sign a mandate to reset.
-- `maxSlippageBps`: hard-capped at 100 bps by contract constant; cannot be raised.
-- `minIntervalSec`: minimum seconds between agent trades (default 300).
-- `maxDailyInB`: rolling UTC calendar-day notional cap in tokenB units.
-
-## 5. One agent trade, then verify
-
-```bash
-cd contracts
-forge script script/TradeCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" -vv
-forge script script/TradeCalldata.s.sol --rpc-url "$HSK_TESTNET_RPC" --json > ../work/trade.json
-cd ..
-TRADE_DATA=$(jq -er '.returns.tradeData.value' work/trade.json)
-send133 "$VAULT_ADDRESS" --data "$TRADE_DATA" --private-key "$TESTNET_AGENT_KEY" --json > work/trade-tx.json
-TX_HASH=$(jq -er '.transactionHash' work/trade-tx.json)
-cast receipt "$TX_HASH" --rpc-url "$HSK_TESTNET_RPC" --json > work/trade-receipt.json
-cast call "$VAULT_ADDRESS" 'seq()(uint64)' --rpc-url "$HSK_TESTNET_RPC"
-cast call "$VAULT_ADDRESS" 'head()(bytes32)' --rpc-url "$HSK_TESTNET_RPC"
-cast call "$VAULT_ADDRESS" 'highWaterMark()(uint256)' --rpc-url "$HSK_TESTNET_RPC"
-cast call "$WHSK" 'allowance(address,address)(uint256)' "$VAULT_ADDRESS" "$SWAP_ROUTER" \
-  --rpc-url "$HSK_TESTNET_RPC"
-RECEIPT_DATA=$(jq -er --arg vault "${VAULT_ADDRESS,,}" '
-  .logs[] | select((.address | ascii_downcase) == $vault) | .data' work/trade-receipt.json)
-cast decode-event --sig 'Receipt(uint64 indexed seq,bytes32 indexed receiptHash,bytes32 prevHead,bytes32 policyHash,uint8 kind,address tokenIn,uint256 amountIn,uint256 amountOut,uint256 minOut,uint256 refOut)' \
-  "$RECEIPT_DATA"
+```sh
+pnpm keeper export-agent --chain 133
+pnpm verify receipts/133/agent/receipts/<receipt-hash>.json \
+  --rpc "$HSK_TESTNET_RPC" --agent-root receipts/133/agent
+scripts/agent-preflight.sh
 ```
 
-Use `cast receipt` logs (or the explorer) to decode the vault's `Receipt`: verify
-amountOut >= minOut, sequence/head and policyHash; allowance must read zero. The
-first-trade helper sells 0.01 WHSK using the current vault TWAP and the default
-1% floor, nonce/head, and a five-minute deadline. It is a manual bootstrap helper,
-not evidence-driven strategy execution. If TWAP history is unavailable, price
-moves, cooldown applies or liquidity cannot fill above that floor, STOP/rebuild
-later; do not weaken the checks. Testnet results are not real P&L.
+Preflight needs `AGENT_FEED_URL` (HTTPS), public roles/vault, matching policy and
+runtime env names. It checks balances, signer, hash and live mandate. Outputs
+presence/check results only, never secrets. Review exported files before force
+adding generated receipts to git at freeze. Without a reachable feed the dashboard
+shows its fallback banner, exported snapshot and on-chain Receipt logs. An absent
+export shows no invented history. v3 verification binds model outputs and artifacts;
+**model outputs are recorded and bound, not reproduced**.
 
-Emergency owner revoke (same UNVERIFIED Ledger path):
+## Stop and recover
 
-```bash
-send133 "$VAULT_ADDRESS" --data "$REVOKE_DATA" --ledger --sender "$OWNER_ADDRESS" \
-  --mnemonic-derivation-path "m/44'/60'/0'/0/0"
-```
+Railway stop/systemd stop sends SIGTERM; let the current wake/mining wait finish.
+Owner Pause on the Ledger prevents execution immediately and is observed at the
+next poll. Owner revoke removes authority. Unresolved `.pending.json`/`pending.json`
+intents are reconciled with mined Receipt logs and wallet nonces, never resent
+blindly. Inspect uncertain transactions manually. Retain the entire state root;
+missing evidence/journal or truncated data fails verification closed.
 
-## GO / NO-GO — 29 October 2026, 23:59 IST (docs/PLAN.md)
-
-- [ ] Ledger signed and broadcast `setMandate` successfully on **133**; save tx hash.
-- [ ] Agent `trade()` succeeded on **133**, real testnet pool fill, Receipt emitted,
-      amountOut >= minOut, allowance zero; save tx hash and decoded receipt.
-- [ ] Roles are distinct; deployed owners are the Ledger; no deployer privileges.
-- [ ] Record the decision and transaction evidence under docs/PLAN.md Decision log.
-
-**GO** only with both Ledger mandate and vault trade. Fork tests do not establish
-GO. **NO-GO:** ship ProofTrade only, leave vault code unadvertised, hide owner UI;
-keeper calls ProofTradeRouter `commitAndSwap`/`commitHold` from its testnet wallet.
-M4–M8 remain unchanged. Faucet, Ledger support and live broadcasts require the
-human to verify them; they are not established by Codex's local tests.
-
-## Publish the verified testnet manifest to the hosted console
-
-After the human chain-133 deploy and both receipt/owner checks, commit
-`contracts/deployments/133.json`, add the verified vault and router deployment
-entries to `docs/ADDRESSES.md`, then redeploy Vercel. The manifest and address
-registry are baked in at build time; live Receipt polling does not publish a
-new deployment manifest automatically. Never commit keys or `.env` files.
+GO requires an actual Ledger mandate and successful vault trade on 133 with a
+matching Receipt, `amountOut >= minOut`, and zero router allowance. Record the
+human-verified evidence in docs/PLAN.md. Anvil tests alone do not establish GO.
