@@ -1,6 +1,11 @@
+import { readChartRisk } from '../lib/chart-data.js';
+import { LimitChart } from '../components/charts/LimitChart.js';
 import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
-import { MarketChart } from './MarketChart.js';
+import { lazy, Suspense } from 'react';
+const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
+import type { ActionView } from '../agent/feed-types.js';
+const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import type { Evidence } from '../../../../packages/core/src/types.js';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -9,7 +14,7 @@ import {
 } from '../../../../packages/core/src/evidence.js';
 import { policySchema } from '../../../../packages/core/src/policy.js';
 import policyJSON from '../../../../policy/default.json';
-import { clientFor, displayTime } from '../lib/clients.js';
+import { clientFor, displayTime, loadDeployment } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
 const policy = policySchema.parse(policyJSON);
 const sizes = [
@@ -154,19 +159,33 @@ export function EvidenceDetails({
     </>
   );
 }
-export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
+export function EvidenceView({
+  compact = false,
+  actions = [],
+  lastTradeB,
+}: { compact?: boolean; actions?: ActionView[]; lastTradeB?: number } = {}) {
   const resource = useResource(
-    useCallback(
-      () =>
-        collectEvidence({
-          marketClient177: market,
-          execClient: execution,
-          sizes,
-          decisionTtlSec: policy.decisionTtlSec ?? 120,
-          fetcher: evidenceFetcher,
-        }),
-      [],
-    ),
+    useCallback(async () => {
+      const deployment = await loadDeployment(133).catch(() => undefined);
+      const evidence = await collectEvidence({
+        vault: deployment?.vault,
+        marketClient177: market,
+        execClient: execution,
+        sizes,
+        decisionTtlSec: policy.decisionTtlSec ?? 120,
+        fetcher: evidenceFetcher,
+      });
+      const chartRisk =
+        evidence.vault && deployment
+          ? await readChartRisk(
+              execution,
+              deployment.vault,
+              evidence.executionBlockNumber,
+              evidence.vault.decimalsB,
+            ).catch(() => undefined)
+          : undefined;
+      return { ...evidence, chartRisk };
+    }, []),
   );
   const [history, setHistory] = useState<Evidence[]>([]);
   useEffect(() => {
@@ -180,6 +199,18 @@ export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
   }, [resource.data]);
   return (
     <section>
+      <Suspense fallback={<p>Loading market chart…</p>}>
+        <PriceChart
+          points={history}
+          actions={actions}
+          unavailable={
+            !!resource.error || (!resource.loading && !resource.data)
+          }
+        />
+      </Suspense>
+      <Suspense fallback={<p>Loading basis history…</p>}>
+        <BasisChart points={history} unavailable={!!resource.error} />
+      </Suspense>
       <p className="eyebrow">02 / SHADOW MODE · MAINNET 177</p>
       <h2>Live market evidence</h2>
       <p>
@@ -196,9 +227,34 @@ export function EvidenceView({ compact = false }: { compact?: boolean } = {}) {
           Evidence unavailable. Please check the network connection and retry.
         </p>
       )}
+      <LimitChart
+        mandate={resource.data?.vault?.mandate}
+        evidence={resource.data}
+        at={resource.data?.chartRisk?.at ?? resource.data?.now}
+        dailySpentB={resource.data?.chartRisk?.dailySpentB}
+        lastTradeAt={resource.data?.chartRisk?.lastTradeAt}
+        lastTradeB={lastTradeB}
+        drawdownBps={
+          resource.data?.vault &&
+          resource.data.dexMid &&
+          resource.data.chartRisk?.highWaterB
+            ? Math.max(
+                0,
+                (1 -
+                  ((Number(resource.data.vault.balanceA) /
+                    10 ** resource.data.vault.decimalsA) *
+                    resource.data.dexMid +
+                    Number(resource.data.vault.balanceB) /
+                      10 ** resource.data.vault.decimalsB) /
+                    resource.data.chartRisk.highWaterB) *
+                  10000,
+              )
+            : undefined
+        }
+      />
       <VaultValue price={resource.data?.dexMid} />
       <CoinGeckoReference />
-      {!compact && <MarketChart points={history} />}
+
       {resource.data && <EvidenceDetails e={resource.data} compact={compact} />}
     </section>
   );

@@ -1,5 +1,10 @@
+import { addresses } from '../../../../packages/core/src/addresses.js';
+import { CostChart } from '../components/charts/CostChart.js';
+import { DemoLimits } from '../components/charts/DemoLimits.js';
 import { RecordedVaultValue } from '../components/RecordedVaultValue.js';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+const BasisChart = lazy(() => import('../components/charts/BasisChart.js'));
+const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
@@ -9,7 +14,7 @@ import {
 } from '../lib/clients.js';
 import { EvidenceView, EvidenceDetails } from './Evidence.js';
 import { Portfolio } from './Portfolio.js';
-import { demoEvidence } from '../lib/demo.js';
+import { demoEvidence, demoReceipts } from '../lib/demo.js';
 const at = (time: number | null | undefined) =>
   time ? displayTime(time) : 'Not scheduled';
 export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
@@ -17,6 +22,41 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
   const receipts = useReceiptEvents(chain, !feed);
   const [history, setHistory] = useState(false);
   const state = feed?.state;
+  const demoActions = demoReceipts.map((r, i) => ({
+    at: demoEvidence[i].now,
+    intent: { type: r.decision.kind, notionalB: 0 },
+    final: { kind: r.decision.kind },
+    trail: 'Recorded receipt',
+    rounds: [],
+    violations: [],
+    txHash: r.settlement?.transactionHash,
+    receiptHash: r.receiptHash,
+  }));
+  const liveActions =
+    feed?.actions ??
+    receipts.data?.map((r) => ({
+      at: r.at,
+      intent: { type: 'Receipt', notionalB: 0 },
+      final: { kind: ['TRADE', 'RESIZE', 'WAIT', 'REJECT'][r.args.kind ?? 3] },
+      trail: 'On-chain receipt',
+      rounds: [],
+      violations: [],
+      txHash: r.transactionHash,
+      receiptHash: r.args.receiptHash,
+    })) ??
+    [];
+  const lastTrade = receipts.data?.find(
+    (r) => r.args.kind === 0 || r.args.kind === 1,
+  );
+  const lastTradeB = lastTrade
+    ? Number(
+        lastTrade.args.tokenIn?.toLowerCase() ===
+          addresses[chain === 133 ? 133 : 177].usdt.address.toLowerCase()
+          ? lastTrade.args.amountIn
+          : lastTrade.args.refOut,
+      ) /
+      10 ** addresses[chain === 133 ? 133 : 177].usdt.decimals
+    : undefined;
   const mode = !state
     ? 'Agent feed not connected yet'
     : state.mode === 'demo'
@@ -31,14 +71,21 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
     <section className="agent-view">
       <p className="eyebrow">AUTONOMOUS AGENT / BOUNDED EXECUTION</p>
       <h2>Agent</h2>
-      {feed ? (
+      {state?.mode === 'demo' ? (
         <>
+          <Suspense fallback={<p>Loading recorded chart…</p>}>
+            <PriceChart points={demoEvidence} demo actions={demoActions} />
+          </Suspense>
+          <Suspense fallback={<p>Loading basis history…</p>}>
+            <BasisChart points={demoEvidence} demo />
+          </Suspense>
           <EvidenceDetails e={demoEvidence[0]} compact />
           <RecordedVaultValue />
+          <DemoLimits />
         </>
       ) : (
         <>
-          <EvidenceView compact />
+          <EvidenceView compact actions={liveActions} lastTradeB={lastTradeB} />
           <Portfolio chain={chain} />
         </>
       )}
@@ -221,6 +268,7 @@ export function AgentView({ chain = 133 }: { chain?: DashboardChain }) {
       </article>
       <article className="agent-card">
         <h3>Model stats</h3>
+        <CostChart feed={feed} />
         {feed ? (
           <p>
             {feed.stats.calls24h} calls / 24h · ${feed.stats.estimatedSpendUsd}{' '}
