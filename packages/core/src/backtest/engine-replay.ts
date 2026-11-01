@@ -1,6 +1,6 @@
 import type { Hour } from './reference.js';
 import { round2 } from './reference.js';
-import { decide } from '../engine.js';
+import { decideLegacy as decide } from '../engine.js';
 import { inputFor } from '../engine-helpers.js';
 import { policyHash, units, type Policy, type Mandate } from '../policy.js';
 import type { Evidence, EngineState } from '../types.js';

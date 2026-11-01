@@ -36,6 +36,7 @@ export const policySchema = z
         maxQuoteVsMidBps: bps,
       })
       .strict(),
+    decisionTtlSec: z.number().int().min(1).max(3600).optional(),
     dailyLossStopB: z.number().finite().positive(),
   })
   .strict();

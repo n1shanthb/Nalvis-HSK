@@ -109,21 +109,21 @@ describe('recorded genuine T5 fork execution', () => {
       (r: typeof trade) => {
         r.decision.kind = 'WAIT';
       },
-      'decision_replay',
+      'receipt_version',
     ],
     [
       'policy',
       (r: typeof trade) => {
         r.evidence.sources.replay.raw.policy.dailyLossStopB += 1;
       },
-      'policyHash',
+      'receipt_version',
     ],
     [
       'minOut',
       (r: typeof trade) => {
         r.tx.minOut = String(BigInt(r.tx.minOut) + 1n);
       },
-      'event_receiptHash',
+      'receipt_version',
     ],
     [
       'validUntil',
@@ -137,7 +137,7 @@ describe('recorded genuine T5 fork execution', () => {
       (r: typeof trade) => {
         r.prevHead = hash('changed');
       },
-      'event_receiptHash',
+      'receipt_version',
     ],
   ] as const)('FAIL rehashed %s', async (_name, mutate, check) => {
     const r = structuredClone(trade);
@@ -196,7 +196,7 @@ describe('recorded genuine T5 fork execution', () => {
     delete r.evidence.sources.replay;
     rehash(r);
     expect(failures(await verify(r, recordedReader(chain)))).toEqual([
-      'replay_snapshot',
+      'receipt_version',
     ]);
   });
   test('metrics use actual mined values and independent chain head formula', async () => {
@@ -218,4 +218,116 @@ describe('recorded genuine T5 fork execution', () => {
     expect(r.metrics?.realisedPrice).toBeGreaterThan(0);
     expect(r.metrics?.slippageQuoteBps).not.toBeNull();
   });
+});
+
+describe('T8 decision expiry', () => {
+  const modernHold = () => {
+    const r = structuredClone(wait);
+    r.version = 2;
+    r.evidence.executionBlockNumber = r.evidence.sources.replay.blockNumber;
+    r.evidence.decisionTime = r.evidence.now;
+    const until = r.evidence.now + 120;
+    r.evidence.validUntil = until;
+    r.evidence.riskInput = {
+      sigma: 0.0045,
+      observations: 719,
+      historyHash: '0x' + 'a'.repeat(64),
+    };
+    r.decision.validUntil = until;
+    r.tx.validUntil = until;
+    r.tx.deadline = until;
+    rehash(r);
+    return r;
+  };
+  test('rejects mismatched committed expiry before touching the chain', async () => {
+    const r = modernHold();
+    r.tx.validUntil++;
+    rehash(r);
+    expect(failures(await verify(r, recordedReader(chain)))).toContain(
+      'decision_expiry',
+    );
+  });
+  test('rejects a receipt mined after its evidence expiry', async () => {
+    const r = modernHold();
+    const reader = {
+      ...recordedReader(chain),
+      timestamp: async (block: bigint) =>
+        block === BigInt(r.evidence.executionBlockNumber)
+          ? r.evidence.decisionTime
+          : r.evidence.validUntil + 1,
+    };
+    const result = await verify(r, reader);
+    expect(result.checks.find((c) => c.name === 'decision_expiry')?.pass).toBe(
+      true,
+    );
+    expect(result.checks.find((c) => c.name === 'decision_replay')?.pass).toBe(
+      true,
+    );
+    expect(failures(result)).toContain('mined_before_expiry');
+  });
+});
+
+describe('v2 cannot opt out of required guards', () => {
+  test.each(['validUntil', 'riskInput', 'both', 'downgrade'])(
+    'rejects stripped %s even after rehash',
+    async (field) => {
+      const r = structuredClone(wait);
+      r.version = 2;
+      r.evidence.decisionTime = r.evidence.now;
+      r.evidence.validUntil = r.evidence.now + 120;
+      r.decision.validUntil = r.evidence.validUntil;
+      r.tx.validUntil = r.evidence.validUntil;
+      r.evidence.riskInput = {
+        sigma: 0,
+        observations: 719,
+        historyHash: '0x' + 'a'.repeat(64),
+      };
+      if (field === 'validUntil' || field === 'both' || field === 'downgrade') {
+        delete r.evidence.validUntil;
+        delete r.decision.validUntil;
+        delete r.tx.validUntil;
+      }
+      if (field === 'riskInput' || field === 'both' || field === 'downgrade')
+        delete r.evidence.riskInput;
+      if (field === 'downgrade') r.version = 1;
+      rehash(r);
+      const result = await verify(r, recordedReader(chain));
+      expect(result.status).toBe('FAIL');
+      expect(failures(result)).toContain(
+        field === 'downgrade' ? 'receipt_version' : 'receipt_schema',
+      );
+    },
+  );
+  test.each([0, -5, 5])(
+    'binds decisionTime to the snapshot block despite server-ahead wall time (tamper %s)',
+    async (tamper) => {
+      const r = structuredClone(wait);
+      r.version = 2;
+      r.evidence.executionBlockNumber = r.evidence.sources.replay.blockNumber;
+      const blockTime = r.evidence.now - 5;
+      r.evidence.decisionTime = blockTime + tamper;
+      r.evidence.validUntil = r.evidence.decisionTime + 120;
+      r.decision.validUntil = r.evidence.validUntil;
+      r.tx.validUntil = r.evidence.validUntil;
+      r.tx.deadline = r.evidence.validUntil;
+      r.evidence.riskInput = {
+        sigma: 0,
+        observations: 719,
+        historyHash: '0x' + 'a'.repeat(64),
+      };
+      rehash(r);
+      const result = await verify(r, {
+        ...recordedReader(chain),
+        timestamp: async (block: bigint) =>
+          block === BigInt(r.evidence.executionBlockNumber)
+            ? blockTime
+            : blockTime + 1,
+      });
+      expect(
+        result.checks.find((c) => c.name === 'decision_time_binding')?.pass,
+      ).toBe(tamper === 0);
+      if (tamper !== 0)
+        expect(failures(result)).toContain('decision_time_binding');
+    },
+  );
 });

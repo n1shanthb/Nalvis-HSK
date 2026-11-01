@@ -1,3 +1,15 @@
+import {
+  proposalCalldata,
+  mandateBaseline,
+  type SignedMandate,
+  type OwnerProposal,
+} from '../../../packages/core/src/desk/proposal.js';
+import {
+  keccak256,
+  encodeFunctionData,
+  zeroAddress,
+  zeroHash,
+} from 'viem';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { serializeTransaction, hexToBytes, type Address, type Hex } from 'viem';
@@ -217,4 +229,161 @@ test('Ledger adapter rejects mainnet serialized payload even when caller claims 
   );
   expect(mocks.signTransaction).not.toHaveBeenCalled();
   await signer.disconnect();
+});
+
+test('pause passes the Ledger owner action allowlist', async () => {
+  const signer = new MockSigner(),
+    client = mockClient();
+  await sendOwnerAction({
+    ...params,
+    data: encodeFunctionData({
+      abi: (await import('../../../packages/core/src/abi/index.js')).vaultAbi,
+      functionName: 'pause',
+    }),
+    signer,
+    client: client as never,
+  });
+  expect(signer.signTransaction).toHaveBeenCalledOnce();
+  expect(client.sendRawTransaction).toHaveBeenCalledOnce();
+});
+test.each(['hash', 'tightening', 'during-signature'] as const)(
+  'proposal %s cannot sign/broadcast obsolete calldata',
+  async (mode) => {
+    const agent = mnemonicToAccount(
+      'test test test test test test test test test test test junk',
+      { addressIndex: 1 },
+    ).address;
+    let m: SignedMandate = {
+      agent,
+      expiry: 1900000000n,
+      maxTradeInA: 2n * 10n ** 18n,
+      maxTradeInB: 100n * 10n ** 18n,
+      maxDailyInB: 500n * 10n ** 18n,
+      maxExposureBps: 8000,
+      maxSlippageBps: 50,
+      maxDrawdownBps: 1200,
+      minIntervalSec: 300n,
+      policyHash: zeroHash,
+    };
+    const diff = { maxTradeInB: String(25n * 10n ** 18n) },
+      data = proposalCalldata('setMandate', diff, m);
+    const proposal: OwnerProposal = {
+      action: 'setMandate',
+      diff,
+      calldataHash: keccak256(data),
+      baselineHash: mandateBaseline(m, false),
+      target: { vault: params.vault, chainId: 133 },
+    };
+    if (mode === 'hash') proposal.calldataHash = zeroHash;
+    if (mode === 'tightening') m = { ...m, maxTradeInB: 20n * 10n ** 18n };
+    const signer = new MockSigner();
+    const oldSign = signer.signTransaction.getMockImplementation()!;
+    if (mode === 'during-signature')
+      signer.signTransaction.mockImplementation(async (unsigned) => {
+        const result = await oldSign(unsigned);
+        m = { ...m, maxTradeInB: 20n * 10n ** 18n };
+        return result;
+      });
+    const client = {
+      ...mockClient(),
+      getBlockNumber: async () => 1n,
+      readContract: vi.fn(async ({ functionName }: { functionName: string }) =>
+        functionName === 'owner'
+          ? account.address
+          : functionName === 'paused'
+            ? false
+            : [
+                m.agent,
+                m.expiry,
+                m.maxTradeInA,
+                m.maxTradeInB,
+                m.maxDailyInB,
+                m.maxExposureBps,
+                m.maxSlippageBps,
+                m.maxDrawdownBps,
+                m.minIntervalSec,
+                m.policyHash,
+              ],
+      ),
+    };
+    await expect(
+      sendOwnerAction({
+        ...params,
+        data,
+        proposal,
+        signer,
+        client: client as never,
+      }),
+    ).rejects.toThrow(mode === 'hash' ? 'hash mismatch' : 'changed');
+    if (mode !== 'during-signature')
+      expect(signer.signTransaction).not.toHaveBeenCalled();
+    expect(client.sendRawTransaction).not.toHaveBeenCalled();
+  },
+);
+
+// Regress the UI-to-signer path, not just an isolated callback.
+test('a loaded desk cap proposal cannot block a manual emergency revoke', async () => {
+  const { createElement } = await import('react');
+  const { render, screen, fireEvent, waitFor } =
+    await import('@testing-library/react');
+  const { MandateForm } = await import('../src/owner/MandateForm.js');
+  const ledger = await import('../src/owner/ledger.js');
+  const mandate: SignedMandate = {
+    agent: mnemonicToAccount(
+      'test test test test test test test test test test test junk',
+      { addressIndex: 1 },
+    ).address,
+    expiry: 1900000000n,
+    maxTradeInA: 10n ** 18n,
+    maxTradeInB: 100n * 10n ** 18n,
+    maxDailyInB: 500n * 10n ** 18n,
+    maxExposureBps: 8000,
+    maxSlippageBps: 50,
+    maxDrawdownBps: 1000,
+    minIntervalSec: 30n,
+    policyHash: zeroHash,
+  };
+  const diff = { maxTradeInB: String(25n * 10n ** 18n) };
+  const proposal: OwnerProposal = {
+    action: 'setMandate',
+    diff,
+    calldataHash: keccak256(proposalCalldata('setMandate', diff, mandate)),
+    baselineHash: mandateBaseline(mandate, false),
+    target: { vault: params.vault, chainId: 133 },
+  };
+  const signer = new MockSigner(),
+    client = mockClient(),
+    clear = vi.fn();
+  const original = ledger.sendOwnerAction;
+  const send = vi
+    .spyOn(ledger, 'sendOwnerAction')
+    .mockImplementation((args) =>
+      original({ ...args, client: client as never }),
+    );
+  render(
+    createElement(MandateForm, {
+      chain: 133,
+      vault: params.vault,
+      snapshot: {
+        owner: account.address,
+        pendingOwner: zeroAddress,
+        mandate,
+        paused: false,
+        blockNumber: 1n,
+        decimalsA: 18,
+        decimalsB: 18,
+      },
+      proposal,
+      onProposalClear: clear,
+      signerFactory: async () => signer,
+    }),
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  fireEvent.click(screen.getByText('Build revoke review'));
+  fireEvent.click(screen.getByText('Sign and send reviewed action'));
+  await waitFor(() => expect(signer.signTransaction).toHaveBeenCalledOnce());
+  await waitFor(() => expect(client.sendRawTransaction).toHaveBeenCalledOnce());
+  expect(send.mock.calls[0][0].proposal).toBeUndefined();
+  expect(send.mock.calls[0][0].data).toBe('0xb6549f75');
+  expect(clear).toHaveBeenCalledTimes(2);
 });

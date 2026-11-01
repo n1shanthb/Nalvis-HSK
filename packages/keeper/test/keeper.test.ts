@@ -308,6 +308,28 @@ describe('keeper safety and deterministic scenarios', () => {
         '.pending.json',
       );
     }));
+  it('drops stale decisions without reaching the signing/broadcast hook', async () =>
+    temporary(async (directory) => {
+      const x = execution('trade');
+      const original = x.e.snapshot;
+      let calls = 0;
+      x.e.snapshot = async () => {
+        const s = await original();
+        if (++calls > 1) s.now += 121;
+        return s;
+      };
+      await expect(
+        tick(
+          optionsSchema.parse({ exec: 'anvil', receipts: directory }),
+          policy,
+          x.e,
+        ),
+      ).rejects.toThrow('Stale decision');
+      expect(x.send).not.toHaveBeenCalled();
+      expect(await readdir(join(directory, '31337'))).not.toContain(
+        '.pending.json',
+      );
+    }));
   it('locks concurrent ticks', async () =>
     temporary(async (directory) => {
       await withLock(directory, async () => {

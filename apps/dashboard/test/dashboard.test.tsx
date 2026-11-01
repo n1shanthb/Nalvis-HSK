@@ -1,3 +1,9 @@
+import {
+  proposalCalldata,
+  mandateBaseline,
+  type OwnerProposal,
+} from '../../../packages/core/src/desk/proposal.js';
+import { keccak256, encodeFunctionData } from 'viem';
 import { describe, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
@@ -172,7 +178,7 @@ describe('owner mandate review', () => {
   });
 });
 describe('views', () => {
-  test.each(['mandate', 'evidence', 'receipts', 'verify'] as const)(
+  test.each(['mandate', 'evidence', 'receipts', 'verify', 'desk'] as const)(
     'route %s renders without console errors',
     async (route) => {
       fetchFailure();
@@ -223,6 +229,28 @@ describe('views', () => {
         if (method === 'eth_blockNumber') return '0x1';
         if (method === 'eth_call') {
           const data = (params![0] as { data: string }).data;
+          if (
+            data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenA' }) ||
+            data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenB' })
+          ) {
+            const functionName =
+              data ===
+              encodeFunctionData({ abi: vaultAbi, functionName: 'tokenA' })
+                ? 'tokenA'
+                : 'tokenB';
+            return encodeFunctionResult({
+              abi: vaultAbi,
+              functionName,
+              result:
+                functionName === 'tokenA'
+                  ? addresses[133].whsk.address
+                  : addresses[133].usdt.address,
+            });
+          }
+          if (data.startsWith('0x70a08231'))
+            return '0x' + (10n ** 18n).toString(16).padStart(64, '0');
           if (data.slice(0, 10) === toFunctionSelector('owner()'))
             return encodeFunctionResult({
               abi: vaultAbi,
@@ -271,4 +299,57 @@ describe('views', () => {
     expect(result.policiesMatch).toBe(true);
     expect(request).toHaveBeenCalled();
   });
+});
+
+test('owner panel reviews exact desk calldata and rejects changed mandate/hash before signer factory', () => {
+  const diff = { maxTradeInB: String(10n * 10n ** 18n) };
+  const data = proposalCalldata('setMandate', diff, snapshot.mandate);
+  const proposal: OwnerProposal = {
+    action: 'setMandate',
+    diff,
+    calldataHash: keccak256(data),
+    baselineHash: mandateBaseline(snapshot.mandate, false),
+    target: { vault: owner, chainId: 133 },
+  };
+  const signerFactory = vi.fn();
+  const view = render(
+    <MandateForm
+      chain={133}
+      vault={owner}
+      snapshot={snapshot}
+      proposal={proposal}
+      signerFactory={signerFactory}
+    />,
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  expect(
+    screen.getByText('Exact calldata').parentElement!.querySelector('code')!
+      .textContent,
+  ).toBe(data);
+  view.rerender(
+    <MandateForm
+      chain={133}
+      vault={owner}
+      snapshot={{
+        ...snapshot,
+        mandate: { ...snapshot.mandate, maxSlippageBps: 20 },
+      }}
+      proposal={proposal}
+      signerFactory={signerFactory}
+    />,
+  );
+  fireEvent.click(screen.getByText('Build exact desk proposal review'));
+  expect(screen.getByRole('status').textContent).toContain('changed');
+  expect(signerFactory).not.toHaveBeenCalled();
+});
+test('owner panel can build pause calldata', () => {
+  render(<MandateForm chain={133} vault={owner} snapshot={snapshot} />);
+  fireEvent.click(screen.getByText('Build pause review'));
+  const data = screen
+    .getByText('Exact calldata')
+    .parentElement!.querySelector('code')!.textContent!;
+  expect(
+    decodeFunctionData({ abi: vaultAbi, data: data as `0x${string}` })
+      .functionName,
+  ).toBe('pause');
 });

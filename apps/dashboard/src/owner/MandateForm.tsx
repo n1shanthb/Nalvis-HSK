@@ -1,3 +1,8 @@
+import {
+  proposalCalldata,
+  assertProposal,
+  type OwnerProposal,
+} from '../../../../packages/core/src/desk/proposal.js';
 import { useState } from 'react';
 import {
   encodeFunctionData,
@@ -28,7 +33,7 @@ import {
 const policy = policySchema.parse(policyJSON);
 export type MandateFields = Record<keyof VaultMandate, string>;
 export const clampSlippage = (value: number) =>
-  Math.max(0, Math.min(100, Number.isFinite(value) ? Math.trunc(value) : 0));
+  Math.max(1, Math.min(100, Number.isFinite(value) ? Math.trunc(value) : 0));
 export function fieldsFor(s: VaultSnapshot): MandateFields {
   return {
     ...Object.fromEntries(
@@ -72,6 +77,8 @@ export function validateMandate(
     throw Error('Drawdown must be at most 10000 bps');
   if (!/^0x[0-9a-fA-F]{64}$/.test(fields.policyHash))
     throw Error('Policy hash must be 32 bytes');
+  if (Number(fields.maxSlippageBps) <= 0)
+    throw Error('Slippage must be between 1 and 100 bps');
   return {
     agent,
     expiry,
@@ -104,12 +111,18 @@ export function MandateForm({
   vault,
   snapshot,
   enabled = true,
+  proposal,
+  onProposalClear,
+  proposalOnly = false,
   signerFactory = connectLedger,
 }: {
   chain: DashboardChain;
   vault: `0x${string}`;
   snapshot: VaultSnapshot;
   enabled?: boolean;
+  proposal?: OwnerProposal;
+  onProposalClear?: () => void;
+  proposalOnly?: boolean;
   signerFactory?: (chain: number, index: number) => Promise<OwnerSigner>;
 }) {
   const [fields, setFields] = useState(() => fieldsFor(snapshot)),
@@ -117,6 +130,7 @@ export function MandateForm({
       data: Hex;
       diff: string;
       context: string;
+      proposal?: OwnerProposal;
     }>(),
     [message, setMessage] = useState(''),
     [text, setText] = useState(''),
@@ -136,29 +150,54 @@ export function MandateForm({
         only.
       </aside>
     );
-  function preview(revoke = false) {
+  function preview(action: 'setMandate' | 'revoke' | 'pause' = 'setMandate') {
     setMessage('');
     setReview(undefined);
+    onProposalClear?.();
     try {
       assertOwnerChain(chain);
-      const params = revoke ? undefined : validateMandate(fields, snapshot);
+      const params =
+        action === 'setMandate' ? validateMandate(fields, snapshot) : undefined;
       const data = params
         ? encodeFunctionData({
             abi: vaultAbi,
             functionName: 'setMandate',
             args: [params],
           })
-        : encodeFunctionData({ abi: vaultAbi, functionName: 'revoke' });
+        : action === 'pause'
+          ? encodeFunctionData({ abi: vaultAbi, functionName: 'pause' })
+          : encodeFunctionData({ abi: vaultAbi, functionName: 'revoke' });
       setReview({
         data,
         context,
         diff: json({
           current: snapshot.mandate,
-          proposed: params ?? { agent: zeroAddress, action: 'revoke' },
+          proposed: params ?? { action },
         }),
       });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Invalid mandate');
+    }
+  }
+  function reviewProposal() {
+    setReview(undefined);
+    setMessage('');
+    try {
+      if (
+        !proposal ||
+        proposal.target?.vault.toLowerCase() !== vault.toLowerCase() ||
+        proposal.target.chainId !== chain
+      )
+        throw Error('Desk proposal target mismatch');
+      const data = proposalCalldata(
+        proposal.action,
+        proposal.diff,
+        snapshot.mandate,
+      );
+      assertProposal(proposal, snapshot.mandate, snapshot.paused, data);
+      setReview({ data, context, diff: json(proposal.diff), proposal });
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Invalid desk proposal');
     }
   }
   async function send() {
@@ -167,6 +206,13 @@ export function MandateForm({
     setMessage('');
     try {
       assertOwnerChain(chain);
+      if (review.proposal)
+        assertProposal(
+          review.proposal,
+          snapshot.mandate,
+          snapshot.paused,
+          review.data,
+        );
       const signer = await signerFactory(chain, account);
       const hash = await sendOwnerAction({
         chainId: chain,
@@ -174,11 +220,15 @@ export function MandateForm({
         owner: snapshot.owner,
         data: review.data,
         signer,
+        proposal: review.proposal,
       });
       setMessage(`Submitted ${hash}. Await inclusion on the testnet explorer.`);
       setReview(undefined);
+      onProposalClear?.();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'Ledger action failed');
+      setReview(undefined);
+      onProposalClear?.();
     } finally {
       setBusy(false);
     }
@@ -212,46 +262,76 @@ export function MandateForm({
         device cannot show it, reject the transaction. Chain 133 only; no
         private or agent keys are used.
       </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          preview();
-        }}
-      >
-        <div className="form-grid">
-          {(Object.keys(labels) as (keyof VaultMandate)[]).map((key) => (
-            <label key={key}>
-              {labels[key]}
-              <input
-                required
-                value={fields[key]}
-                type={key === 'maxSlippageBps' ? 'number' : 'text'}
-                min={key === 'maxSlippageBps' ? 0 : undefined}
-                max={key === 'maxSlippageBps' ? 100 : undefined}
-                onChange={(e) => {
-                  setReview(undefined);
-                  setFields({
-                    ...fields,
-                    [key]:
-                      key === 'maxSlippageBps'
-                        ? String(clampSlippage(Number(e.target.value)))
-                        : e.target.value,
-                  });
-                }}
-              />
-            </label>
-          ))}
+      {proposal && (
+        <div>
+          <p>
+            Desk proposal hash <code>{proposal.calldataHash}</code>
+          </p>
+          <button disabled={busy} onClick={reviewProposal}>
+            Build exact desk proposal review
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setReview(undefined);
+              onProposalClear?.();
+            }}
+          >
+            Dismiss desk proposal
+          </button>
         </div>
-        <button disabled={busy}>Build setMandate review</button>
-        <button
-          className="secondary"
-          type="button"
-          disabled={busy}
-          onClick={() => preview(true)}
-        >
-          Build revoke review
-        </button>
-      </form>
+      )}
+      {!proposalOnly && (
+        <>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => preview('pause')}
+          >
+            Build pause review
+          </button>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              preview();
+            }}
+          >
+            <div className="form-grid">
+              {(Object.keys(labels) as (keyof VaultMandate)[]).map((key) => (
+                <label key={key}>
+                  {labels[key]}
+                  <input
+                    required
+                    value={fields[key]}
+                    type={key === 'maxSlippageBps' ? 'number' : 'text'}
+                    min={key === 'maxSlippageBps' ? 1 : undefined}
+                    max={key === 'maxSlippageBps' ? 100 : undefined}
+                    onChange={(e) => {
+                      setReview(undefined);
+                      setFields({
+                        ...fields,
+                        [key]:
+                          key === 'maxSlippageBps'
+                            ? String(clampSlippage(Number(e.target.value)))
+                            : e.target.value,
+                      });
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <button disabled={busy}>Build setMandate review</button>
+            <button
+              className="secondary"
+              type="button"
+              disabled={busy}
+              onClick={() => preview('revoke')}
+            >
+              Build revoke review
+            </button>
+          </form>
+        </>
+      )}
       <label>
         Ledger account index
         <input
@@ -284,26 +364,40 @@ export function MandateForm({
           >
             {busy ? 'Check your Ledger…' : 'Sign and send reviewed action'}
           </button>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => {
+              setReview(undefined);
+              onProposalClear?.();
+            }}
+          >
+            Cancel review
+          </button>
           {review.context !== context && (
             <p>Mandate changed; build a fresh review.</p>
           )}
         </div>
       )}
       {message && <p role="status">{message}</p>}
-      <h4>Natural-language change</h4>
-      <label>
-        Request
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="be more conservative"
-        />
-      </label>
-      <button className="secondary" onClick={naturalLanguage}>
-        Show parameter diff
-      </button>
-      <pre aria-live="polite">{nl}</pre>
-      <p>Suggestions do not change the mandate or send transactions.</p>
+      {!proposalOnly && (
+        <>
+          <h4>Natural-language change</h4>
+          <label>
+            Request
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="be more conservative"
+            />
+          </label>
+          <button className="secondary" onClick={naturalLanguage}>
+            Show parameter diff
+          </button>
+          <pre aria-live="polite">{nl}</pre>
+          <p>Suggestions do not change the mandate or send transactions.</p>
+        </>
+      )}
       <a
         href={explorerLink(133, 'address', vault)}
         target="_blank"

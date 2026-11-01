@@ -1,3 +1,4 @@
+import { riskCheck } from './risk.js';
 import {
   evidenceSchema,
   engineStateSchema,
@@ -15,17 +16,26 @@ import {
 } from './policy.js';
 import { cexMid, quality, valueA, evaluateQuote } from './engine-helpers.js';
 
-export function decide(
+function decideInternal(
   evidence: Evidence,
   policy: Policy,
   mandate: Mandate,
   state: EngineState,
+  legacyRecording: boolean,
 ): Decision {
   const ruleTrace: RuleTrace = [];
+  let lastRisk: Decision['riskCheck'];
   const trace = (rule: string, pass: boolean, detail: string) => {
     ruleTrace.push({ rule, pass, detail });
   };
-  const finish = (kind: Decision['kind']): Decision => ({ kind, ruleTrace });
+  const finish = (kind: Decision['kind']): Decision => ({
+    kind,
+    ruleTrace,
+    ...(lastRisk ? { riskCheck: lastRisk } : {}),
+    ...(evidence.validUntil !== undefined
+      ? { validUntil: evidence.validUntil }
+      : {}),
+  });
   const ep = evidenceSchema.safeParse(evidence),
     pp = policySchema.safeParse(policy),
     mp = mandateSchema.safeParse(mandate),
@@ -37,6 +47,23 @@ export function decide(
   const e = ep.data,
     p = pp.data,
     m = mp.data;
+  if (
+    !legacyRecording &&
+    (e.validUntil === undefined ||
+      e.decisionTime === undefined ||
+      e.validUntil !== e.decisionTime + (p.decisionTtlSec ?? 120))
+  ) {
+    trace('decision_expiry', false, 'Evidence expiry differs from policy');
+    return finish('REJECT');
+  }
+  if (!legacyRecording && !e.riskInput) {
+    trace(
+      'risk_input',
+      false,
+      'Historical volatility is required for new decisions',
+    );
+    return finish('REJECT');
+  }
   const failure = quality(e, p);
   trace('data_quality', !failure, failure);
   if (failure) return finish('REJECT');
@@ -62,7 +89,8 @@ export function decide(
     trace('mandate_revoked', false, 'Revoked');
     return finish('REJECT');
   }
-  if (e.now >= m.expiry) {
+  const executionNow = e.decisionTime ?? e.now;
+  if (executionNow >= m.expiry) {
     trace('mandate_expired', false, 'Expired');
     return finish('REJECT');
   }
@@ -72,7 +100,9 @@ export function decide(
   }
   const spent = state.dailySpentB;
   const loss =
-    state.dailyBucket === Math.floor(e.now / 86400) ? state.dailyLossB : 0;
+    state.dailyBucket === Math.floor(executionNow / 86400)
+      ? state.dailyLossB
+      : 0;
   if (spent >= m.maxDailyInB || loss >= p.dailyLossStopB) {
     trace(
       'daily_stop',
@@ -83,7 +113,7 @@ export function decide(
   }
   const preset = p.presets[state.preset];
   if (
-    e.now <
+    executionNow <
     state.lastTradeAt + Math.max(m.minIntervalSec, preset.cooldownSec)
   ) {
     trace('cooldown', true, 'Minimum interval not elapsed');
@@ -130,8 +160,21 @@ export function decide(
       basis,
     );
     trace('size', valid, `${sizeB}: cost=${cost}`);
-    if (valid)
+    const risk =
+      valid && e.riskInput
+        ? riskCheck(e, quote, preset.edgeBufferBps)
+        : undefined;
+    if (risk) lastRisk = risk;
+    if (risk)
+      trace(
+        'sigma_worst_case',
+        risk.accepted,
+        `${sizeB}: ±σ worst-case stress (two endpoints); worst cost ${risk.worstCostBps.toFixed(4)} bps`,
+      );
+    if (valid && (!risk || risk.accepted))
       return {
+        ...(e.validUntil !== undefined ? { validUntil: e.validUntil } : {}),
+        ...(risk ? { riskCheck: risk } : {}),
         kind: i === 0 ? 'TRADE' : 'RESIZE',
         direction,
         sizeB,
@@ -140,6 +183,29 @@ export function decide(
         ruleTrace,
       };
   }
+  if (ruleTrace.some((t) => t.rule === 'sigma_worst_case' && !t.pass)) {
+    trace(
+      'risk_reject',
+      false,
+      'No smaller grid size survives historical sigma stress',
+    );
+    return finish('REJECT');
+  }
   trace('edge_or_caps', false, 'No valid grid size');
   return finish('WAIT');
 }
+
+/** Only for pinned historical recordings and labelled research replay. Never use for new decisions. */
+export const decideLegacy = (
+  e: Evidence,
+  p: Policy,
+  m: Mandate,
+  s: EngineState,
+) => decideInternal(e, p, m, s, true);
+
+export const decide = (
+  e: Evidence,
+  p: Policy,
+  m: Mandate,
+  s: EngineState,
+): Decision => decideInternal(e, p, m, s, false);

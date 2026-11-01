@@ -6,6 +6,7 @@ export function recordedReader(input: unknown): ChainReader {
   const b = z
     .object({
       chainId: z.number().int(),
+      blocks: z.record(z.number().int().nonnegative()).optional(),
       receipts: z.array(minedSchema),
       transactions: z.array(z.record(z.unknown())),
       heads: z.record(z.string().regex(/^0x[0-9a-f]{64}$/)),
@@ -26,6 +27,20 @@ export function recordedReader(input: unknown): ChainReader {
     return r;
   };
   return {
+    async timestamp(block) {
+      if (b.blocks?.[String(block)] !== undefined)
+        return b.blocks[String(block)];
+      const r = b.receipts.find((r) => r.blockNumber === block);
+      if (
+        !r ||
+        !(
+          typeof r.blockTimestamp === 'number' ||
+          typeof r.blockTimestamp === 'string'
+        )
+      )
+        throw Error('Recorded block timestamp unavailable');
+      return Number(r.blockTimestamp);
+    },
     async chainId() {
       return b.chainId;
     },

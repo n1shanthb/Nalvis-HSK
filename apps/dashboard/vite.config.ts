@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { createDeskHandler } from './server/desk.js';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 const root = resolve(import.meta.dirname, '../..');
@@ -51,7 +52,79 @@ function receiptAssets(): Plugin {
   };
 }
 export default defineConfig({
-  plugins: [receiptAssets()],
+  plugins: [
+    receiptAssets(),
+    {
+      name: 'desk-server',
+      configureServer(server) {
+        const handle = createDeskHandler({
+          ...loadEnv(server.config.mode, root, ''),
+          ...process.env,
+        });
+        server.middlewares.use('/api/desk', async (req, res) => {
+          try {
+            const chunks: Buffer[] = [];
+            let size = 0;
+            for await (const chunk of req) {
+              size += chunk.length;
+              if (size > 4096) {
+                res.statusCode = 413;
+                res.end();
+                return;
+              }
+              chunks.push(Buffer.from(chunk));
+            }
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(req.headers))
+              if (value)
+                headers.set(
+                  key,
+                  Array.isArray(value) ? value.join(',') : value,
+                );
+            const response = await handle(
+              new Request(`http://${req.headers.host}/api/desk`, {
+                method: req.method,
+                headers,
+                ...(req.method === 'POST'
+                  ? { body: Buffer.concat(chunks).toString('utf8') }
+                  : {}),
+              }),
+              req.socket.remoteAddress,
+            );
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => res.setHeader(key, value));
+            res.end(await response.text());
+          } catch {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Desk unavailable' }));
+          }
+        });
+      },
+    },
+  ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Share view markup and the fixture loader; the canvas library remains lazy.
+          if (
+            /components\/charts\/(PriceChart|BasisChart|VaultChart)\.tsx$/.test(
+              id,
+            ) ||
+            id.endsWith('/lib/recorded-history.ts')
+          )
+            return 'chart-views';
+          if (id.includes('@ledgerhq/device-management-kit'))
+            return 'ledger-device';
+          if (id.includes('@ledgerhq/device-signer-kit-ethereum'))
+            return 'ledger-ethereum';
+          if (id.includes('@ledgerhq/device-transport-kit'))
+            return 'ledger-transport';
+          if (id.includes('/rxjs/')) return 'ledger-streams';
+        },
+      },
+    },
+  },
   server: {
     proxy:
       process.env.ENABLE_CEX_PROXY === 'true'

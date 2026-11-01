@@ -188,7 +188,14 @@ it.skipIf(!!reason)(
         transactions: unknown[];
         heads: Record<string, string>;
         configs: Record<string, unknown>;
-      } = { receipts: [], transactions: [], heads: {}, configs: {} };
+        blocks: Record<string, number>;
+      } = {
+        receipts: [],
+        transactions: [],
+        heads: {},
+        configs: {},
+        blocks: {},
+      };
       // Transfer fork-only test funds from the pool by impersonation; never any remote writes.
       const local = createWalletClient({
         chain,
@@ -267,7 +274,28 @@ it.skipIf(!!reason)(
           ['resize', 'RESIZE'],
           ['reject', 'REJECT'],
         ] as const) {
-          if (scenario === 'resize') await mandate(50);
+          if (scenario === 'resize') {
+            await mandate(50);
+            const cli = spawnSync(
+              process.execPath,
+              [
+                join(root, 'scripts/nalvis.mjs'),
+                'desk',
+                'set cap to 75',
+                '--receipts',
+                join(directory, '31337'),
+                '--rpc',
+                chain.rpcUrls.default.http[0],
+              ],
+              { encoding: 'utf8' },
+            );
+            expect(cli.status, cli.stderr).toBe(0);
+            const reply = JSON.parse(cli.stdout);
+            expect(reply.diff).toBeUndefined();
+            expect(reply.message).toContain(
+              'requires new Ledger-signed mandate',
+            );
+          }
           await client.request({
             method: 'evm_increaseTime' as never,
             params: [601] as never,
@@ -332,6 +360,12 @@ it.skipIf(!!reason)(
           const r = JSON.parse(
             await readFile(join(directory, '31337', name!), 'utf8'),
           );
+          expect(r.version).toBe(2);
+          expect(r.evidence.decisionTime).toBeDefined();
+          expect(r.tx.validUntil).toBe(r.evidence.decisionTime + 120);
+          expect(r.evidence.riskInput).toBeDefined();
+          if (kind === 'TRADE' || kind === 'RESIZE')
+            expect(r.decision.riskCheck.method).toBe('sigma-worst-case-v1');
           expect(r.decision.kind).toBe(kind);
           // Verify against RPC while the real fork is alive, including its prior links.
           const { verify, rpcReader } =
@@ -371,7 +405,12 @@ it.skipIf(!!reason)(
             const mined = await client.getTransactionReceipt({
               hash: r.settlement.transactionHash,
             });
-            recording.receipts.push(mined);
+            const snapshotBlock = BigInt(r.evidence.executionBlockNumber);
+            recording.blocks[String(snapshotBlock)] =
+              await reader.timestamp!(snapshotBlock);
+            const blockTimestamp = await reader.timestamp!(mined.blockNumber);
+            recording.blocks[String(mined.blockNumber)] = blockTimestamp;
+            recording.receipts.push({ ...mined, blockTimestamp });
             recording.transactions.push(
               await client.getTransaction({ hash: mined.transactionHash }),
             );

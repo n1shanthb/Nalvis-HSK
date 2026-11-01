@@ -1,0 +1,11 @@
+work/
+.git/
+node_modules/
+**/node_modules/
+.env
+.env.*
+**/.env
+**/.env.*
+contracts/out/
+contracts/cache/
+contracts/broadcast/

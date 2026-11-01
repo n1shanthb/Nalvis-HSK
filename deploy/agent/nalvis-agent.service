@@ -1,0 +1,29 @@
+[Unit]
+Description=Nalvis testnet agent (177 read-only, 133 execution)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nalvis
+Group=nalvis
+WorkingDirectory=/opt/nalvis
+EnvironmentFile=/etc/nalvis/agent.env
+Environment=NODE_ENV=production
+Environment=AGENT_DATA_DIR=/var/lib/nalvis
+ExecStart=/usr/bin/node /opt/nalvis/packages/keeper/dist/keeper/src/cli.js agent --exec testnet
+Restart=on-failure
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=300
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nalvis
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
