@@ -1,3 +1,5 @@
+import { lazy, Suspense } from 'react';
+const PriceChart = lazy(() => import('../components/charts/PriceChart.js'));
 import { Overview } from './Overview.js';
 import { useCallback, useState } from 'react';
 import { demoContext, demoEvidence, demoReceipts } from '../lib/demo.js';
@@ -14,13 +16,13 @@ export function DemoConsole({ route }: { route: Route }) {
   return (
     <section>
       <p className="eyebrow">RECORDED SESSION / LOCAL ANVIL</p>
-      <h2>
+      <h1>
         {route === 'evidence'
           ? 'Market evidence'
           : route === 'verify'
             ? 'Independent verification'
             : 'Decision timeline'}
-      </h2>
+      </h1>
       <p>
         {demoReceipts.length} recorded fork receipts. Offline RPC replay. Local
         anvil — prices not real. Captured {displayTime(demoEvidence[0].now)}.
@@ -32,6 +34,24 @@ export function DemoConsole({ route }: { route: Route }) {
       )}
       {resource.error && (
         <p role="alert">Verification unavailable: {resource.error}</p>
+      )}
+      {route === 'evidence' && (
+        <Suspense fallback={<p>Loading recorded price…</p>}>
+          <PriceChart
+            points={demoEvidence}
+            demo
+            actions={demoReceipts.map((r, i) => ({
+              at: demoEvidence[i].now,
+              intent: { type: r.decision.kind, notionalB: 0 },
+              final: { kind: r.decision.kind },
+              trail: 'Recorded receipt',
+              rounds: [],
+              violations: [],
+              txHash: r.settlement?.transactionHash,
+              receiptHash: r.receiptHash,
+            }))}
+          />
+        </Suspense>
       )}
       {route === 'evidence' && <MarketChart points={demoEvidence} />}
       {route === 'evidence' && <EvidenceDetails e={demoEvidence[selected]} />}

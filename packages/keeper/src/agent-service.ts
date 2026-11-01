@@ -202,12 +202,12 @@ export async function startAgentService(options: {
         openRouter({
           ...env,
           AGENT_OPENROUTER_API_KEY:
-            env.OPENROUTER_API_KEY ?? env.AGENT_OPENROUTER_API_KEY,
+            env.AGENT_OPENROUTER_API_KEY,
         });
       if (!provider.isConfigured())
         throw new PreflightError(
           'offline',
-          'OPENROUTER_API_KEY or STRATEGIST_MODEL missing',
+          'AGENT_OPENROUTER_API_KEY or STRATEGIST_MODEL missing',
         );
       if (!config) {
         try {
@@ -286,7 +286,7 @@ export async function startAgentService(options: {
       if (!provider.isConfigured())
         throw new PreflightError(
           'offline',
-          'OPENROUTER_API_KEY or STRATEGIST_MODEL missing',
+          'AGENT_OPENROUTER_API_KEY or STRATEGIST_MODEL missing',
         );
       const live = await readState!();
       policyHashOk = live.mandate.policyHash === validateAgentPolicy(config);

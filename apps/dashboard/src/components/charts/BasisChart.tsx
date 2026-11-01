@@ -61,7 +61,7 @@ export default function BasisChart({
           series={[
             {
               name: 'Basis %',
-              color: '#75baff',
+              color: '#a3e635',
               points: rows.map((r) => ({ time: r.time, value: r.basis })),
             },
           ]}

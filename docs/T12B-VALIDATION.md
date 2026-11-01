@@ -1,5 +1,23 @@
 # T12B validation — 1 November 2026 (IST)
 
+## Integration with Ledger Guard UI
+
+Integrated main `1aff45d` without rewriting the PR history. Agent room, Overview,
+Market evidence and recorded T8 verification retain the current UI while consuming
+the live-feed hook. Explicit production demo mode does not poll the hosted agent.
+Agent credentials now require `AGENT_OPENROUTER_API_KEY`; the desk key is ignored.
+
+The signed autonomous strategy remains OFFLINE without its provider. Automatically
+substituting deterministic trading would change the signed strategy. The existing
+deterministic keeper is a separate entry point; no silent strategy fallback was added.
+The top-level optional-LLM wording and T12's explicitly model-bound strategy are a
+documented specification inconsistency requiring a separate strategy decision.
+
+Local Windows full tests still encounter the existing core watch-restart failure
+(`Store path escapes root`). Foundry is unavailable locally; Linux service/flock
+and Solidity validation require CI. Earlier results below describe the original
+branch validation, not a claim that those Linux checks were repeated on Windows.
+
 Base: main `5778ad9`, including T11, T12 and T13A, merged into
 `t12b-agent-service`. T13A price/basis/limit/portfolio/cost charts are retained.
 No contract implementation or protected desk/LLM source was changed. Solidity

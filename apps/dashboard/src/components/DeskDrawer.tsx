@@ -10,9 +10,11 @@ export function DeskDrawer({
     close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
+    const active = document.activeElement as HTMLElement | null;
     const trigger =
-      document.querySelector<HTMLElement>('[data-desk-trigger]') ??
-      (document.activeElement as HTMLElement);
+      active && active !== document.body
+        ? active
+        : document.querySelector<HTMLElement>('[data-desk-trigger]');
     panel.current?.querySelector<HTMLElement>('button')?.focus();
     const key = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {

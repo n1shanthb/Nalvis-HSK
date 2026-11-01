@@ -1,0 +1,254 @@
+[
+  {
+    "phase": "before",
+    "page": "agent",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "before",
+    "page": "mandate",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "before",
+    "page": "verify",
+    "width": 375,
+    "scrollWidth": 375,
+    "viewport": 375
+  },
+  {
+    "phase": "before",
+    "page": "landing",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "before",
+    "page": "agent",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "before",
+    "page": "mandate",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "before",
+    "page": "verify",
+    "width": 768,
+    "scrollWidth": 768,
+    "viewport": 768
+  },
+  {
+    "phase": "before",
+    "page": "landing",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "before",
+    "page": "agent",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "before",
+    "page": "mandate",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "before",
+    "page": "verify",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "phase": "before",
+    "page": "landing",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "before",
+    "page": "agent",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "phase": "before",
+    "page": "mandate",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "phase": "before",
+    "page": "verify",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "phase": "before",
+    "page": "landing",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "phase": "after",
+    "page": "agent",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "after",
+    "page": "mandate",
+    "width": 375,
+    "scrollWidth": 375,
+    "viewport": 375
+  },
+  {
+    "phase": "after",
+    "page": "verify",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "after",
+    "page": "landing",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "after",
+    "page": "demo",
+    "width": 375,
+    "scrollWidth": 360,
+    "viewport": 375
+  },
+  {
+    "phase": "after",
+    "page": "agent",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "after",
+    "page": "mandate",
+    "width": 768,
+    "scrollWidth": 768,
+    "viewport": 768
+  },
+  {
+    "phase": "after",
+    "page": "verify",
+    "width": 768,
+    "scrollWidth": 768,
+    "viewport": 768
+  },
+  {
+    "phase": "after",
+    "page": "landing",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "after",
+    "page": "demo",
+    "width": 768,
+    "scrollWidth": 753,
+    "viewport": 768
+  },
+  {
+    "phase": "after",
+    "page": "agent",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "after",
+    "page": "mandate",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "phase": "after",
+    "page": "verify",
+    "width": 1024,
+    "scrollWidth": 1024,
+    "viewport": 1024
+  },
+  {
+    "phase": "after",
+    "page": "landing",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "after",
+    "page": "demo",
+    "width": 1024,
+    "scrollWidth": 1009,
+    "viewport": 1024
+  },
+  {
+    "phase": "after",
+    "page": "agent",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "phase": "after",
+    "page": "mandate",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "phase": "after",
+    "page": "verify",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "viewport": 1440
+  },
+  {
+    "phase": "after",
+    "page": "landing",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  },
+  {
+    "phase": "after",
+    "page": "demo",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "viewport": 1440
+  }
+]

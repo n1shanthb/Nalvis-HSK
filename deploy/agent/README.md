@@ -22,7 +22,7 @@ first: registry entries, verified deployment manifest, policy and Ledger mandate
 
    | Variable | Setting |
    | --- | --- |
-   | `OPENROUTER_API_KEY` | server-only provider credential |
+   | `AGENT_OPENROUTER_API_KEY` | dedicated server-only agent provider credential |
    | `STRATEGIST_MODEL` | `anthropic/claude-haiku-5.5` |
    | `FITTER_MODEL` | `xiaomi/mimo-v2.6-flash` |
    | `AGENT_DAILY_LLM_BUDGET_USD` | `1.00` |
@@ -37,8 +37,8 @@ first: registry entries, verified deployment manifest, policy and Ledger mandate
 
    `AGENT_FEED_ORIGINS` is a comma-separated allowlist alias and takes precedence
    over the single `AGENT_FEED_CORS_ORIGIN`. The T12 provider's dedicated
-   `AGENT_OPENROUTER_API_KEY` is also supported; this service maps its configured
-   `OPENROUTER_API_KEY` into that interface. No desk source is changed. The
+   `AGENT_OPENROUTER_API_KEY` is required for this service. The desk's
+   `OPENROUTER_API_KEY` is never used by the agent. The
    provider already requires JSON-capable routes (`require_parameters: true`)
    and low reasoning. Do not change models/prompts without regenerating policy
    and having the owner sign the new hash.

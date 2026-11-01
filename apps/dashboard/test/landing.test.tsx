@@ -7,12 +7,12 @@ it('opens the recorded console explicitly and keeps product claims grounded', ()
     screen
       .getAllByRole('link', { name: /Open live console/ })[0]
       .getAttribute('href'),
-  ).toBe('#/agent');
+  ).toBe('#/overview');
   expect(
     screen
       .getByRole('link', { name: /Watch recorded demo/ })
       .getAttribute('href'),
-  ).toBe('?demo=1#/agent');
+  ).toBe('?demo=1#/overview');
   expect(
     screen
       .getByRole('link', { name: /Live console \/ Connect Ledger/ })

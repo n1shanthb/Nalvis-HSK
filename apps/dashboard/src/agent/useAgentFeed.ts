@@ -12,7 +12,6 @@ export function useAgentFeed(): {
   unreachable: boolean;
 } {
   const [feed, setFeed] = useState<AgentFeed | null>(() =>
-      import.meta.env.DEV &&
       new URLSearchParams(window.location.search).get('demo') === '1'
         ? fixture
         : null,
@@ -24,7 +23,6 @@ export function useAgentFeed(): {
       failures = 0;
     const controller = new AbortController();
     const demo =
-      import.meta.env.DEV &&
       new URLSearchParams(window.location.search).get('demo') === '1';
     async function poll() {
       if (demo) return;

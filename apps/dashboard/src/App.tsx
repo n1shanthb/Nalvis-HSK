@@ -11,9 +11,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 const MandateView = lazy(() =>
   import('./views/Mandate.js').then((m) => ({ default: m.MandateView })),
 );
-const EvidenceView = lazy(() =>
-  import('./views/Evidence.js').then((m) => ({ default: m.EvidenceView })),
-);
+const EvidenceView = lazy(() => import('./views/MarketEvidence.js'));
 const ReceiptsView = lazy(() =>
   import('./views/Receipts.js').then((m) => ({ default: m.ReceiptsView })),
 );
@@ -29,7 +27,12 @@ const DemoConsole = lazy(() =>
 const DeskView = lazy(() =>
   import('./views/Desk.js').then((m) => ({ default: m.DeskView })),
 );
+const WorkspaceOverview = lazy(() => import('./views/WorkspaceOverview.js'));
+const ActivityView = lazy(() => import('./views/Activity.js'));
 const routes = [
+  'overview',
+  'setup',
+  'activity',
   'mandate',
   'evidence',
   'receipts',
@@ -55,9 +58,16 @@ function AppContent({
   const [chain] = useState<DashboardChain>(initialChain);
   const readRoute = () => {
     const path = window.location.hash.split('?')[0];
-    if (path === '#/evidence' || path === '#/receipts') {
-      window.history.replaceState(null, '', `${window.location.search}#/agent`);
-      return 'agent' as const;
+    if (path === '#/receipts') {
+      const query = window.location.hash.includes('?')
+        ? '?' + window.location.hash.split('?')[1]
+        : '';
+      window.history.replaceState(
+        null,
+        '',
+        `${window.location.search}#/activity${query}`,
+      );
+      return 'activity' as const;
     }
     return routes.find((r) => `#/${r}` === path) ?? 'home';
   };
@@ -74,7 +84,7 @@ function AppContent({
     const change = () => {
       const next = readRoute();
       setRoute(next);
-      if (next !== 'mandate') setProposal(undefined);
+      if (next !== 'mandate' && next !== 'setup') setProposal(undefined);
       setDeskOpen(false);
     };
     window.addEventListener('hashchange', change);
@@ -112,7 +122,11 @@ function AppContent({
             Mainnet 177 — read-only
           </div>
         )}
-        <main key={`${chain}-${route}-${demo}`}>
+        <main
+          id="workspace-main"
+          tabIndex={-1}
+          key={`${chain}-${route}-${demo}`}
+        >
           <Suspense
             fallback={
               <div className="skeleton" role="status">
@@ -120,8 +134,20 @@ function AppContent({
               </div>
             }
           >
-            {route === 'agent' ? (
-              <AgentView chain={chain} />
+            {route === 'overview' ? (
+              <WorkspaceOverview chain={chain} demo={demo} />
+            ) : route === 'activity' ? (
+              <ActivityView chain={chain} demo={demo} />
+            ) : route === 'agent' ? (
+              <AgentView
+                chain={chain}
+                enableOwner={enableOwner}
+                onProposal={(p) => {
+                  setProposal(p);
+                  window.location.hash = '#/mandate';
+                  setRoute('mandate');
+                }}
+              />
             ) : route === 'desk' ? (
               <DeskView
                 demo={demo}
@@ -137,16 +163,17 @@ function AppContent({
                 }
               />
             ) : route === 'verify' ? (
-              <VerifyView chain={demo ? 31337 : chain} />
-            ) : demo && route === 'mandate' ? (
-              <DemoMandate />
+              <VerifyView chain={demo ? 31337 : chain} demo={demo} />
+            ) : demo && (route === 'mandate' || route === 'setup') ? (
+              <DemoMandate setup={route === 'setup'} />
             ) : demo ? (
               <DemoConsole route={route} />
             ) : (
               <>
-                {route === 'mandate' && (
+                {(route === 'mandate' || route === 'setup') && (
                   <MandateView
                     chain={chain}
+                    setup={route === 'setup'}
                     onOwner={
                       enableOwner
                         ? (d, s, reload) => (
@@ -185,7 +212,7 @@ function AppContent({
                     }
                   />
                 )}{' '}
-                {route === 'evidence' && <EvidenceView />}
+                {route === 'evidence' && <EvidenceView chain={chain} />}
                 {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
               </>
             )}

@@ -31,6 +31,21 @@ const live = {
   spendByDay: [{ day: '2026-11-01', usd: 0.2 }],
   stats: { calls24h: 5, estimatedSpendUsd: 0.2, averageLatencyMs: 125 },
 };
+it('production demo stays offline and never fetches the live agent', async () => {
+  window.history.replaceState(null, '', '/?demo=1#/agent');
+  vi.stubEnv('DEV', false);
+  vi.stubEnv('VITE_AGENT_FEED_URL', 'https://agent.example');
+  const send = vi
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(Error('Unexpected network'));
+  render(<AgentView />);
+  await screen.findByText('Demo: rule engine, not the AI agent');
+  expect(
+    send.mock.calls.some(([url]) =>
+      String(url).startsWith('https://agent.example'),
+    ),
+  ).toBe(false);
+});
 it('renders panels and T13A spend chart data from validated live feed', async () => {
   window.history.replaceState(null, '', '/#/agent');
   vi.stubEnv('VITE_AGENT_FEED_URL', 'https://agent.example');
@@ -54,9 +69,13 @@ it('renders panels and T13A spend chart data from validated live feed', async ()
   expect(screen.getByText('live/strategist')).toBeTruthy();
   expect(screen.getByText(/125 ms average latency/)).toBeTruthy();
   expect(screen.queryByText(fallbackMessage)).toBeNull();
-  expect(screen.getByText('Live market chart retained')).toBeTruthy();
-  expect(screen.getByText('Vault chart retained')).toBeTruthy();
-  expect(send).toHaveBeenCalledTimes(4);
+  expect(screen.getByRole('heading', { name: 'Agent room' })).toBeTruthy();
+  expect(screen.getByLabelText('Agent operations')).toBeTruthy();
+  expect(
+    send.mock.calls.filter(([url]) =>
+      String(url).startsWith('https://agent.example'),
+    ),
+  ).toHaveLength(4);
 });
 it('unreachable feed shows the exported snapshot and fallback banner', async () => {
   window.history.replaceState(null, '', '/#/agent');
