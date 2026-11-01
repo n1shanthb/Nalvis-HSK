@@ -23,6 +23,9 @@ it('requires explicit activation and refuses CI even with the acknowledgment', (
   expect(() => assertMainnetActivation({})).toThrow();
   expect(() => assertMainnetActivation({ ...approved, CI: 'true' })).toThrow();
   expect(() =>
+    assertMainnetActivation({ ...approved, AGENT_ALLOW_EPHEMERAL: '1' }),
+  ).toThrow();
+  expect(() =>
     assertMainnetActivation({ ...approved, MAINNET_DEPLOY_COMMIT: '' }),
   ).toThrow();
   expect(() => assertMainnetActivation(approved)).not.toThrow();
