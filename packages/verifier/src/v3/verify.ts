@@ -81,12 +81,13 @@ export async function verifyV3(
       policy.strategyHash === r.strategy.strategyHash &&
       hash(policy.strategy) === r.strategy.strategyHash);
     const definition = policy.strategy;
+    require('v3_market_context', definition.marketContext === undefined || definition.marketContext === 'fresh-dex-cex');
     require('v3_strategy', definition.provider === r.strategy.provider &&
       equal(definition.models, r.strategy.models) &&
       definition.STRATEGIST_PROMPT_V1 ===
-        executionPrompt(STRATEGIST_PROMPT_V1, r.executionChainId) &&
+        executionPrompt(STRATEGIST_PROMPT_V1, r.executionChainId, definition.marketContext) &&
       definition.FITTER_PROMPT_V1 ===
-        executionPrompt(FITTER_PROMPT_V1, r.executionChainId) &&
+        executionPrompt(FITTER_PROMPT_V1, r.executionChainId, definition.marketContext) &&
       definition.schemaVersion === 1);
     const entries: JournalEntry[] = (await store!.text('journal.jsonl'))
       .trim()
@@ -181,6 +182,7 @@ export async function verifyV3(
         require('v3_prompt_version', executionPrompt(
           systems[String(d.promptVersion)],
           r.executionChainId,
+          definition.marketContext,
         ) === prompt.system);
         require('v3_output_hash', typeof d.rawOutput === 'string' &&
           outputHash(d.rawOutput) === d.outputHash &&

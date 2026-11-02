@@ -78,6 +78,7 @@ export async function fitToMandate(args: {
   state: MandateState;
   initial: CheckResult;
   market?: unknown;
+  marketContext?: 'fresh-dex-cex';
   quote: (a: Action, s: MandateState) => Promise<ExecQuote>;
   rounds?: number;
   charge?: (usd: number) => Promise<void>;
@@ -106,6 +107,7 @@ export async function fitToMandate(args: {
   if (needsOwner(s)) return finish(waiting(0));
   for (let round = 1; round <= (args.rounds ?? 3); round++) {
     const common = {
+      marketContext: args.marketContext,
       executionChainId: s.chainId,
       provider: args.provider,
       journal: args.journal,

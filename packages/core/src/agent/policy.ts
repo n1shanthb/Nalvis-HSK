@@ -36,6 +36,7 @@ export const agentConfigSchema = z
     ttlSec: positive.max(120).default(120),
     policyFile: z.string(),
     executionChainId: z.literal(177).optional(),
+    marketContext: z.literal('fresh-dex-cex').optional(),
   })
   .strict();
 export type AgentConfig = z.infer<typeof agentConfigSchema>;
@@ -57,13 +58,14 @@ export function configFromEnv(
     dailyLlmBudgetUsd: Number(env.AGENT_DAILY_LLM_BUDGET_USD ?? 1),
     anchorSec: Number(env.AGENT_ANCHOR_SEC ?? 7200),
     policyFile,
+    ...(env.AGENT_MARKET_CONTEXT ? { marketContext: env.AGENT_MARKET_CONTEXT } : {}),
     ...(env.EXECUTION_CHAIN === '177' ? { executionChainId: 177 } : {}),
   });
 }
 export function strategyDefinition(
   config: Pick<
     AgentConfig,
-    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId' | 'marketContext'
   >,
 ) {
   return {
@@ -72,12 +74,15 @@ export function strategyDefinition(
     STRATEGIST_PROMPT_V1: executionPrompt(
       STRATEGIST_PROMPT_V1,
       config.executionChainId,
+      config.marketContext,
     ),
     FITTER_PROMPT_V1: executionPrompt(
       FITTER_PROMPT_V1,
       config.executionChainId,
+      config.marketContext,
     ),
     ...(config.executionChainId === 177 ? { executionChainId: 177 } : {}),
+    ...(config.marketContext ? { marketContext: config.marketContext } : {}),
     schemaVersion,
     watchBounds: config.watchBounds,
     fitRounds: config.fitRounds,
@@ -86,7 +91,7 @@ export function strategyDefinition(
 export const strategyHash = (
   config: Pick<
     AgentConfig,
-    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId' | 'marketContext'
   >,
 ) => hash(strategyDefinition(config));
 /** Ledger helper hashes exact file bytes, including any trailing newline. */
@@ -94,7 +99,7 @@ export const agentPolicyHash = (file: string) => keccak256(toBytes(file));
 export function createAgentPolicy(
   config: Pick<
     AgentConfig,
-    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId'
+    'models' | 'watchBounds' | 'fitRounds' | 'executionChainId' | 'marketContext'
   >,
   extra: Record<string, unknown> = {},
 ) {
