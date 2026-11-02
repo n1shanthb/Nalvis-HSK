@@ -50,7 +50,7 @@ export async function projectFeed(
         minOut: String(e.data.minOut ?? 0),
       },
       trail: r?.fit.trail ?? String(e.data.reason ?? ''),
-      rounds: wake
+      rounds: (r?.version === 4 ? [] : wake)
         .filter((e) => e.type === 'LLM_CALL')
         .map((e) => ({
           role: String(e.data.role),
@@ -60,7 +60,7 @@ export async function projectFeed(
             : 'Response rejected',
           outputHash: String(e.data.outputHash),
         })),
-      violations: wake
+      violations: (r?.version === 4 ? [] : wake)
         .filter((e) => e.type === 'MANDATE_CHECK')
         .flatMap((e) => (e.data.violations ?? []) as ActionView['violations']),
       ...(e.data.txHash ? { txHash: String(e.data.txHash) } : {}),
