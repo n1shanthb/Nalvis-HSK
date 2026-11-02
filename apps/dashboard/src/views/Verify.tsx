@@ -63,7 +63,7 @@ export function VerifyView({
             );
         if (!input && !demo) {
           try {
-            input = await receiptForTransaction(hash);
+            input = await receiptForTransaction(hash, chain);
           } catch {
             /* allow explicit JSON */
           }
@@ -71,6 +71,16 @@ export function VerifyView({
         if (!input)
           throw Error(
             'Matching receipt JSON unavailable. Paste the keeper receipt below.',
+          );
+        if (
+          !demo &&
+          typeof input === 'object' &&
+          input !== null &&
+          'executionChainId' in input &&
+          input.executionChainId !== chain
+        )
+          throw Error(
+            'Receipt execution chain does not match the selected chain',
           );
         const url = clientFor(chain).chain.rpcUrls.default.http[0];
         const v3 =
@@ -84,7 +94,18 @@ export function VerifyView({
             demo ? recordedReader(demoRecording) : rpcReader(url),
             {
               txHash: hash as Hex,
-              ...(v3 ? { agentStore: await verificationStore() } : {}),
+              ...(v3
+                ? {
+                    agentStore: await verificationStore(
+                      undefined,
+                      chain,
+                      (source) =>
+                        setMode(
+                          `Live chain ${chain} · ${source === 'snapshot' ? 'recorded artifact snapshot' : 'read-only live artifacts'} · independent RPC checks`,
+                        ),
+                    ),
+                  }
+                : {}),
             },
           ),
         );
@@ -158,7 +179,14 @@ export function VerifyView({
       {result && (
         <div aria-live="polite">
           <h3>{result.status}</h3>
-          <p>{result.label}</p>
+          <p>
+            {!demo && chain === 177 && mode.startsWith(`Live chain ${chain}`)
+              ? result.label.replace(
+                  'execution — prices not real.',
+                  'Mainnet 177 — real funds.',
+                )
+              : result.label}
+          </p>
           {result.receiptV3 && (
             <div aria-label="v3 receipt checks">
               {v3Groups.map(([label, names]) => {

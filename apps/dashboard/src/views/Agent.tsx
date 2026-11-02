@@ -1,8 +1,12 @@
 import { CostChart } from '../components/charts/CostChart.js';
+import { sources } from '../lib/chart-data.js';
 import { useState } from 'react';
 import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { fallbackMessage } from '../agent/feed-client.js';
+import { FeedStatus } from '../components/FeedStatus.js';
+import { DecisionHistory } from '../components/DecisionHistory.js';
+import { CurrentMandate } from '../components/CurrentMandate.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
   displayTime,
@@ -23,7 +27,8 @@ export function AgentView({
   enableOwner?: boolean;
   onProposal?: (p: OwnerProposal) => void;
 }) {
-  const { feed, unreachable } = useAgentFeed();
+  const observation = useAgentFeed(chain);
+  const { feed, unreachable } = observation;
   const receipts = useReceiptEvents(
     chain,
     !feed || unreachable || feed.state.mode === 'live',
@@ -36,7 +41,7 @@ export function AgentView({
       ? 'Demo: rule engine, not the AI agent'
       : {
           online: 'Agent online',
-          offline: 'Agent offline — no model key',
+          offline: 'Agent offline — reason unavailable in feed',
           budget_paused: 'Budget paused',
           needs_owner: 'Needs owner',
         }[state.state];
@@ -49,6 +54,13 @@ export function AgentView({
         Every outcome leaves evidence.
       </p>
       <Readiness feed={feed} demo={state?.mode === 'demo'} chain={chain} />
+      <FeedStatus observation={observation} />
+      {state?.mode !== 'demo' && <CurrentMandate chain={chain} />}
+      <DecisionHistory
+        actions={feed?.actions ?? []}
+        chain={chain}
+        provenance={observation.provenance}
+      />
       {unreachable && <p role="status">{fallbackMessage}</p>}
       <OperationView feed={feed} />
       <div className="agent-workspace">
@@ -83,7 +95,7 @@ export function AgentView({
             <p>Refreshes every 30 seconds.</p>
             {receipts.error && (
               <p>
-                Receipts unavailable. Check the testnet deployment and RPC
+                Receipts unavailable. Check the selected deployment and RPC
                 connection.
               </p>
             )}
@@ -103,7 +115,7 @@ export function AgentView({
             {!receipts.data?.length && (
               <p>
                 {feed
-                  ? 'Recorded UI fixtures; no live transaction activity.'
+                  ? 'No on-chain receipts loaded for this observation.'
                   : 'Waiting for agent receipts.'}
               </p>
             )}
@@ -141,7 +153,7 @@ export function AgentView({
                   'LLM calls today': state.llmCallsToday,
                   'Spend / budget (USD)': `${state.spendTodayUsd} / ${state.budgetUsd}`,
                   'Policy hash': state.policyHashOk ? 'Matches' : 'Needs owner',
-                  'Journal head': state.journalHead ?? 'No journal in fixture',
+                  'Journal head': state.journalHead ?? 'Unavailable',
                 }).map(([k, v]) => (
                   <div key={k}>
                     <dt>{k}</dt>
@@ -243,45 +255,28 @@ export function AgentView({
           </div>
         </article>
       </details>
-      <details className="secondary-section" open={!!feed}>
-        <summary>Decision explanations & negotiation</summary>
-        <article className="agent-card">
-          <h3>Decisions & negotiation trail</h3>
-          {!feed && <p>Agent feed not connected yet</p>}
-          {feed?.actions.map((a, i) => (
-            <div key={i}>
-              <h4>
-                {a.intent.type} {a.intent.notionalB} USDT → {a.final.kind}
-              </h4>
-              <p>{at(a.at)}</p>
-              <p>{a.trail}</p>
-              <ol className="negotiation-stepper">
-                {a.rounds.map((r, j) => (
-                  <li key={j}>
-                    {r.role} · round {r.round}: {r.summary}
-                  </li>
-                ))}
-              </ol>
-              {a.violations.map((v) => (
-                <span className="badge" key={v.limit}>
-                  {v.limit}: {v.required} requested / {v.allowed} allowed
-                </span>
-              ))}
-              {a.txHash && (
-                <a href={explorerLink(chain, 'tx', a.txHash)}>Transaction ↗</a>
-              )}
-              {a.receiptHash && a.txHash && (
-                <a href={`#/verify?tx=${a.txHash}`}>Verify receipt</a>
-              )}
-            </div>
-          ))}
-        </article>
-      </details>
       <details className="secondary-section">
         <summary>Model usage & costs</summary>
         <article className="agent-card">
           <h3>Model stats</h3>
-          <CostChart feed={feed} />
+          <CostChart
+            feed={feed}
+            source={
+              observation.provenance === 'demo'
+                ? sources.demo
+                : observation.provenance === 'snapshot'
+                  ? sources.agentSnapshot
+                  : !feed
+                    ? sources.agentUnavailable
+                    : observation.connection !== 'connected'
+                      ? sources.agentObservation
+                      : chain === 177
+                        ? sources.market
+                        : chain === 31337
+                          ? sources.demo
+                          : sources.execution
+            }
+          />
           {feed ? (
             <p>
               {feed.stats.calls24h} calls / 24h · $

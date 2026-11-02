@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+/** Read invalidation only; never remount owner review or modify signing state. */
+export const invalidateReads = () =>
+  window.dispatchEvent(new Event('dashboard:reads-invalidated'));
 export function useResource<T>(load: () => Promise<T>, interval = 30000) {
   const [state, setState] = useState<{
     data?: T;
@@ -42,10 +45,15 @@ export function useResource<T>(load: () => Promise<T>, interval = 30000) {
       }
     }
     refresh.current = poll;
+    const invalidate = () => {
+      void poll();
+    };
+    window.addEventListener('dashboard:reads-invalidated', invalidate);
     void poll();
     return () => {
       active = false;
       clearTimeout(timer);
+      window.removeEventListener('dashboard:reads-invalidated', invalidate);
     };
   }, [load, interval]);
   return { ...state, reload };

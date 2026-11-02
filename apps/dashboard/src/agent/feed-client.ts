@@ -1,5 +1,17 @@
 import { z } from 'zod';
 import type { AgentFeed } from './feed-types.js';
+import type { DashboardChain } from '../lib/clients.js';
+export const selectedChain = (): DashboardChain =>
+  import.meta.env.VITE_EXECUTION_CHAIN === '177' ? 177 : 133;
+export const snapshotFor = (chain: DashboardChain) =>
+  `/receipts/${chain}/agent`;
+export function validateFeedChain(
+  state: AgentFeed['state'],
+  chain: DashboardChain,
+) {
+  if (state.mode !== 'live' || state.executionChainId !== chain)
+    throw Error('Agent execution chain mismatch or non-live feed');
+}
 const finite = z.number().finite(),
   time = finite.nonnegative(),
   nullable = time.nullable();
@@ -99,16 +111,13 @@ export async function readFeedJSON(
 export async function fetchFeed(
   base: string,
   signal?: AbortSignal,
+  chain: DashboardChain = selectedChain(),
 ): Promise<AgentFeed> {
   // Sequential requests stay below the shared 10 rps/IP feed cap, including Verify.
   const state = stateSchema.parse(
     await readFeedJSON(base, '/feed/state', signal),
   );
-  if (
-    import.meta.env.VITE_EXECUTION_CHAIN === '177' &&
-    state.executionChainId !== 177
-  )
-    throw Error('Agent execution chain mismatch');
+  validateFeedChain(state, chain);
   const w = z
     .object({ active: z.array(watch), history: z.array(history) })
     .parse(await readFeedJSON(base, '/feed/watches', signal));
@@ -127,5 +136,5 @@ export async function fetchFeed(
   };
 }
 export const fallbackMessage =
-  'Agent feed unreachable — showing on-chain receipts and the last exported snapshot';
-export const snapshotBase = `/receipts/${import.meta.env.VITE_EXECUTION_CHAIN === '177' ? 177 : 133}/agent`;
+  'Live agent feed unavailable. Review observation provenance and feed diagnostics.';
+export const snapshotBase = snapshotFor(selectedChain());

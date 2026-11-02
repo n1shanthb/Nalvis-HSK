@@ -53,6 +53,7 @@ const address = z
   .regex(/^0x[0-9a-fA-F]{40}$/)
   .transform((v) => v as Address);
 const deploymentSchema = z.object({
+  chainId: z.number().int().optional(),
   vault: address,
   router: address,
   block: z.coerce.bigint().nonnegative().optional(),
@@ -84,7 +85,7 @@ export async function readJSON(path: string): Promise<unknown> {
   )
     throw Error(
       path.startsWith('/deployments/')
-        ? 'The verified deployment is not available yet. Follow the testnet bootstrap.'
+        ? 'The verified deployment manifest is unavailable for the selected chain.'
         : 'The requested data could not be loaded. Please retry shortly.',
     );
   return response.json();
@@ -96,6 +97,8 @@ export async function loadDeployment(
   const parsed = deploymentSchema.safeParse(raw);
   if (!parsed.success) throw new DeploymentError('unverified');
   const deployment = parsed.data;
+  if (deployment.chainId !== undefined && deployment.chainId !== chain)
+    throw new DeploymentError('unverified', chain);
   const documented = new Set(
     (addressBook.match(/0x[0-9a-fA-F]{40}/g) ?? []).map((v) => v.toLowerCase()),
   );
@@ -148,15 +151,10 @@ export async function readVault(
       ? (providedClient ?? clientFor(chain))
       : (routerOrClient ?? providedClient ?? clientFor(chain));
   if ((await client.getChainId()) !== chain) throw Error('RPC chain mismatch');
-  const blockNumber = await client.getBlockNumber();
+  const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
   const read = <
     F extends
-      | 'owner'
-      | 'pendingOwner'
-      | 'paused'
-      | 'mandate'
-      | 'tokenA'
-      | 'tokenB',
+      'owner' | 'pendingOwner' | 'paused' | 'mandate' | 'tokenA' | 'tokenB',
   >(
     functionName: F,
   ) =>
@@ -166,14 +164,7 @@ export async function readVault(
       functionName,
       blockNumber,
     });
-  const [
-    owner,
-    pendingOwner,
-    paused,
-    raw,
-    tokenA,
-    tokenB,
-  ] = await Promise.all([
+  const [owner, pendingOwner, paused, raw, tokenA, tokenB] = await Promise.all([
     read('owner'),
     read('pendingOwner'),
     read('paused'),

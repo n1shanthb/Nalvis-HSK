@@ -35,7 +35,8 @@ export const stages = [
     id: 'execution',
     label: 'Execution',
     type: 'CODE',
-    detail: 'Bounded testnet execution. Submission is not confirmation.',
+    detail:
+      'Bounded execution on the selected chain. Submission is not confirmation.',
     position: [3, 1.05, -2],
   },
   {

@@ -3,16 +3,31 @@ import {
   validateChain,
   type JournalEntry,
 } from '../../../../packages/core/src/agent/journal.js';
-import { readFeedJSON, snapshotBase } from './feed-client.js';
+import {
+  readFeedJSON,
+  selectedChain,
+  snapshotFor,
+  stateSchema,
+  validateFeedChain,
+  feedSchema,
+} from './feed-client.js';
+import type { DashboardChain } from '../lib/clients.js';
 const hash = /^0x[\da-f]{64}$/i;
 /** Browser read-only artifact store. Hashes/replay are checked by the existing v3 verifier. */
 export async function verificationStore(
   base = import.meta.env.VITE_AGENT_FEED_URL,
+  chain: DashboardChain = selectedChain(),
+  onSource?: (source: 'live' | 'snapshot') => void,
 ): Promise<Store> {
+  const snapshotBase = snapshotFor(chain);
   let entries: JournalEntry[] = [];
   let source: 'live' | 'snapshot' = 'live';
   if (base)
     try {
+      validateFeedChain(
+        stateSchema.parse(await readFeedJSON(base, '/feed/state')),
+        chain,
+      );
       let after = '';
       for (;;) {
         const page = await readFeedJSON(
@@ -44,6 +59,7 @@ export async function verificationStore(
     'journal.jsonl',
     entries.map((e) => JSON.stringify(e)).join('\n') + '\n',
   );
+  onSource?.(source);
   const text = async (path: string): Promise<string> => {
     if (cache.has(path)) return cache.get(path)!;
     if (
@@ -121,10 +137,18 @@ export const v3Groups = [
   ],
 ] as const;
 
-export async function receiptForTransaction(txHash: string): Promise<unknown> {
+export async function receiptForTransaction(
+  txHash: string,
+  chain: DashboardChain = selectedChain(),
+): Promise<unknown> {
+  const snapshotBase = snapshotFor(chain);
   const base = import.meta.env.VITE_AGENT_FEED_URL;
   if (base)
     try {
+      validateFeedChain(
+        stateSchema.parse(await readFeedJSON(base, '/feed/state')),
+        chain,
+      );
       const actions = await readFeedJSON(base, '/feed/actions?limit=200');
       if (Array.isArray(actions)) {
         const action = actions.find(
@@ -145,7 +169,10 @@ export async function receiptForTransaction(txHash: string): Promise<unknown> {
     } catch {
       /* fall back to the export */
     }
-  const saved = await readFeedJSON('', snapshotBase + '/feed.json');
+  const saved = feedSchema.parse(
+    await readFeedJSON('', snapshotBase + '/feed.json'),
+  );
+  validateFeedChain(saved.state, chain);
   if (
     typeof saved !== 'object' ||
     saved === null ||

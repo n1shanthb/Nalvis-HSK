@@ -11,7 +11,7 @@ export function Portfolio({ chain }: { chain: DashboardChain }) {
         Verifying portfolio receipts…
       </div>
     );
-  if (r.error || !r.data?.portfolio)
+  if (!r.data?.portfolio)
     return (
       <p>
         Portfolio unavailable:{' '}
@@ -22,8 +22,13 @@ export function Portfolio({ chain }: { chain: DashboardChain }) {
   const p = r.data.portfolio;
   return (
     <>
+      {r.error && (
+        <p role="status">
+          Portfolio refresh failed; showing last verified history.
+        </p>
+      )}
       <Suspense fallback={<p>Loading vault history…</p>}>
-        <VaultChart results={r.data.results} />
+        <VaultChart results={r.data.results} chain={chain} />
       </Suspense>
       <div className="metrics">
         <article>

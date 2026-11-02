@@ -1,7 +1,13 @@
 import type { AgentFeed } from '../../agent/feed-types.js';
-import { sources, istDay } from '../../lib/chart-data.js';
+import { sources, istDay, type ChartSource } from '../../lib/chart-data.js';
 import { ChartFrame } from './ChartFrame.js';
-export function CostChart({ feed }: { feed: AgentFeed | null }) {
+export function CostChart({
+  feed,
+  source,
+}: {
+  feed: AgentFeed | null;
+  source?: ChartSource;
+}) {
   const s = feed?.state;
   const at = s?.lastWakeAt ?? undefined;
   const rows =
@@ -13,7 +19,14 @@ export function CostChart({ feed }: { feed: AgentFeed | null }) {
   return (
     <ChartFrame
       title="Model cost per day"
-      source={s?.mode === 'demo' ? sources.demo : sources.execution}
+      source={
+        source ??
+        (s?.mode === 'demo'
+          ? sources.demo
+          : s?.executionChainId === 177
+            ? sources.market
+            : sources.execution)
+      }
       at={at}
       summary={
         s

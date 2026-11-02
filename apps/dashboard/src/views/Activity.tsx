@@ -3,6 +3,9 @@ import { demoContext, demoReceipts } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
 import { displayTime, type DashboardChain } from '../lib/clients.js';
 import { ReceiptsView } from './Receipts.js';
+import { useAgentFeed } from '../agent/useAgentFeed.js';
+import { FeedStatus } from '../components/FeedStatus.js';
+import { DecisionHistory } from '../components/DecisionHistory.js';
 const verdicts = ['All', 'TRADE', 'RESIZE', 'WAIT', 'REJECT'];
 export default function ActivityView({
   chain,
@@ -12,6 +15,7 @@ export default function ActivityView({
   demo: boolean;
 }) {
   const [filter, setFilter] = useState('All');
+  const observation = useAgentFeed(chain);
   const result = useResource(
     useCallback(async () => (demo ? demoContext() : null), [demo]),
   );
@@ -126,7 +130,15 @@ export default function ActivityView({
           ) && <p>No recorded decisions match this filter.</p>}
         </>
       ) : (
-        <ReceiptsView chain={chain} />
+        <>
+          <FeedStatus observation={observation} />
+          <DecisionHistory
+            actions={observation.feed?.actions ?? []}
+            chain={chain}
+            provenance={observation.provenance}
+          />
+          <ReceiptsView chain={chain} />
+        </>
       )}
     </section>
   );
