@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 export function Header({
   demo,
-  onDesk,
   activeRoute,
 }: {
   demo: boolean;
-  onDesk: () => void;
+  onDesk?: () => void;
   activeRoute?: string;
 }) {
   const [menu, setMenu] = useState(false);
@@ -21,10 +20,12 @@ export function Header({
   };
   const entries = [
     ['overview', 'Overview'],
-    ['setup', 'Set mandate'],
     ['mandate', 'Mandate'],
     ['activity', 'Activity'],
     ['agent', 'Agent'],
+    ['operations', 'Operations 3D'],
+    ['evidence', 'Market'],
+    ['desk', 'Copilot'],
   ];
   const links = (
     <>
@@ -41,14 +42,8 @@ export function Header({
       <details className="advanced-nav">
         <summary>Advanced</summary>
         <div>
-          <a href="#/evidence" onClick={close}>
-            Market evidence
-          </a>
           <a href="#/verify" onClick={close}>
             Verify receipt
-          </a>
-          <a href="#/desk" onClick={close}>
-            Nalvis Copilot
           </a>
         </div>
       </details>
@@ -84,13 +79,12 @@ export function Header({
           >
             {demo ? 'Switch to Live' : 'Watch Demo'}
           </a>
-          <button
+          <a
             className="text-action desk-top"
-            data-desk-trigger
-            onClick={onDesk}
+            href="#/desk"
           >
             Nalvis Copilot
-          </button>
+          </a>
           <a className="button primary-setup" href="#/setup">
             Set mandate
           </a>

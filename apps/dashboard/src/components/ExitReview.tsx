@@ -29,6 +29,11 @@ const previewSchema = z.object({
   block: z.string(),
   pnlReason: z.string(),
   order: sellOrderSchema.optional(),
+  direction: z.enum(['BUY', 'SELL']).optional(),
+  buyUSDT: z.string().optional(),
+  expectedWHSK: z.string().optional(),
+  minimumWHSK: z.string().optional(),
+  poolFeeUSDT: z.string().optional(),
   sellWHSK: z.string().optional(),
   expectedUSDT: z.string().optional(),
   minimumUSDT: z.string().optional(),
@@ -58,8 +63,12 @@ async function request(body?: unknown) {
 }
 export function ExitReview({
   allowTrading = false,
+  direction = 'SELL',
+  notionalB,
 }: {
   allowTrading?: boolean;
+  direction?: 'BUY' | 'SELL';
+  notionalB?: string;
 }) {
   const ledger = useContext(LedgerContext),
     address = ledger?.address;
@@ -87,6 +96,7 @@ export function ExitReview({
       if (
         !old ||
         old.owner.toLowerCase() !== state.owner.toLowerCase() ||
+        old.scope !== 'TRADE_WITHIN_MANDATE' ||
         old.policyHash !== state.policyHash ||
         old.expiresAt <= state.now
       ) {
@@ -94,7 +104,7 @@ export function ExitReview({
         sessionKey.current = account;
         delegation.current = {
           version: 1,
-          scope: 'SELL_WITHIN_MANDATE',
+          scope: 'TRADE_WITHIN_MANDATE',
           chainId: 177,
           owner: state.owner as Hex,
           vault: state.vault as Hex,
@@ -108,7 +118,7 @@ export function ExitReview({
       }
       setPreview(
         previewSchema.parse(
-          await request({ op: 'preview', session: delegation.current }),
+          await request({ op: 'preview', session: delegation.current, direction, ...(notionalB ? { notionalB } : {}) }),
         ),
       );
     } catch (e) {
@@ -116,7 +126,7 @@ export function ExitReview({
     } finally {
       setBusy(false);
     }
-  }, [address]);
+  }, [address, direction, notionalB]);
   useEffect(() => {
     setOrderId('');
     setStatus('');
@@ -249,14 +259,14 @@ export function ExitReview({
     }
   }
   if (rejected)
-    return <p role="status">Sell review rejected. No order was submitted.</p>;
+    return <p role="status">Trade review rejected. No order was submitted.</p>;
   return (
     <section
       className="exit-review agent-card"
-      aria-label="Review owner-directed sell"
+      aria-label={`Review owner-directed ${direction.toLowerCase()}`}
     >
-      <p className="eyebrow">OWNER-DIRECTED EXIT · MAINNET 177 · REAL FUNDS</p>
-      <h3>Review your WHSK → USDT sell</h3>
+      <p className="eyebrow">OWNER-DIRECTED {direction} · MAINNET 177 · REAL FUNDS</p>
+      <h3>{direction === 'BUY' ? 'Review USDT → WHSK buy' : 'Review WHSK → USDT sell'}</h3>
       {busy && <p role="status">Reading or reviewing…</p>}
       {error && <p role="alert">{error}</p>}
       {preview && (
@@ -279,30 +289,34 @@ export function ExitReview({
             </div>
             {preview.order && (
               <>
-                <div>
+                {direction === 'BUY' && <div><dt>Spend USDT</dt><dd>{preview.buyUSDT}</dd></div>}
+                {direction === 'BUY' && <div><dt>Estimated WHSK received</dt><dd>{preview.expectedWHSK}</dd></div>}
+                {direction === 'BUY' && <div><dt>Minimum WHSK received</dt><dd>{preview.minimumWHSK}</dd></div>}
+                {direction === 'BUY' && <div><dt>Pool fee (included in quote)</dt><dd>{preview.poolFeeUSDT} USDT</dd></div>}
+                {direction === 'SELL' && <div>
                   <dt>Sell WHSK</dt>
                   <dd>{preview.sellWHSK}</dd>
-                </div>
-                <div>
+                </div>}
+                {direction === 'SELL' && <div>
                   <dt>Estimated USDT received</dt>
                   <dd>{preview.expectedUSDT}</dd>
-                </div>
-                <div>
+                </div>}
+                {direction === 'SELL' && <div>
                   <dt>Minimum USDT received</dt>
                   <dd>{preview.minimumUSDT}</dd>
-                </div>
-                <div>
+                </div>}
+                {direction === 'SELL' && <div>
                   <dt>Pool fee (included in quote)</dt>
                   <dd>{preview.poolFeeWHSK} WHSK</dd>
-                </div>
+                </div>}
                 <div>
                   <dt>Estimated keeper gas</dt>
                   <dd>{preview.estimatedGasHSK ?? 'Unavailable'} HSK</dd>
                 </div>
-                <div>
+                {direction === 'SELL' && <div>
                   <dt>WHSK remaining</dt>
                   <dd>{preview.remainingWHSK}</dd>
-                </div>
+                </div>}
                 <div>
                   <dt>Slippage ceiling</dt>
                   <dd>{preview.slippageBps} bps</dd>
@@ -311,10 +325,10 @@ export function ExitReview({
             )}
           </dl>
           <p>
-            Proceeds stay in the vault. This is an owner-directed sell, not an
+            Assets stay in the vault. This is an owner-directed trade, not an
             autonomous AI trade.
           </p>
-          {preview.partialExit && (
+          {direction === 'SELL' && preview.partialExit && (
             <p>
               This is a capped sell clip, not a guaranteed full exit. Remaining
               WHSK is shown above; no later legs are authorized automatically.
@@ -332,7 +346,7 @@ export function ExitReview({
       )}
       {!canTrade && (
         <p>
-          Only the connected vault owner can confirm a sell from their own
+          Only the connected vault owner can confirm a trade from their own
           workspace. Viewing Nishanth’s activity grants no trading authority.
           {allowTrading && !enabled
             ? ' Keeper order processing is not enabled yet.'
@@ -349,7 +363,7 @@ export function ExitReview({
               onClick={() => void authorize()}
               disabled={!canTrade || busy || !preview?.executable}
             >
-              Authorize 15-minute sell session with Ledger
+              Authorize 15-minute trade session with Ledger
             </button>
           )}
           <button
@@ -362,7 +376,7 @@ export function ExitReview({
               !preview?.executable
             }
           >
-            Confirm sell
+            Confirm {direction.toLowerCase()}
           </button>
           <button
             className="secondary"

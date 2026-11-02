@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mnemonicToAccount } from 'viem/accounts';
-import { zeroHash } from 'viem';
+import { zeroHash, parseUnits } from 'viem';
 import { hash } from '../../src/canonical.js';
 import {
   assertSellAuthorization,
   sellSessionMessage,
   type SellSession,
 } from '../../src/copilot.js';
-import { sellActionFor, sellPreview } from '../../src/agent/owner-preview.js';
+import { sellActionFor, sellPreview, buyPreview } from '../../src/agent/owner-preview.js';
 import { createAgent } from '../../src/agent/agent.js';
 import { memoryStore } from '../../src/agent/store.js';
 import {
@@ -120,6 +120,31 @@ it('executes a capped owner sell without calling an LLM, persists a v4 receipt a
     'already consumed',
   );
   expect(f.send).toHaveBeenCalledTimes(1);
+});
+it('executes an exact reviewed BUY and rejects replay and tampering', async () => {
+  const f = await fixture();
+  const delegation: SellSession = { ...f.signed.delegation, scope: 'TRADE_WITHIN_MANDATE' };
+  const action = { type: 'BUY' as const, notionalB: '1', urgency: 'now' as const, reason: 'Owner-confirmed Copilot buy' };
+  const preview = buyPreview(f.s, await quote(action, f.s), delegation, '1');
+  expect(preview.checked.ok).toBe(true);
+  const signed = {
+    delegation,
+    ownerSignature: await owner.signMessage({ message: sellSessionMessage(delegation) }),
+    order: preview.order,
+    orderSignature: await sessionKey.signMessage({ message: { raw: hash(preview.order) } }),
+  };
+  await expect(assertSellAuthorization(signed, f.context)).resolves.toBeTruthy();
+  await expect(assertSellAuthorization({ ...signed, order: { ...signed.order, amountIn: '2' } }, f.context)).rejects.toThrow();
+  const receipt = await f.agent.executeOwnerSell(signed);
+  expect(receipt.intent.type).toBe('BUY');
+  expect(receipt.final.direction).toBe('BUY');
+  expect(receipt.final.amountIn).toBe(parseUnits('1', f.s.decimalsB));
+  expect(f.send).toHaveBeenCalledTimes(1);
+  await expect(f.agent.executeOwnerSell(signed)).rejects.toThrow('already consumed');
+  expect(f.send).toHaveBeenCalledTimes(1);
+  const sellOnly = { ...delegation, scope: 'SELL_WITHIN_MANDATE' as const };
+  const blocked = { ...signed, delegation: sellOnly, ownerSignature: await owner.signMessage({ message: sellSessionMessage(sellOnly) }) };
+  await expect(assertSellAuthorization(blocked, f.context)).rejects.toThrow();
 });
 describe.each([
   'paused',

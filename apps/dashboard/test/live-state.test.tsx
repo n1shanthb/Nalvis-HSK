@@ -223,7 +223,7 @@ it('renders chronological WAIT details, IST, original intent and supplied reject
   expect(screen.getAllByText(/Recorded transaction hash/)).toHaveLength(2);
   expect(
     screen
-      .getAllByRole('link', { name: 'Transaction ↗' })[0]
+      .getAllByRole('link', { name: 'View transaction on Blockscout ↗' })[0]
       .getAttribute('href'),
   ).toContain('hsk.blockscout.com');
   expect(screen.getAllByText(/Per-trade cap/).length).toBeGreaterThan(0);

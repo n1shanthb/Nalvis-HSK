@@ -47,9 +47,10 @@ export function AgentFeedProvider({
 }
 export function useAgentFeed(
   chain: DashboardChain = selectedChain(),
+  enabled = true,
 ): FeedObservation {
   const shared = useContext(FeedContext);
-  const standalone = useAgentFeedSource(chain, shared?.chain !== chain);
+  const standalone = useAgentFeedSource(chain, enabled && shared?.chain !== chain);
   return shared?.chain === chain ? shared.observation : standalone;
 }
 function useAgentFeedSource(

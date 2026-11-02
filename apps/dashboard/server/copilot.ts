@@ -69,10 +69,15 @@ export function createCopilotHandler(
       const body = JSON.parse(text + decoder.decode());
       if (body.op === 'preview') {
         const input = z
-          .object({ op: z.literal('preview'), session: sellSessionSchema })
+          .object({
+            op: z.literal('preview'),
+            session: sellSessionSchema,
+            direction: z.enum(['BUY', 'SELL']).optional(),
+            notionalB: z.string().optional(),
+          })
           .strict()
           .parse(body);
-        return json(await deps.preview(input.session));
+        return json(await deps.preview(input.session, { direction: input.direction, notionalB: input.notionalB }));
       }
       const input = z
         .object({ op: z.literal('confirm'), signed: signedSellOrderSchema })

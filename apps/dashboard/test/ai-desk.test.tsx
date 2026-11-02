@@ -8,19 +8,19 @@ const credits = {
 };
 import { DeskView } from '../src/views/Desk.js';
 afterEach(() => vi.unstubAllGlobals());
-it('interprets via Groq then answers from verified evidence', async () => {
+it('interprets via OpenRouter then answers from verified evidence', async () => {
   const send = vi
     .fn()
     .mockResolvedValueOnce(
       Response.json({
-        providers: [{ id: 'groq', available: true }],
+        providers: [{ id: 'openrouter', available: true }],
         credits,
         status: 'ready',
       }),
     )
     .mockResolvedValueOnce(
       Response.json({
-        provider: 'groq',
+        provider: 'openrouter',
         model: 'test-model',
         credits,
         command: 'why REJECT #3',
@@ -32,12 +32,12 @@ it('interprets via Groq then answers from verified evidence', async () => {
   render(<DeskView demo />);
   await waitFor(() =>
     expect(
-      (screen.getByRole('option', { name: 'Groq' }) as HTMLOptionElement)
+      (screen.getByRole('option', { name: 'OpenRouter' }) as HTMLOptionElement)
         .disabled,
     ).toBe(false),
   );
   fireEvent.change(screen.getByLabelText('Language engine'), {
-    target: { value: 'groq' },
+    target: { value: 'openrouter' },
   });
   fireEvent.change(screen.getByLabelText('Ask Nalvis'), {
     target: { value: 'Explain the rejected decision' },
@@ -52,7 +52,7 @@ it('interprets via Groq then answers from verified evidence', async () => {
   await screen.findByText(/Receipt #3 · REJECT:/);
   expect(screen.getByText('why REJECT #3')).toBeTruthy();
   expect(JSON.parse(send.mock.calls[1][1].body)).toEqual({
-    provider: 'groq',
+    provider: 'openrouter',
     text: 'Explain the rejected decision',
   });
 });
@@ -80,13 +80,10 @@ it('uses original text with a visible fallback when the provider fails', async (
   fireEvent.change(screen.getByLabelText('Language engine'), {
     target: { value: 'openrouter' },
   });
-  await waitFor(() =>
-    expect(
-      (screen.getByRole('button', { name: 'show P&L' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(false),
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'show P&L' }));
+  fireEvent.change(screen.getByLabelText('Ask Nalvis'), {
+    target: { value: 'show P&L' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   await screen.findByText(/AI unavailable or unable/);
   await screen.findByText(/P&L vs hold after gas:/);
 });
@@ -96,7 +93,7 @@ it('shows exhausted credits and uses built-in commands without another provider 
     .fn()
     .mockResolvedValueOnce(
       Response.json({
-        providers: [{ id: 'groq', available: true }],
+        providers: [{ id: 'openrouter', available: true }],
         credits: { ...credits, remaining: 1 },
         status: 'ready',
       }),
@@ -114,12 +111,12 @@ it('shows exhausted credits and uses built-in commands without another provider 
   render(<DeskView demo />);
   await waitFor(() =>
     expect(
-      (screen.getByRole('option', { name: 'Groq' }) as HTMLOptionElement)
+      (screen.getByRole('option', { name: 'OpenRouter' }) as HTMLOptionElement)
         .disabled,
     ).toBe(false),
   );
   fireEvent.change(screen.getByLabelText('Language engine'), {
-    target: { value: 'groq' },
+    target: { value: 'openrouter' },
   });
   fireEvent.change(screen.getByLabelText('Ask Nalvis'), {
     target: { value: 'show positions' },
@@ -136,6 +133,9 @@ it('shows exhausted credits and uses built-in commands without another provider 
     (screen.getByLabelText('Language engine') as HTMLSelectElement).value,
   ).toBe('rules');
   await screen.findByText(/AI request budget or rate limit reached/);
-  fireEvent.click(screen.getByRole('button', { name: 'show P&L' }));
+  fireEvent.change(screen.getByLabelText('Ask Nalvis'), {
+    target: { value: 'show P&L' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
 });

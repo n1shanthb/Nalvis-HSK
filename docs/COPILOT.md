@@ -1,7 +1,7 @@
 # Nalvis Copilot
 
 Copilot translates requests and displays read-only evidence or a reviewed,
-owner-directed WHSK-to-USDT sell. The LLM does not construct, sign or submit
+owner-directed USDT-to-WHSK buy or WHSK-to-USDT sell. The LLM does not construct, sign or submit
 transactions and does not override the autonomous agent's verdict. Existing
 autonomous policies, mandate gates and contract addresses remain unchanged.
 
@@ -9,7 +9,7 @@ autonomous policies, mandate gates and contract addresses remain unchanged.
 
 Only the connected on-chain vault owner in their own workspace can authorize a
 session. The selected Ledger account signs a readable EIP-191 delegation for a
-browser-generated key: SELL only, one vault, chain and current policy hash, at
+browser-generated key: BUY or SELL within the mandate, one vault, chain and current policy hash, at
 most 15 minutes. The key remains in memory and is destroyed on page close,
 account change or ending the session. Ending a session does not cancel an order
 already confirmed and queued. Pause/revoke remain the on-chain emergency controls.
@@ -22,8 +22,8 @@ reads fresh state/quotes and simulates under its existing single-writer lock.
 Changed or expired orders are rejected, never silently resized or repriced.
 All existing on-chain mandate checks still apply. Proceeds remain in the vault.
 
-A sell is a capped clip; additional legs are never automatically scheduled.
-Zero WHSK means no executable sell. Profit/loss is unavailable without verified
+A sell is a capped clip; a buy uses the exact reviewed USDT input. Additional legs are never automatically scheduled.
+Zero WHSK means no executable sell; insufficient USDT means no executable buy. Profit/loss is unavailable without verified
 cost-basis history. Quoted output and estimated gas are not guaranteed settlement.
 Public viewers have no trading authority. A Redis credential or server request
 alone cannot authorize a swap; the agent private key remains only on OCI.
@@ -52,7 +52,7 @@ may require manual review rather than claiming a swap succeeded.
 
 ## Receipt version 4
 
-Owner-directed sells use version 4, explicitly distinct from autonomous version
+Owner-directed buys and sells use version 4, explicitly distinct from autonomous version
 3 receipts. Existing receipt formats and hashes are unchanged. The v4 hash is
 `keccak256(utf8(canonical(body)))`, excluding only `receiptHash` and post-mining
 `settlement`. The exact committed body fields are:
@@ -66,7 +66,7 @@ browser-key signature. `strategy.mode=owner-command`, provider `owner-session`,
 models `none`; no fictitious model transcript is generated. The verifier checks
 signatures, historical owner/state, mandate replay, artifacts/journal, exact
 calldata, sender, receipt event, output floor, expiry and chain head. Local
-integration tests perform two swaps under one delegation, verify both, reject
+integration tests perform buys and sells under one delegation, verify both, reject
 tampering and replay, and rehearse a mined transaction followed by a disconnect.
 
 No contract redeployment or mandate replacement is required. This feature does

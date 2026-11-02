@@ -12,6 +12,7 @@ import type { DashboardChain } from '../lib/clients.js';
 import { demoContext } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
 import { ExitReview } from '../components/ExitReview.js';
+import { useAgentFeed } from '../agent/useAgentFeed.js';
 const creditsSchema = z
   .object({
     remaining: z.number().int().nonnegative(),
@@ -23,7 +24,7 @@ const creditsSchema = z
 const providerSchema = z.object({
   providers: z.array(
     z.object({
-      id: z.enum(['groq', 'openrouter']),
+      id: z.literal('openrouter'),
       available: z.boolean(),
     }),
   ),
@@ -32,7 +33,7 @@ const providerSchema = z.object({
 });
 const translationSchema = z
   .object({
-    provider: z.enum(['groq', 'openrouter']),
+    provider: z.literal('openrouter'),
     model: z.string(),
     credits: creditsSchema,
     command: z.string().max(120),
@@ -58,8 +59,9 @@ export function DeskView({
       [demo, chain],
     ),
   );
+  const observation = useAgentFeed(chain, !demo);
   const [input, setInput] = useState('');
-  const [provider, setProvider] = useState('rules');
+  const [provider, setProvider] = useState('openrouter');
   const [providers, setProviders] = useState<
     z.infer<typeof providerSchema>['providers']
   >([]);
@@ -77,6 +79,7 @@ export function DeskView({
           setProviders(status.providers);
           setCredits(status.credits);
           if (!status.providers.some((p) => p.available)) setProvider('rules');
+          else setProvider('openrouter');
         })
         .catch(() => {
           if (!controller.signal.aborted) {
@@ -139,7 +142,7 @@ export function DeskView({
         )
           setProvider('rules');
         command = result.command;
-        source = `${result.provider === 'groq' ? 'Groq' : 'OpenRouter'} · ${result.model}`;
+        source = `OpenRouter · ${result.model}`;
         transcript = {
           promptHash: result.promptHash,
           outputHash: result.outputHash,
@@ -149,11 +152,35 @@ export function DeskView({
       warning ??=
         'AI unavailable or unable to interpret this request. Answered using the original text and built-in commands.';
     }
+    const latest = observation.feed?.actions.reduce(
+      (best, action) => !best || action.at > best.at ? action : best,
+      undefined as (typeof observation.feed.actions)[number] | undefined,
+    );
+    const liveContext: DeskContext = {
+      ...(resource.data ?? {}),
+      ...(latest && observation.provenance === 'live'
+        ? {
+            latestAction: { at: latest.at, kind: latest.final.kind, trail: latest.trail, txHash: latest.txHash },
+            recentActions: observation.feed!.actions.map((action) => ({
+              at: action.at, kind: action.final.kind, trail: action.trail, txHash: action.txHash,
+            })),
+          }
+        : {}),
+    };
+    if (command.toLowerCase().replace(/[?!.]+$/, '') === 'show spread' && !demo) {
+      try {
+        const { collectCurrentEvidence } = await import('./Evidence.js');
+        liveContext.evidence = await collectCurrentEvidence(chain);
+        liveContext.evidenceLabel = 'Current market observation';
+      } catch {
+        warning = 'Current market evidence could not be loaded. Open Market to inspect source status.';
+      }
+    }
     setMessages((m) => [
       ...m,
       {
         input: text,
-        reply: desk(command, resource.data),
+        reply: desk(command, liveContext),
         source,
         interpretation: command !== text ? command : undefined,
         warning,
@@ -167,8 +194,9 @@ export function DeskView({
       <p className="eyebrow">05 / REVIEWED OWNER COMMANDS</p>
       <h2>Nalvis Copilot</h2>
       <p>
-        Grounded answers from verified evidence. Sell requests produce a live
-        review card; mandate changes require Ledger review.
+        Answers use current market reads and the observed agent feed. Buy and
+        sell requests produce a fresh review card; mandate changes require
+        Ledger review.
       </p>
       <div className="desk-toolbar">
         <label>
@@ -179,7 +207,7 @@ export function DeskView({
             disabled={pending}
           >
             <option value="rules">Built-in commands</option>
-            {(['groq', 'openrouter'] as const).map((id) => (
+            {(['openrouter'] as const).map((id) => (
               <option
                 key={id}
                 value={id}
@@ -189,7 +217,7 @@ export function DeskView({
                   credits?.globalRemaining === 0
                 }
               >
-                {id === 'groq' ? 'Groq' : 'OpenRouter'}
+                OpenRouter
                 {providers.find((p) => p.id === id)?.available
                   ? ''
                   : ' · not configured'}
@@ -200,8 +228,8 @@ export function DeskView({
         <p>
           {provider === 'rules'
             ? providers.some((p) => p.available)
-              ? 'Choose an AI provider, or use built-in commands without a key.'
-              : 'Groq / OpenRouter not configured. Built-in commands are available.'
+              ? 'Choose OpenRouter, or use built-in commands without a key.'
+              : 'OpenRouter not configured. Built-in commands are available.'
             : 'AI interprets language only. Verified rules decide.'}
         </p>
       </div>
@@ -228,18 +256,6 @@ export function DeskView({
       {resource.error && (
         <p role="alert">Recorded evidence unavailable: {resource.error}</p>
       )}
-      <div className="desk-commands">
-        {['show P&L', 'kyu wait kiya', 'show spread', 'pause'].map((t) => (
-          <button
-            key={t}
-            className="secondary"
-            disabled={pending}
-            onClick={() => void submit(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
       <div className="conversation" role="log" aria-live="polite">
         {!messages.length && (
           <p>
@@ -267,14 +283,18 @@ export function DeskView({
               </p>
             )}
             <p>{m.reply.message}</p>
-            {m.reply.intent.kind === 'exit' &&
+            {(m.reply.intent.kind === 'exit' || m.reply.intent.kind === 'buy') &&
               (demo || chain !== 177 ? (
                 <p>
                   Owner-directed exits require the live mainnet workspace. No
                   swap is submitted from recorded examples.
                 </p>
               ) : (
-                <ExitReview allowTrading={allowTrading} />
+                <ExitReview
+                  allowTrading={allowTrading}
+                  direction={m.reply.intent.kind === 'buy' ? 'BUY' : 'SELL'}
+                  notionalB={m.reply.intent.kind === 'buy' ? m.reply.intent.notionalB : undefined}
+                />
               ))}
             {m.transcript && (
               <details className="ai-meta">

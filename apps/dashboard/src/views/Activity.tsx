@@ -137,7 +137,10 @@ export default function ActivityView({
             chain={chain}
             provenance={observation.provenance}
           />
-          <ReceiptsView chain={chain} />
+          <details className="secondary-section">
+            <summary>On-chain receipt records</summary>
+            <ReceiptsView chain={chain} />
+          </details>
         </>
       )}
     </section>

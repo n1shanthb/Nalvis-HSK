@@ -335,7 +335,7 @@ export async function connectAgentRpc(
       if (receipt.version === 4) {
         if (
           ownerReceiptHash(receipt) !== receipt.receiptHash ||
-          receipt.intent.type !== 'SELL' ||
+          receipt.intent.type !== (receipt.authorization.order.direction ?? 'SELL') ||
           receipt.intent.notionalB !== receipt.authorization.order.notionalB ||
           !matchesConfirmedSell(
             receipt.authorization.order,

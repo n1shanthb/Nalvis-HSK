@@ -17,6 +17,7 @@ import {
 import {
   sellActionFor,
   sellPreview,
+  buyPreview,
 } from '../../../packages/core/src/agent/owner-preview.js';
 import {
   sellSessionSchema,
@@ -52,7 +53,7 @@ export async function copilotState() {
   });
   return { state, owner };
 }
-export async function copilotPreview(sessionInput: unknown) {
+export async function copilotPreview(sessionInput: unknown, request: { direction?: 'BUY' | 'SELL'; notionalB?: string } = {}) {
   const session = sellSessionSchema.parse(sessionInput);
   const { state, owner } = await copilotState();
   if (
@@ -75,16 +76,25 @@ export async function copilotPreview(sessionInput: unknown) {
     pnl: null,
     pnlReason:
       'Verified cost basis is unavailable; profit or loss is not assumed to be zero.',
-    scope: 'Owner-directed WHSK → USDT. Proceeds remain in the vault.',
+    scope: 'Owner-directed trade within the signed mandate. Assets remain in the vault.',
   };
-  if (state.balanceA === 0n)
+  const buy = request.direction === 'BUY';
+  if (buy && !/^\d+(?:\.\d+)?$/.test(request.notionalB ?? ''))
+    throw Error('Enter an exact positive USDT amount');
+  if (buy && session.scope !== 'TRADE_WITHIN_MANDATE')
+    throw Error('BUY requires a trade session');
+  if (!buy && state.balanceA === 0n)
     return {
       ...status,
       executable: false,
       reason: 'There is no WHSK position to sell. No swap can be submitted.',
     };
-  const action = sellActionFor(state),
+  const action = buy
+      ? { type: 'BUY' as const, notionalB: request.notionalB!, urgency: 'now' as const, reason: 'Owner-confirmed Copilot buy' }
+      : sellActionFor(state),
     amountIn = amountFor(action, state);
+  if (buy && (amountIn === 0n || amountIn > state.balanceB))
+    return { ...status, executable: false, reason: 'The exact USDT amount is unavailable in the vault.' };
   const fee = await client.readContract({
     address: vault,
     abi: vaultAbi,
@@ -98,8 +108,8 @@ export async function copilotPreview(sessionInput: unknown) {
     blockNumber: state.block,
     args: [
       {
-        tokenIn: state.tokenA,
-        tokenOut: state.tokenB,
+        tokenIn: buy ? state.tokenB : state.tokenA,
+        tokenOut: buy ? state.tokenA : state.tokenB,
         amountIn,
         fee,
         sqrtPriceLimitX96: 0n,
@@ -112,7 +122,9 @@ export async function copilotPreview(sessionInput: unknown) {
     amountIn,
     amountOut: q.result[0],
   };
-  const preview = sellPreview(state, quote, session as SellSession);
+  const preview = buy
+    ? buyPreview(state, quote, session as SellSession, request.notionalB!)
+    : sellPreview(state, quote, session as SellSession);
   const simulation = preview.checked.ok
     ? await simulate(client, state, preview.checked.prepared)
     : { ok: false };
@@ -135,17 +147,22 @@ export async function copilotPreview(sessionInput: unknown) {
       preview.checked.violations.map((v) => v.limit).join(', ') ||
       (!simulation.ok ? 'On-chain simulation failed' : ''),
     order: preview.order,
-    sellWHSK: formatUnits(amountIn, state.decimalsA),
-    expectedUSDT: formatUnits(quote.amountOut, state.decimalsB),
-    minimumUSDT: formatUnits(preview.checked.prepared.minOut, state.decimalsB),
-    remainingWHSK: formatUnits(state.balanceA - amountIn, state.decimalsA),
-    partialExit: amountIn < state.balanceA,
+    direction: buy ? 'BUY' : 'SELL',
+    buyUSDT: buy ? request.notionalB : undefined,
+    expectedWHSK: buy ? formatUnits(quote.amountOut, state.decimalsA) : undefined,
+    minimumWHSK: buy ? formatUnits(preview.checked.prepared.minOut, state.decimalsA) : undefined,
+    sellWHSK: buy ? undefined : formatUnits(amountIn, state.decimalsA),
+    expectedUSDT: buy ? undefined : formatUnits(quote.amountOut, state.decimalsB),
+    minimumUSDT: buy ? undefined : formatUnits(preview.checked.prepared.minOut, state.decimalsB),
+    remainingWHSK: buy ? undefined : formatUnits(state.balanceA - amountIn, state.decimalsA),
+    partialExit: buy ? false : amountIn < state.balanceA,
     slippageBps: state.mandate.maxSlippageBps,
     feePpm: fee,
-    poolFeeWHSK: formatUnits(
+    poolFeeWHSK: buy ? undefined : formatUnits(
       (amountIn * BigInt(fee)) / 1_000_000n,
       state.decimalsA,
     ),
+    poolFeeUSDT: buy ? formatUnits((amountIn * BigInt(fee)) / 1_000_000n, state.decimalsB) : undefined,
     estimatedGasHSK: gasHSK,
   };
 }

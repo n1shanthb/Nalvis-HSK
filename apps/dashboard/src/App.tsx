@@ -1,10 +1,11 @@
-import { DeskDrawer } from './components/DeskDrawer.js';
 import { LedgerProvider } from './owner/LedgerContext.js';
 import { CopilotSessionProvider } from './owner/CopilotSession.js';
 import { MainnetOwner } from './owner/MainnetOwner.js';
 import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
 import { AgentView } from './views/Agent.js';
+import { OperationView } from './components/operations/OperationView.js';
+import { useAgentFeed } from './agent/useAgentFeed.js';
 import { MandateWizard } from './owner/MandateWizard.js';
 import { OwnerActions } from './owner/OwnerActions.js';
 import { Landing } from './views/Landing.js';
@@ -44,6 +45,7 @@ const routes = [
   'verify',
   'desk',
   'agent',
+  'operations',
 ] as const;
 type AppRoute = Route | 'home';
 export type Route = (typeof routes)[number];
@@ -76,21 +78,12 @@ function AppContent({
     }
     return routes.find((r) => `#/${r}` === path) ?? 'home';
   };
-  const [deskOpen, setDeskOpen] = useState(false);
   const [route, setRoute] = useState<AppRoute>(initialRoute ?? readRoute);
-  useEffect(() => {
-    if (route === 'desk') {
-      setDeskOpen(true);
-      setRoute('agent');
-      window.history.replaceState(null, '', `${window.location.search}#/agent`);
-    }
-  }, [route]);
   useEffect(() => {
     const change = () => {
       const next = readRoute();
       setRoute(next);
       if (next !== 'mandate' && next !== 'setup') setProposal(undefined);
-      setDeskOpen(false);
     };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
@@ -101,14 +94,10 @@ function AppContent({
       {(publicView) => (
         <AgentFeedProvider chain={chain}>
           <div className="shell ux-shell">
-            <div inert={deskOpen || undefined}>
+            <div>
               <Header
                 activeRoute={route}
                 demo={demo}
-                onDesk={() => {
-                  setProposal(undefined);
-                  setDeskOpen(true);
-                }}
               />
               {demo && (
                 <div className="banner" role="note">
@@ -158,6 +147,8 @@ function AppContent({
                         setRoute('mandate');
                       }}
                     />
+                  ) : route === 'operations' ? (
+                    <OperationsPage chain={chain} />
                   ) : route === 'desk' ? (
                     <DeskView
                       allowTrading={
@@ -247,43 +238,7 @@ function AppContent({
                 </Suspense>
               </main>
             </div>
-            {deskOpen && (
-              <DeskDrawer
-                onClose={() => {
-                  setDeskOpen(false);
-                  setProposal(undefined);
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setDeskOpen(false);
-                    setProposal(undefined);
-                  }}
-                >
-                  Close Copilot
-                </button>
-                <Suspense fallback={<p>Loading desk…</p>}>
-                  <DeskView
-                    allowTrading={
-                      enableOwner && !publicView && !demo && chain === 177
-                    }
-                    demo={demo}
-                    chain={chain}
-                    onProposal={
-                      enableOwner && !publicView && !demo && chain === 133
-                        ? (p) => {
-                            setProposal(p);
-                            window.location.hash = '#/mandate';
-                            setRoute('mandate');
-                            setDeskOpen(false);
-                          }
-                        : undefined
-                    }
-                  />
-                </Suspense>
-              </DeskDrawer>
-            )}
-            <footer inert={deskOpen || undefined}>
+            <footer>
               <span>Market evidence · mainnet 177 · read-only</span>
               <span>No proven edge. Bounded, provable execution.</span>
             </footer>
@@ -291,6 +246,18 @@ function AppContent({
         </AgentFeedProvider>
       )}
     </WorkspaceAccess>
+  );
+}
+
+function OperationsPage({ chain }: { chain: DashboardChain }) {
+  const { feed } = useAgentFeed(chain);
+  return (
+    <section className="operations-page">
+      <p className="eyebrow">AGENT OPERATIONS</p>
+      <h1>How a decision moves</h1>
+      <p>Observed agent stages and their latest available state.</p>
+      <OperationView feed={feed} />
+    </section>
   );
 }
 

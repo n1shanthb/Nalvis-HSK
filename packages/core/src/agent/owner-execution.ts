@@ -52,11 +52,12 @@ export async function executeOwnerSell(args: {
   const id = sellOrderId(signed);
   if (await store.read(`owner-orders/${id}.json`))
     throw Error('Owner confirmation already consumed');
+  const direction = signed.order.direction ?? 'SELL';
   const action = {
-    type: 'SELL' as const,
+    type: direction,
     notionalB: signed.order.notionalB,
     urgency: 'now' as const,
-    reason: 'Owner-confirmed Copilot sell; not an autonomous model decision',
+    reason: `Owner-confirmed Copilot ${direction.toLowerCase()}; not an autonomous model decision`,
   };
   const quote = await clients.quote(action, s),
     prepared = preparedSellOrder(signed.order);

@@ -47,6 +47,18 @@ export const evidenceFetcher: typeof fetch = (input, init) => {
   }
   return fetch(url, init);
 };
+export async function collectCurrentEvidence(chain: DashboardChain) {
+  const execution = clientFor(chain);
+  const deployment = await loadDeployment(chain).catch(() => undefined);
+  return collectEvidence({
+    vault: deployment?.vault,
+    marketClient177: market,
+    execClient: execution,
+    sizes: chain === 177 ? [0.1, 0.5, 1] : sizes,
+    decisionTtlSec: policy.decisionTtlSec ?? 120,
+    fetcher: evidenceFetcher,
+  });
+}
 export function EvidenceDetails({
   e,
   compact = false,

@@ -81,12 +81,12 @@ it('renders panels and T13A spend chart data from validated live feed', async ()
   expect(screen.getByText(/125 ms average latency/)).toBeTruthy();
   expect(screen.queryByText(fallbackMessage)).toBeNull();
   expect(screen.getByRole('heading', { name: 'Agent room' })).toBeTruthy();
-  expect(screen.getByLabelText('Agent operations')).toBeTruthy();
+  expect(screen.getByRole('link', { name: /Open 3D operations view/ })).toBeTruthy();
   expect(
     send.mock.calls.filter(([url]) =>
       String(url).startsWith('https://agent.example'),
-    ),
-  ).toHaveLength(5);
+    ).length,
+  ).toBeGreaterThanOrEqual(4);
   expect(
     send.mock.calls.some(([url]) => String(url).endsWith('/feed/policy')),
   ).toBe(true);

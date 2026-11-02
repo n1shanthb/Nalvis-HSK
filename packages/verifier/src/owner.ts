@@ -59,9 +59,10 @@ export async function verifyOwnerReceipt(
     });
     require('v4_owner_signatures', true);
     const o = r.authorization.order;
-    require('v4_confirmed_order', r.intent.type === 'SELL' &&
+    const direction = o.direction ?? 'SELL';
+    require('v4_confirmed_order', r.intent.type === direction &&
       r.intent.notionalB === o.notionalB &&
-      r.final.direction === 'SELL' &&
+      r.final.direction === direction &&
       r.final.kind === 'TRADE' &&
       r.final.tokenIn.toLowerCase() === o.tokenIn.toLowerCase() &&
       r.final.amountIn === BigInt(o.amountIn) &&

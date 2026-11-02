@@ -11,13 +11,14 @@ import type { Evidence, RuleTrace } from '../types.js';
 
 export type DeskIntent =
   | { kind: 'exit' }
+  | { kind: 'buy'; notionalB: string }
   | { kind: 'positions' }
   | { kind: 'spread' }
   | { kind: 'unknown' }
   | { kind: 'why'; verdict?: string; seq?: number }
   | { kind: 'change'; text: string };
 export const supportedCommands =
-  'Try: show positions, show P&L, why did you WAIT last, why REJECT #3, show spread, sell now, exit my position, set cap to 25, slippage 50 bps, pause, revoke.';
+  'Try: show positions, why did you WAIT last, buy 1 USDT of WHSK, sell now, set cap to 25, pause, revoke. BUY translates to an exact USDT amount for review; no request alone sends a trade.';
 /** Whole-input matching prevents accidentally interpreting extra instructions as an owner action. */
 export function parseIntent(input: string): DeskIntent {
   const t = input
@@ -31,6 +32,9 @@ export function parseIntent(input: string): DeskIntent {
     )
   )
     return { kind: 'exit' };
+  const buy = /^buy (\d+(?:\.\d+)?) usdt(?: of)? whsk$/.exec(t);
+  if (buy && Number.isFinite(Number(buy[1])) && Number(buy[1]) > 0)
+    return { kind: 'buy', notionalB: buy[1] };
   if (
     /^(show (positions|p&l)|how am i doing|mera (p&l|pnl|positions) dikhao|positions dikhao|munafa dikhao)$/.test(
       t,
@@ -89,6 +93,13 @@ export type DeskContext = {
     label: string;
     assumptions?: string;
   };
+  latestAction?: {
+    at: number;
+    kind: string;
+    trail: string;
+    txHash?: string;
+  };
+  recentActions?: { at: number; kind: string; trail: string; txHash?: string }[];
 };
 export type DeskReply = {
   intent: DeskIntent;
@@ -107,6 +118,11 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
       message:
         'Review your current WHSK position and a fresh sell quote below. No order has been sent.',
     };
+  if (intent.kind === 'buy')
+    return {
+      intent,
+      message: `Review a fresh quote to buy WHSK with ${intent.notionalB} USDT below. No order has been sent.`,
+    };
   const answer = (message: string): DeskReply => ({ intent, message });
   if (intent.kind === 'unknown')
     return answer(`I couldn't recognise that command. ${supportedCommands}`);
@@ -119,6 +135,12 @@ export function desk(input: string, context: DeskContext = {}): DeskReply {
     );
   }
   if (intent.kind === 'why') {
+    const observed = intent.seq === undefined
+      ? [...(context.recentActions ?? [])].sort((a, b) => b.at - a.at)
+          .find((a) => !intent.verdict || intent.verdict === a.kind)
+      : undefined;
+    if (observed)
+      return answer(`Latest observed ${observed.kind} at ${new Date(observed.at * 1000).toISOString()}: ${observed.trail}${observed.txHash ? ` Transaction: ${observed.txHash}` : ''}. This feed observation is not an independently replayed receipt.`);
     const r = [...(context.receipts ?? [])]
       .sort((a, b) => (a.seq < b.seq ? 1 : -1))
       .find(

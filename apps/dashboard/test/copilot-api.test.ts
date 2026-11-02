@@ -10,6 +10,7 @@ import {
 import {
   sellActionFor,
   sellPreview,
+  buyPreview,
 } from '../../../packages/core/src/agent/owner-preview.js';
 import {
   sellSessionMessage,
@@ -80,6 +81,28 @@ it('accepts only an explicit same-origin confirmation carrying both valid owner 
   expect(
     (await f.handler(f.post({ op: 'confirm', signed: f.signed }))).status,
   ).toBe(202);
+  expect(f.queue.enqueue).toHaveBeenCalledTimes(1);
+});
+it('passes exact BUY size to preview and queues only a separately signed confirmation', async () => {
+  const f = await setup();
+  f.deps.preview.mockResolvedValue({ executable: false, reason: 'review only' });
+  const state = fixtureState();
+  const delegation = { ...f.signed.delegation, scope: 'TRADE_WITHIN_MANDATE' as const };
+  const action = { type: 'BUY' as const, notionalB: '1', urgency: 'now' as const, reason: 'Owner-confirmed Copilot buy' };
+  const preview = buyPreview(state, await quote(action, state), delegation, '1');
+  const response = await f.handler(f.post({ op: 'preview', session: delegation, direction: 'BUY', notionalB: '1' }));
+  expect(response.status).toBe(200);
+  expect(f.deps.preview).toHaveBeenCalledWith(delegation, { direction: 'BUY', notionalB: '1' });
+  expect(f.queue.enqueue).not.toHaveBeenCalled();
+  const owner = mnemonicToAccount('test test test test test test test test test test test junk');
+  const browser = mnemonicToAccount('test test test test test test test test test test test junk', { addressIndex: 9 });
+  const signed = {
+    delegation,
+    order: preview.order,
+    ownerSignature: await owner.signMessage({ message: sellSessionMessage(delegation) }),
+    orderSignature: await browser.signMessage({ message: { raw: hash(preview.order) } }),
+  };
+  expect((await f.handler(f.post({ op: 'confirm', signed }))).status).toBe(202);
   expect(f.queue.enqueue).toHaveBeenCalledTimes(1);
 });
 it('rejects forged, expired, changed-order and cross-origin requests without enqueuing', async () => {

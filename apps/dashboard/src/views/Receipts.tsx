@@ -132,14 +132,9 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
               ))}
               <code>{log.args.receiptHash}</code>
               <p>
-                <a href={`#/verify?tx=${log.transactionHash}`}>
-                  Verify receipt →
-                </a>
-              </p>
-              <p>
                 {href ? (
                   <a href={href} target="_blank" rel="noreferrer">
-                    Transaction ↗
+                    View transaction on Blockscout ↗
                   </a>
                 ) : (
                   `Local Anvil transaction ${log.transactionHash}`
