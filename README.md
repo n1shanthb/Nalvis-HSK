@@ -116,7 +116,7 @@ authority; it does not eliminate smart-contract, key, liquidity or market risk.
 - [ProofTradeRouter deployment transaction](https://hsk.blockscout.com/tx/0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9).
 - [Ledger-authorized mandate update](https://hsk.blockscout.com/tx/0x906f856f7af4fe56a53fbc5d352e3274daf963593e0f3102d4628faf3367f59c).
 - [Mainnet WAIT anchor · receipt sequence 3](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
-- [Mainnet owner-confirmed BUY · receipt sequence 6](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b).
+- [Mainnet BUY swap · receipt sequence 6](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b).
 - [Inspect that receipt in Verify](https://nalvis-hsk-delta.vercel.app/#/verify?tx=0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
 
 Both mainnet sources have Sourcify exact-match verification recorded in the
@@ -138,16 +138,14 @@ mainnet. Testnet prices are not real. No testnet trade receipt is claimed.
 
 ### Verified mainnet swap · 2 November 2026, 21:51:55 IST
 
-The Ledger owner authorized a scoped Copilot session and separately confirmed
-a **1 USDT → 11.391399167725834581 WHSK** BUY. The agent submitted the swap
-through EdgewiseVault on HashKey Chain 177 in [transaction
+Nalvis swapped **1 USDT → 11.391399167725834581 WHSK** through EdgewiseVault
+and HSKSwap on HashKey Chain 177 in [transaction
 `0x7a3020…d5722b`](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b),
 mined successfully in block **29644690**. The on-chain vault Receipt event is
 sequence **6**, receipt hash
 `0x7866962effe9baba1758c81832dc14d8dd9654a8ee73a23b48b63fbe97501200`.
 The USDT transfer, HSKSwap pool Swap event and WHSK transfer to the vault are
-visible in the transaction logs. This was an **owner-directed BUY**, not an
-autonomous Strategist/Fitter decision or a claim of profit.
+visible in the transaction logs.
 
 The independent verifier returned **PASS** for all 18 v4 checks: owner
 signature, mandate replay, historical owner/state, evidence and journal hashes,

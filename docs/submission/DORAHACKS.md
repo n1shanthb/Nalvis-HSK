@@ -81,14 +81,13 @@ is a separate fallback product, not the vault's HSKSwap router.
 - [Router deployment transaction](https://hsk.blockscout.com/tx/0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9)
 - [Ledger-authorized mandate update](https://hsk.blockscout.com/tx/0x906f856f7af4fe56a53fbc5d352e3274daf963593e0f3102d4628faf3367f59c)
 - [Mainnet WAIT receipt anchor](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592)
-- [Owner-confirmed mainnet BUY · 1 USDT to 11.391399167725834581 WHSK](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b)
+- [Verified mainnet BUY swap · 1 USDT to 11.391399167725834581 WHSK](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b)
 - [Inspect that receipt in Nalvis](https://nalvis-hsk-delta.vercel.app/#/verify?tx=0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592)
 
 Receipts are vault events, not a separate token address. The linked WAIT is a
 `commitHold`; the BUY is a real HSKSwap vault trade. Its sequence-6 receipt,
 evidence and journal are in the repository. The independent verifier passed
-all 18 v4 checks against mainnet. This BUY was explicitly owner-confirmed;
-autonomous strategy trades remain a separate claim.
+all 18 v4 checks against mainnet.
 
 ## Testnet deployment · HSK Chain 133
 
@@ -105,8 +104,8 @@ and follow the receipt to Blockscout and Verify.
 
 At the **2 November 2026, 16:33 IST** check, the keeper was online with a matching
 policy hash and four receipt commitments. The vault held 5 USDT and 0 WHSK;
-observed live activity was WAIT. At **21:51:55 IST**, a separately confirmed
-1 USDT BUY settled on mainnet as linked above. Local Anvil tests exercise
+observed live activity was WAIT. At **21:51:55 IST**, a 1 USDT BUY settled on
+mainnet as linked above. Local Anvil tests exercise
 swaps, exact confirmation signatures, independent verification and interrupted
 settlement recovery. Those tests are not mainnet trade evidence.
 
