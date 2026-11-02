@@ -90,6 +90,16 @@ it('OpenRouter uses JSON mode, configured model, headers and actual returned mod
     });
   }
 });
+it('routes Haiku without temperature and preserves MiMo temperature for the fitter', async () => {
+  const send = vi.fn<typeof fetch>(async () => Response.json({ model: 'returned', choices: [{ message: { content: '{}' } }], usage: { cost: 0.001 } }));
+  const provider = openRouter({ AGENT_OPENROUTER_API_KEY: 'test-only-placeholder', STRATEGIST_MODEL: 'anthropic/claude-haiku-5.5', FITTER_MODEL: 'xiaomi/mimo-v2.6-flash' }, send);
+  await provider.complete({ role: 'strategist', system: 'system', input: '{}' });
+  await provider.complete({ role: 'fitter', system: 'system', input: '{}' });
+  const bodies = send.mock.calls.map(([, options]) => JSON.parse(String(options?.body)));
+  expect(bodies[0]).not.toHaveProperty('temperature');
+  expect(bodies[0].provider).toEqual({ require_parameters: true });
+  expect(bodies[1]).toMatchObject({ model: 'xiaomi/mimo-v2.6-flash', temperature: 0, response_format: { type: 'json_object' } });
+});
 it('retries once on 429, 5xx and timeout, never exposes provider errors', async () => {
   for (const first of [429, 503, 'timeout']) {
     let calls = 0;

@@ -96,7 +96,10 @@ export function openRouter(
                   { role: 'system', content: request.system },
                   { role: 'user', content: request.input },
                 ],
-                temperature: 0,
+                // Haiku 5.5 endpoints reject temperature with strict routing.
+                ...(model === 'anthropic/claude-haiku-5.5'
+                  ? {}
+                  : { temperature: 0 }),
                 response_format: { type: 'json_object' },
                 provider: { require_parameters: true },
                 reasoning: { effort: 'low', exclude: true },
