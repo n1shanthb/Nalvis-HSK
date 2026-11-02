@@ -8,6 +8,10 @@ monitors markets and can execute inside that mandate without requiring a new
 hardware signature on every autonomous trade. The owner can pause or revoke
 authority. Decisions leave inspectable evidence and hash-chained receipts.
 
+**The distinctive combination:** a Ledger-owned mainnet vault, a live LLM
+Strategist and Fitter, and contract-enforced limits around every agent action.
+Judges can inspect the running agent, its mandate and its on-chain decisions.
+
 Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 
 [Live app](https://nalvis-hsk-delta.vercel.app/) ·
@@ -15,6 +19,10 @@ Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 [Vault explorer](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521) ·
 [DoraHacks copy](docs/submission/DORAHACKS.md) ·
 [Video script](docs/submission/VIDEO-SCRIPT.md)
+
+**Verify in three steps:** [watch the mainnet agent](https://nalvis-hsk-delta.vercel.app/#/agent),
+[inspect the Ledger-owned vault](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521),
+then [inspect a WAIT receipt](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
 
 ### Live mainnet agent
 
