@@ -5,6 +5,7 @@ import {
 } from '../../../../packages/core/src/agent/journal.js';
 import {
   readFeedJSON,
+  agentFeedBase,
   selectedChain,
   snapshotFor,
   stateSchema,
@@ -15,7 +16,7 @@ import type { DashboardChain } from '../lib/clients.js';
 const hash = /^0x[\da-f]{64}$/i;
 /** Browser read-only artifact store. Hashes/replay are checked by the existing v3 verifier. */
 export async function verificationStore(
-  base = import.meta.env.VITE_AGENT_FEED_URL,
+  base = agentFeedBase(),
   chain: DashboardChain = selectedChain(),
   onSource?: (source: 'live' | 'snapshot') => void,
 ): Promise<Store> {
@@ -142,7 +143,7 @@ export async function receiptForTransaction(
   chain: DashboardChain = selectedChain(),
 ): Promise<unknown> {
   const snapshotBase = snapshotFor(chain);
-  const base = import.meta.env.VITE_AGENT_FEED_URL;
+  const base = agentFeedBase();
   if (base)
     try {
       validateFeedChain(

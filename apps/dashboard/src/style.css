@@ -1,4 +1,104 @@
 /* Nalvis foundations: shared geometry, distinct marketing and workspace surfaces. */
+.agent-pulse {
+  margin: 24px 0;
+  padding: 24px;
+}
+.pulse-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.pulse-heading h2 {
+  margin: 4px 0 20px;
+}
+.pulse-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block: 1px solid var(--line);
+  padding: 20px 0;
+  gap: 20px;
+}
+.pulse-metrics span,
+.pulse-metrics strong {
+  display: block;
+}
+.pulse-metrics span,
+.agent-pulse small {
+  color: var(--muted);
+}
+.pulse-metrics strong {
+  margin-top: 8px;
+  font-size: clamp(18px, 2vw, 26px);
+  font-variant-numeric: tabular-nums;
+}
+.pulse-rationale {
+  margin: 24px 0;
+  padding: 20px;
+  border-left: 3px solid var(--accent);
+  background: var(--raised);
+}
+.pulse-rationale > p:not(.micro-label) {
+  font-size: 18px;
+  line-height: 1.65;
+}
+.pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+.pulse-model {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.pulse-chart {
+  width: 100%;
+  min-height: 140px;
+  color: var(--accent);
+}
+.pulse-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+}
+.pulse-watches ul {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.pulse-watches li {
+  border: 1px solid var(--line);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.pulse-watches li > * {
+  display: block;
+}
+.pulse-watches span {
+  margin: 8px 0;
+}
+@media (max-width: 767px) {
+  .agent-pulse {
+    padding: 16px;
+  }
+  .pulse-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pulse-grid,
+  .pulse-watches ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pulse-heading {
+    align-items: flex-start;
+  }
+  .pulse-rationale > p:not(.micro-label) {
+    font-size: 16px;
+  }
+}
 @font-face {
   font-family: Syne;
   src: url('/fonts/syne-latin-variable.woff2') format('woff2');
@@ -1595,15 +1695,51 @@ progress {
   }
 }
 /* Read-only observation panels must contain long keeper artifacts on small screens. */
-.feed-status { padding: 1rem; border: 1px solid var(--line, #d3d6d9); margin-block: 1rem; }
-.decision-timeline { padding-inline-start: 1.5rem; }
-.decision-timeline > li { margin-block: 1rem; }
-.decision-history, .decision-history .activity-row, .decision-history .activity-detail { min-width: 0; }
-.decision-history summary { flex-wrap: wrap; }
-.decision-history pre { max-width: 100%; max-height: 28rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.decision-history code, .mandate-groups dd, .technical-details dd { overflow-wrap: anywhere; word-break: break-word; }
-.decision-explanation { white-space: pre-wrap; overflow-wrap: anywhere; }
-.decision-history summary:focus-visible, .feed-status summary:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.feed-status {
+  padding: 1rem;
+  border: 1px solid var(--line, #d3d6d9);
+  margin-block: 1rem;
+}
+.decision-timeline {
+  padding-inline-start: 1.5rem;
+}
+.decision-timeline > li {
+  margin-block: 1rem;
+}
+.decision-history,
+.decision-history .activity-row,
+.decision-history .activity-detail {
+  min-width: 0;
+}
+.decision-history summary {
+  flex-wrap: wrap;
+}
+.decision-history pre {
+  max-width: 100%;
+  max-height: 28rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.decision-history code,
+.mandate-groups dd,
+.technical-details dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.decision-explanation {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.decision-history summary:focus-visible,
+.feed-status summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
 @media (max-width: 600px) {
-  .decision-history .activity-row summary { display: flex; gap: .75rem; flex-wrap: wrap; }
+  .decision-history .activity-row summary {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
 }

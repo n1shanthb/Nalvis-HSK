@@ -1,7 +1,11 @@
 import { useCallback } from 'react';
 import { receiptV3Schema } from '../../../../packages/core/src/agent/receipt.js';
 import { parseEvidenceJSON } from '../../../../packages/core/src/serialization.js';
-import { readFeedJSON, snapshotFor } from '../agent/feed-client.js';
+import {
+  agentFeedBase,
+  readFeedJSON,
+  snapshotFor,
+} from '../agent/feed-client.js';
 import {
   displayTime,
   loadDeployment,
@@ -17,7 +21,7 @@ export async function readDecisionArtifacts(
   if (!/^0x[\da-f]{64}$/i.test(receiptHash))
     throw Error('Invalid receipt hash');
   const live = provenance === 'live';
-  const base = live ? import.meta.env.VITE_AGENT_FEED_URL : '';
+  const base = live ? agentFeedBase() : '';
   if (live && !base) throw Error('Live artifact feed is not configured');
   const path = (kind: string, hash: string) =>
     live

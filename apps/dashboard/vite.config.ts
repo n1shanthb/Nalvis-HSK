@@ -1,5 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createDeskHandler } from './server/desk.js';
+import { createAgentFeedHandler } from './server/agent-feed.js';
+import { demoFeedUpstream } from './server/demo-feed.js';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 const root = resolve(import.meta.dirname, '../..');
@@ -57,6 +59,19 @@ export default defineConfig({
     {
       name: 'desk-server',
       configureServer(server) {
+        const agentFeed = createAgentFeedHandler(
+          process.env.AGENT_FEED_UPSTREAM ?? demoFeedUpstream,
+        );
+        server.middlewares.use('/api/agent', async (req, res) => {
+          const response = await agentFeed(
+            new Request(`http://localhost/api/agent${req.url ?? ''}`, {
+              method: req.method,
+            }),
+          );
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => res.setHeader(key, value));
+          res.end(await response.text());
+        });
         const handle = createDeskHandler({
           ...loadEnv(server.config.mode, root, ''),
           ...process.env,

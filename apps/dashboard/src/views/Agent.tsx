@@ -7,6 +7,7 @@ import { fallbackMessage } from '../agent/feed-client.js';
 import { FeedStatus } from '../components/FeedStatus.js';
 import { DecisionHistory } from '../components/DecisionHistory.js';
 import { CurrentMandate } from '../components/CurrentMandate.js';
+import { AgentPulse } from '../components/AgentPulse.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
   displayTime,
@@ -55,12 +56,16 @@ export function AgentView({
       </p>
       <Readiness feed={feed} demo={state?.mode === 'demo'} chain={chain} />
       <FeedStatus observation={observation} />
+      <AgentPulse observation={observation} />
       {state?.mode !== 'demo' && <CurrentMandate chain={chain} />}
-      <DecisionHistory
-        actions={feed?.actions ?? []}
-        chain={chain}
-        provenance={observation.provenance}
-      />
+      <details className="secondary-section">
+        <summary>Full decision history & negotiation</summary>
+        <DecisionHistory
+          actions={feed?.actions ?? []}
+          chain={chain}
+          provenance={observation.provenance}
+        />
+      </details>
       {unreachable && <p role="status">{fallbackMessage}</p>}
       <OperationView feed={feed} />
       <div className="agent-workspace">

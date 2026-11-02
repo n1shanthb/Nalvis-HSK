@@ -4,6 +4,7 @@ import { formatUnits } from 'viem';
 import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { FeedStatus } from '../components/FeedStatus.js';
+import { AgentPulse } from '../components/AgentPulse.js';
 import { MandateDetails } from './Mandate.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import { useResource } from '../lib/useResource.js';
@@ -51,6 +52,7 @@ export default function WorkspaceOverview({
       </div>
       <Readiness feed={feed} demo={demo} chain={chain} />
       <FeedStatus observation={observation} />
+      {!demo && <AgentPulse observation={observation} compact />}
       <section className="next-action">
         <p className="eyebrow">NEXT ACTION</p>
         <h2>
