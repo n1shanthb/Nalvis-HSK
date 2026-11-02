@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { canonical } from '../../../packages/core/src/canonical.js';
 import {
   assertSellAuthorization,
   sellSessionSchema,
@@ -16,7 +15,8 @@ export function createCopilotHandler(
   },
 ) {
   const json = (body: unknown, status = 200) =>
-    new Response(canonical(body), {
+    new Response(JSON.stringify(body, (_key, value) =>
+      typeof value === 'bigint' ? value.toString() : value), {
       status,
       headers: {
         'Content-Type': 'application/json',
