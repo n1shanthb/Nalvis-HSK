@@ -1,0 +1,68 @@
+[
+  {
+    "id": "intro-slide",
+    "start": 0,
+    "duration": 8,
+    "midpoint": 4
+  },
+  {
+    "id": "s01-agent",
+    "start": 8,
+    "duration": 16,
+    "midpoint": 16
+  },
+  {
+    "id": "s02-market",
+    "start": 24,
+    "duration": 9,
+    "midpoint": 28.5
+  },
+  {
+    "id": "s03-mandate",
+    "start": 33,
+    "duration": 10,
+    "midpoint": 38
+  },
+  {
+    "id": "s04-operations",
+    "start": 43,
+    "duration": 8,
+    "midpoint": 47
+  },
+  {
+    "id": "s05-activity",
+    "start": 51,
+    "duration": 10,
+    "midpoint": 56
+  },
+  {
+    "id": "s06-copilot",
+    "start": 61,
+    "duration": 9,
+    "midpoint": 65.5
+  },
+  {
+    "id": "s07-swap-proof",
+    "start": 70,
+    "duration": 19,
+    "midpoint": 79.5
+  },
+  {
+    "id": "s08-verifier",
+    "start": 89,
+    "duration": 12,
+    "midpoint": 95
+  },
+  {
+    "id": "s09-architecture",
+    "start": 101,
+    "duration": 11,
+    "midpoint": 106.5
+  },
+  {
+    "id": "outro-slide",
+    "start": 112,
+    "duration": 8,
+    "midpoint": 116
+  }
+]
