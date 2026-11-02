@@ -59,7 +59,9 @@ inside the signed envelope without unrestricted custody of the owner's key.
 
 - **Ledger-governed mandate:** agent identity, expiry, per-token trade caps,
   rolling daily turnover, exposure, slippage, drawdown and minimum interval.
-  Owner controls include pause, unpause, revoke and withdrawal.
+  Owner controls include pause, unpause, revoke and withdrawal. **Revoke
+  immediately removes the agent's trading authority on-chain**; a queued or
+  future agent order cannot bypass the revoked mandate.
 - **Strategist + Fitter:** the strategist proposes actions and market watches;
   the fitter negotiates a compliant proposal. Deterministic checks, simulation
   and the vault govern execution. The LLM never signs transactions or creates
@@ -180,6 +182,23 @@ live vault/keeper, not automatic multi-tenant provisioning.
 
 Solidity / Foundry · TypeScript / viem / zod / Vitest · React 19 / Vite · Ledger
 WebHID · OpenRouter · OCI Docker keeper · Vercel · Upstash Redis.
+
+### Test evidence
+
+**643 passing tests across the current Foundry, dashboard, core and verifier
+suites** in a local run on 2 November 2026: 163 Foundry, 212 dashboard, 205
+core and 63 verifier. There were no failures in those four suites. Eight
+RPC-dependent Foundry tests and six TypeScript tests were skipped because their
+fork/Anvil prerequisites were not supplied in that run. The separate keeper
+suite includes Linux `flock` and `/proc` lifecycle tests and is checked in CI;
+it is excluded from this local aggregate.
+
+Earlier [mainnet-readiness rehearsals](docs/MAINNET_READINESS.md) exercised a
+pinned **mainnet fork** with real token decimals and a **testnet fork** covering
+trade, resize, hold and pause/revoke behavior. Local Anvil integration also
+mined and independently verified owner-directed BUY and SELL receipts on local
+chain IDs 31337 and 177, including tamper and replay rejection. Fork and local
+Anvil transactions were simulations, not mainnet broadcasts or profit proof.
 
 Requirements: Node 22, pnpm 9, Foundry and initialized submodules.
 
