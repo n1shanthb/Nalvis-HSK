@@ -150,3 +150,23 @@ it('does not enqueue on a preview, or when the operator has not enabled command 
   ).toBe(503);
   expect(f.queue.enqueue).not.toHaveBeenCalled();
 });
+
+it('serializes optional BUY-only review fields without turning a valid preview into 400', async () => {
+  const f = await setup();
+  f.deps.preview.mockResolvedValue({
+    executable: true,
+    buyUSDT: '1',
+    expectedWHSK: '10',
+    sellWHSK: undefined,
+    expectedUSDT: undefined,
+    feePpm: 3000n,
+  });
+  const response = await f.handler(f.post({
+    op: 'preview', session: f.signed.delegation, direction: 'BUY', notionalB: '1',
+  }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    executable: true, buyUSDT: '1', expectedWHSK: '10', feePpm: '3000',
+  });
+  expect(f.queue.enqueue).not.toHaveBeenCalled();
+});
