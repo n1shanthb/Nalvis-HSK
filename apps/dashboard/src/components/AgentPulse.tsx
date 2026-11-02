@@ -4,6 +4,7 @@ import type { FeedObservation } from '../agent/useAgentFeed.js';
 import { agentFeedBase, readFeedJSON } from '../agent/feed-client.js';
 import { displayTime } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
+import { readStrategyNotes } from '../agent/strategy-notes.js';
 
 const policySummary = z.object({
   executionChainId: z.number(),
@@ -25,6 +26,20 @@ export function AgentPulse({
   const { feed, provenance, connection } = observation;
   const actions = [...(feed?.actions ?? [])].sort((a, b) => a.at - b.at);
   const latest = actions.at(-1);
+  const strategistHash = latest?.rounds
+    .filter(
+      (round) =>
+        round.role === 'strategist' &&
+        round.round === 0 &&
+        round.summary === 'Validated response recorded',
+    )
+    .at(-1)?.outputHash;
+  const strategyNotes = useResource(
+    useCallback(async () => {
+      if (provenance !== 'live' || !strategistHash) return null;
+      return readStrategyNotes(strategistHash);
+    }, [provenance, strategistHash]),
+  );
   const policy = useResource(
     useCallback(async () => {
       if (provenance !== 'live' || !feed) return null;
@@ -103,6 +118,28 @@ export function AgentPulse({
       <div className="pulse-grid">
         <div>
           <h3>Strategy & execution</h3>
+          {strategyNotes.data && (
+            <article className="recorded-thesis">
+              <p className="micro-label">LATEST RECORDED STRATEGY THESIS</p>
+              <p>{strategyNotes.data.thesis}</p>
+              <p>
+                Model-reported confidence:{' '}
+                {Math.round(strategyNotes.data.confidence * 100)}% (not a win
+                probability).
+              </p>
+              <ul>
+                {strategyNotes.data.signals.map((signal, i) => (
+                  <li key={i}>{signal}</li>
+                ))}
+              </ul>
+            </article>
+          )}
+          {strategyNotes.error && (
+            <small>
+              The detailed strategy output could not be loaded. The recorded
+              decision rationale remains above.
+            </small>
+          )}
           <p>
             The strategist chooses direction, timing and size within the signed
             mandate. The fitter negotiates compliant proposals; deterministic
