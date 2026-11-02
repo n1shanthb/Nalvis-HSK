@@ -10,13 +10,14 @@ import type { Policy, Mandate } from '../policy.js';
 import type { Evidence, RuleTrace } from '../types.js';
 
 export type DeskIntent =
+  | { kind: 'exit' }
   | { kind: 'positions' }
   | { kind: 'spread' }
   | { kind: 'unknown' }
   | { kind: 'why'; verdict?: string; seq?: number }
   | { kind: 'change'; text: string };
 export const supportedCommands =
-  'Try: show positions, show P&L, why did you WAIT last, why REJECT #3, show spread, set cap to 25, slippage 50 bps, pause, revoke.';
+  'Try: show positions, show P&L, why did you WAIT last, why REJECT #3, show spread, sell now, exit my position, set cap to 25, slippage 50 bps, pause, revoke.';
 /** Whole-input matching prevents accidentally interpreting extra instructions as an owner action. */
 export function parseIntent(input: string): DeskIntent {
   const t = input
@@ -24,6 +25,12 @@ export function parseIntent(input: string): DeskIntent {
     .toLowerCase()
     .replace(/[?!.]+$/, '')
     .replace(/\s+/g, ' ');
+  if (
+    /^(sell now|exit my position|close my position|sell all whsk|exit position)$/.test(
+      t,
+    )
+  )
+    return { kind: 'exit' };
   if (
     /^(show (positions|p&l)|how am i doing|mera (p&l|pnl|positions) dikhao|positions dikhao|munafa dikhao)$/.test(
       t,
@@ -94,6 +101,12 @@ export type DeskReply = {
 /** Pure read-only desk: no transport, wallet, account or execution callback is accepted. */
 export function desk(input: string, context: DeskContext = {}): DeskReply {
   const intent = parseIntent(input);
+  if (intent.kind === 'exit')
+    return {
+      intent,
+      message:
+        'Review your current WHSK position and a fresh sell quote below. No order has been sent.',
+    };
   const answer = (message: string): DeskReply => ({ intent, message });
   if (intent.kind === 'unknown')
     return answer(`I couldn't recognise that command. ${supportedCommands}`);

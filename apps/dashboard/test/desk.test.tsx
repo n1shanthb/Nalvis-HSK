@@ -52,11 +52,11 @@ it('hands the exact desk proposal to the owner review callback without signing',
   });
   await waitFor(() =>
     expect(
-      (screen.getByRole('button', { name: 'Ask desk' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: 'Ask Copilot' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Ask desk' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   fireEvent.click(await screen.findByText('Review exact proposal with Ledger'));
   expect(onProposal).toHaveBeenCalledOnce();
   expect(onProposal.mock.calls[0][0]).toMatchObject({

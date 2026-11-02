@@ -153,7 +153,6 @@ v1 receipt projection or golden-file contract. `sources.keeperState` continues
 to record the execution snapshot. See `packages/verifier/README.md` for failure
 semantics and execution-unit comparisons.
 
-
 ## T8 desk, expiry and worst-case stress (review fixes)
 
 `pnpm build && pnpm nalvis desk "show P&L" --demo` verifies the new v2 Anvil
@@ -204,3 +203,7 @@ The autonomous path lives in [agent/README.md](src/agent/README.md). It preserve
 the existing v1/v2 rule engine and receipt hashes. New consumers import the server
 library from `src/agent/index.ts`; v3 receipt builders are also re-exported from
 `receipt.ts`. The always-on service and dashboard integration are T12B.
+
+Owner-directed Copilot execution uses a separate receipt v4. Its exact hash
+field list, session authorization and recovery protocol are documented in
+[docs/COPILOT.md](../../docs/COPILOT.md). Autonomous v3 hashes are unchanged.

@@ -9,7 +9,7 @@ import { snapshot, vault, owner } from './ux-fixtures.js';
 test('drawer makes background inert, closes with document Escape, and restores focus', async () => {
   window.history.replaceState(null, '', '?demo=1#/agent');
   render(<App initialRoute="agent" />);
-  const trigger = screen.getByRole('button', { name: 'AI desk' });
+  const trigger = screen.getByRole('button', { name: 'Nalvis Copilot' });
   trigger.focus();
   fireEvent.click(trigger);
   await screen.findByRole('dialog');

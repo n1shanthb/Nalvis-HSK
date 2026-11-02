@@ -189,6 +189,8 @@ it.skipIf(!hasAnvil)(
       });
       rpc.clients.quote = h.quote;
       rpc.clients.send = async (r) => {
+        if (r.version !== 3)
+          throw Error('This fixture exercises autonomous v3 receipts');
         const result = await send(r);
         mined = r;
         if (gateEnabled) {

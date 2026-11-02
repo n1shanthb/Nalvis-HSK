@@ -8,6 +8,7 @@ import type {
   ReceiptV3,
 } from '../../core/src/agent/index.js';
 import type { AgentFeed, AgentState, ActionView } from './agent-feed-types.js';
+import type { OwnerReceipt } from '../../core/src/agent/owner-receipt.js';
 export type { AgentFeed, AgentState } from './agent-feed-types.js';
 export const json = (value: unknown) =>
   JSON.stringify(value, (_, v: unknown) =>
@@ -32,7 +33,9 @@ export async function projectFeed(
     wake.push(e);
     if (e.type !== 'ACTION') continue;
     const r = e.data.receiptHash
-      ? await store.read<ReceiptV3>(`receipts/${e.data.receiptHash}.json`)
+      ? await store.read<ReceiptV3 | OwnerReceipt>(
+          `receipts/${e.data.receiptHash}.json`,
+        )
       : undefined;
     actions.push({
       at: e.at,
@@ -47,7 +50,7 @@ export async function projectFeed(
         minOut: String(e.data.minOut ?? 0),
       },
       trail: r?.fit.trail ?? String(e.data.reason ?? ''),
-      rounds: wake
+      rounds: (r?.version === 4 ? [] : wake)
         .filter((e) => e.type === 'LLM_CALL')
         .map((e) => ({
           role: String(e.data.role),
@@ -57,7 +60,7 @@ export async function projectFeed(
             : 'Response rejected',
           outputHash: String(e.data.outputHash),
         })),
-      violations: wake
+      violations: (r?.version === 4 ? [] : wake)
         .filter((e) => e.type === 'MANDATE_CHECK')
         .flatMap((e) => (e.data.violations ?? []) as ActionView['violations']),
       ...(e.data.txHash ? { txHash: String(e.data.txHash) } : {}),

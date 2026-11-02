@@ -157,7 +157,11 @@ export async function localVault(chainId: 31337 | 177 = 31337) {
     },
     simulate: (s: MandateState, p: Parameters<typeof simulate>[2], h?: Hex) =>
       simulate(client, s, p, h),
-    async send(r: import('../../src/agent/receipt.js').ReceiptV3) {
+    async send(
+      r:
+        | import('../../src/agent/receipt.js').ReceiptV3
+        | import('../../src/agent/owner-receipt.js').OwnerReceipt,
+    ) {
       if (
         (await client.getChainId()) !== chainId ||
         !url.startsWith('http://127.0.0.1:')

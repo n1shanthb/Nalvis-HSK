@@ -53,7 +53,7 @@ export function DeskDrawer({
         className="desk-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="AI desk"
+        aria-label="Nalvis Copilot"
       >
         {children}
       </aside>

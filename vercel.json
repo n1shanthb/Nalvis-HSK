@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "corepack pnpm install --frozen-lockfile",
-  "buildCommand": "VITE_EXECUTION_CHAIN=177 VITE_ENABLE_OWNER=true VITE_DEMO_MODE=false corepack pnpm --filter @nalvis/dashboard build",
+  "buildCommand": "VITE_EXECUTION_CHAIN=177 VITE_MAINNET_EXECUTION=true VITE_ENABLE_OWNER=true VITE_DEMO_MODE=false corepack pnpm --filter @nalvis/dashboard build",
   "outputDirectory": "apps/dashboard/dist",
   "framework": "vite",
   "functions": {
@@ -13,6 +13,9 @@
     },
     "api/agent.ts": {
       "maxDuration": 10
+    },
+    "api/copilot.ts": {
+      "maxDuration": 60
     }
   }
 }

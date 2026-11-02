@@ -190,11 +190,11 @@ export function createDeskHandler(
             { role: 'system', content: system },
             { role: 'user', content: input.text },
           ],
-          temperature: 0,
+          ...(model === 'anthropic/claude-haiku-5.5' ? {} : { temperature: 0 }),
           response_format: { type: 'json_object' },
           ...(input.provider === 'groq'
             ? { max_completion_tokens: 256 }
-            : { max_tokens: 256 }),
+            : { max_tokens: 512, reasoning: { effort: 'low', exclude: true } }),
         }),
         signal: AbortSignal.timeout(12000),
       });

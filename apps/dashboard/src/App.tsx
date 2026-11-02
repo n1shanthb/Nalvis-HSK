@@ -1,5 +1,6 @@
 import { DeskDrawer } from './components/DeskDrawer.js';
 import { LedgerProvider } from './owner/LedgerContext.js';
+import { CopilotSessionProvider } from './owner/CopilotSession.js';
 import { MainnetOwner } from './owner/MainnetOwner.js';
 import { DemoMandate } from './owner/DemoMandate.js';
 import { Header } from './components/Header.js';
@@ -159,6 +160,9 @@ function AppContent({
                     />
                   ) : route === 'desk' ? (
                     <DeskView
+                      allowTrading={
+                        enableOwner && !publicView && !demo && chain === 177
+                      }
                       demo={demo}
                       chain={chain}
                       onProposal={
@@ -256,10 +260,13 @@ function AppContent({
                     setProposal(undefined);
                   }}
                 >
-                  Close desk
+                  Close Copilot
                 </button>
                 <Suspense fallback={<p>Loading desk…</p>}>
                   <DeskView
+                    allowTrading={
+                      enableOwner && !publicView && !demo && chain === 177
+                    }
                     demo={demo}
                     chain={chain}
                     onProposal={
@@ -290,7 +297,9 @@ function AppContent({
 export function App(props: React.ComponentProps<typeof AppContent>) {
   return (
     <LedgerProvider>
-      <AppContent {...props} />
+      <CopilotSessionProvider>
+        <AppContent {...props} />
+      </CopilotSessionProvider>
     </LedgerProvider>
   );
 }

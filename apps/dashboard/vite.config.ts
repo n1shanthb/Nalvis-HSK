@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { createDeskHandler } from './server/desk.js';
 import { createAgentFeedHandler } from './server/agent-feed.js';
+import { createCopilotHandler } from './server/copilot.js';
 import { demoFeedUpstream } from './server/demo-feed.js';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
@@ -63,6 +64,47 @@ export default defineConfig({
           ...loadEnv(server.config.mode, root, ''),
           ...process.env,
         };
+        const copilot = createCopilotHandler(feedEnvironment);
+        server.middlewares.use('/api/copilot', async (req, res) => {
+          try {
+            const chunks: Buffer[] = [];
+            let size = 0;
+            for await (const chunk of req) {
+              size += chunk.length;
+              if (size > 16384) {
+                res.statusCode = 413;
+                res.end();
+                return;
+              }
+              chunks.push(Buffer.from(chunk));
+            }
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(req.headers))
+              if (value)
+                headers.set(
+                  key,
+                  Array.isArray(value) ? value.join(',') : value,
+                );
+            const response = await copilot(
+              new Request(
+                `http://${req.headers.host}/api/copilot${req.url ?? ''}`,
+                {
+                  method: req.method,
+                  headers,
+                  ...(req.method === 'POST'
+                    ? { body: Buffer.concat(chunks).toString('utf8') }
+                    : {}),
+                },
+              ),
+            );
+            res.statusCode = response.status;
+            response.headers.forEach((value, key) => res.setHeader(key, value));
+            res.end(await response.text());
+          } catch {
+            res.statusCode = 503;
+            res.end(JSON.stringify({ error: 'Copilot review unavailable' }));
+          }
+        });
         const agentFeed = createAgentFeedHandler(
           feedEnvironment.AGENT_FEED_UPSTREAM ?? demoFeedUpstream,
           fetch,

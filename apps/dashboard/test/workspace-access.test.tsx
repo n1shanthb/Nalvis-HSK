@@ -25,9 +25,10 @@ function View({ address }: { address?: Address }) {
   );
 }
 function ownership() {
-  vi.spyOn(clients, 'loadDeployment').mockResolvedValue(
-    deployment as clients.Deployment,
-  );
+  vi.spyOn(clients, 'loadDeployment').mockResolvedValue({
+    ...deployment,
+    block: BigInt(deployment.block),
+  } as clients.Deployment);
   vi.spyOn(clients, 'clientFor').mockReturnValue({
     getChainId: async () => 177,
     readContract: async () => deployment.owner,
