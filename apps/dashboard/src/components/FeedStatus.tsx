@@ -9,6 +9,12 @@ export function FeedStatus({ observation }: { observation: FeedObservation }) {
   }, []);
   const { feed, connection, provenance, observedAt, error } = observation;
   const lastWake = feed?.state.lastWakeAt;
+  const nextWake = feed?.state.nextWakeAt;
+  const feedStale =
+    provenance === 'live' &&
+    (connection !== 'connected' ||
+      observedAt == null ||
+      now - observedAt > 120);
   return (
     <aside
       className="feed-status"
@@ -39,11 +45,14 @@ export function FeedStatus({ observation }: { observation: FeedObservation }) {
       {lastWake != null && (
         <p>
           Last agent wake: {displayTime(lastWake)}
-          {now - lastWake > 120
-            ? ' · Stale last observation (over 2 minutes); current agent state is unknown.'
-            : ''}
+          {feedStale
+            ? ' · Stale last observation; live feed freshness is unavailable.'
+            : provenance === 'live' && nextWake != null && now > nextWake + 120
+              ? ' · Scheduled wake overdue by more than 2 minutes.'
+              : ''}
         </p>
       )}
+      {nextWake != null && <p>Next scheduled wake: {displayTime(nextWake)}</p>}
       {error && (
         <details>
           <summary>Feed diagnostics</summary>

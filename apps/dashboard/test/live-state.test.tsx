@@ -42,7 +42,9 @@ const live = {
   },
 };
 it('rejects a manifest for a different selected chain even when its addresses are documented', async () => {
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json(mainnetDeployment));
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+    Response.json(mainnetDeployment),
+  );
   await expect(clients.loadDeployment(133)).rejects.toThrow(
     'Deployment not verified',
   );
@@ -157,6 +159,39 @@ it('labels exported snapshots and stale agent observations explicitly', () => {
     />,
   );
   expect(screen.getByText(/Recorded snapshot — not live/)).toBeTruthy();
+  expect(screen.queryByText(/Scheduled wake overdue/)).toBeNull();
+});
+it('does not mark a healthy ten-minute heartbeat stale between scheduled wakes', () => {
+  const now = Date.now() / 1000;
+  const observation = {
+    feed: {
+      ...live,
+      state: { ...live.state, lastWakeAt: now - 300, nextWakeAt: now + 300 },
+    },
+    unreachable: false,
+    connection: 'connected' as const,
+    provenance: 'live' as const,
+    observedAt: now,
+  };
+  const view = render(<FeedStatus observation={observation} />);
+  expect(
+    screen.queryByText(/Stale last observation|Scheduled wake overdue/),
+  ).toBeNull();
+  view.rerender(
+    <FeedStatus
+      observation={{
+        ...observation,
+        feed: {
+          ...observation.feed,
+          state: { ...observation.feed.state, nextWakeAt: now - 180 },
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText(/Scheduled wake overdue/)).toBeTruthy();
+  view.rerender(
+    <FeedStatus observation={{ ...observation, observedAt: now - 180 }} />,
+  );
   expect(screen.getByText(/Stale last observation/)).toBeTruthy();
 });
 it('renders chronological WAIT details, IST, original intent and supplied rejection reasons without implying a swap', () => {
