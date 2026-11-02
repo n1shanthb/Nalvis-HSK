@@ -32,6 +32,7 @@ export function MainnetOwner({
     [busy, setBusy] = useState(false),
     [result, setResult] = useState('');
   function prepare(next: string) {
+    next = next.trim();
     setReview(undefined);
     setAck(false);
     setResult('');
