@@ -40,7 +40,7 @@ const diffLabels: Record<keyof MandateFields, string> = {
   expiry: 'Expiry (IST)',
   maxTradeInA: 'WHSK per trade',
   maxTradeInB: 'USDT per trade',
-  maxDailyInB: 'USDT per UTC day',
+  maxDailyInB: 'USDT rolling 24-hour cap',
   maxExposureBps: 'Exposure (%)',
   maxSlippageBps: 'Slippage (bps)',
   maxDrawdownBps: 'Drawdown (%)',

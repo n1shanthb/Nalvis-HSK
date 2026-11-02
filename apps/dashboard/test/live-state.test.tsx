@@ -315,6 +315,7 @@ it('successful refresh and failed refresh preserve mainnet review calldata, ackn
   }
   render(<View />);
   await act(async () => {});
+  fireEvent.click(screen.getByText('Advanced: import generated calldata'));
   fireEvent.change(
     screen.getByLabelText('Exact generated mandate or withdrawal calldata'),
     { target: { value: calldata } },
