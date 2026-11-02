@@ -48,7 +48,7 @@ export function Header({
             Verify receipt
           </a>
           <a href="#/desk" onClick={close}>
-            AI desk
+            Nalvis Copilot
           </a>
         </div>
       </details>
@@ -89,7 +89,7 @@ export function Header({
             data-desk-trigger
             onClick={onDesk}
           >
-            AI desk
+            Nalvis Copilot
           </button>
           <a className="button primary-setup" href="#/setup">
             Set mandate

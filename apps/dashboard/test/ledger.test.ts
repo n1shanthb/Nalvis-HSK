@@ -4,12 +4,7 @@ import {
   type SignedMandate,
   type OwnerProposal,
 } from '../../../packages/core/src/desk/proposal.js';
-import {
-  keccak256,
-  encodeFunctionData,
-  zeroAddress,
-  zeroHash,
-} from 'viem';
+import { keccak256, encodeFunctionData, zeroAddress, zeroHash } from 'viem';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { serializeTransaction, hexToBytes, type Address, type Hex } from 'viem';
@@ -18,6 +13,7 @@ import { addresses } from '../../../packages/core/src/addresses.js';
 const mocks = vi.hoisted(() => ({
   getAddress: vi.fn(),
   signTransaction: vi.fn(),
+  signMessage: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
   stopDiscovering: vi.fn(),
@@ -102,6 +98,24 @@ test('forbidden chain refuses before discovery and signer calls', async () => {
   await expect(connectLedger(31337)).rejects.toThrow('133 only');
   expect(mocks.startDiscovering).not.toHaveBeenCalled();
   expect(() => derivationPath(-1)).toThrow();
+});
+
+test('session message signing preserves the selected third account and normalizes the SDK signature', async () => {
+  mocks.signMessage.mockReturnValue(
+    done({ r: `0x${'11'.repeat(32)}`, s: `0x${'22'.repeat(32)}`, v: 1 }),
+  );
+  const signer = await connectLedger(133, 2);
+  const signature = await signer.signMessage!('Nalvis scoped sell session');
+  expect(mocks.signMessage).toHaveBeenCalledWith(
+    "44'/60'/0'/0/2",
+    'Nalvis scoped sell session',
+  );
+  expect(signature).toBe(`0x${'11'.repeat(32)}${'22'.repeat(32)}1c`);
+  mocks.signMessage.mockReturnValue(done({ r: '0x01', s: '0x02', v: 99 }));
+  await expect(signer.signMessage!('invalid signature')).rejects.toThrow(
+    'Unexpected Ledger',
+  );
+  await signer.disconnect();
 });
 test('DMK rejection and transport errors fail closed', async () => {
   mocks.getAddress.mockReturnValue({ observable: of({ status: 'stopped' }) });

@@ -44,11 +44,11 @@ it('interprets via Groq then answers from verified evidence', async () => {
   });
   await waitFor(() =>
     expect(
-      (screen.getByRole('button', { name: 'Ask desk' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: 'Ask Copilot' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Ask desk' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   await screen.findByText(/Receipt #3 · REJECT:/);
   expect(screen.getByText('why REJECT #3')).toBeTruthy();
   expect(JSON.parse(send.mock.calls[1][1].body)).toEqual({
@@ -126,11 +126,11 @@ it('shows exhausted credits and uses built-in commands without another provider 
   });
   await waitFor(() =>
     expect(
-      (screen.getByRole('button', { name: 'Ask desk' }) as HTMLButtonElement)
+      (screen.getByRole('button', { name: 'Ask Copilot' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Ask desk' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   await screen.findByText(/AI credits: 0 remaining today/);
   expect(
     (screen.getByLabelText('Language engine') as HTMLSelectElement).value,

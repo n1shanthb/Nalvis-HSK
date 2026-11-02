@@ -1,4 +1,6 @@
 import { verifyV3 } from './v3/verify.js';
+import { verifyOwnerReceipt } from './owner.js';
+import type { OwnerReceipt } from '../../core/src/agent/owner-receipt.js';
 import {
   readMandateState,
   type MandateState,
@@ -177,6 +179,7 @@ const transactionSchema = z
   .passthrough();
 export type Transaction = z.infer<typeof transactionSchema>;
 export interface ChainReader {
+  owner?(vault: Address, block: bigint): Promise<Address>;
   agentState?(
     vault: Address,
     block: bigint,
@@ -237,6 +240,7 @@ export type Verification = {
   metrics?: Metrics;
   receipt?: StoredReceipt;
   receiptV3?: ReceiptV3;
+  receiptV4?: OwnerReceipt;
 };
 class Failed extends Error {}
 /** Read-only RPC adapter. Never constructs a wallet or broadcasts. */
@@ -245,6 +249,13 @@ export function rpcReader(url: string): ChainReader {
     transport: http(url, { retryCount: 0, timeout: 15000 }),
   });
   return {
+    owner: (address, blockNumber) =>
+      client.readContract({
+        address,
+        abi: vaultAbi,
+        functionName: 'owner',
+        blockNumber,
+      }),
     agentState: (vault, block, agent) =>
       readMandateState(client, vault, block, agent),
     timestamp: async (blockNumber) =>
@@ -339,6 +350,18 @@ export async function verify(
   reader: ChainReader,
   options: { txHash?: Hex; chain?: number; agentStore?: Store } = {},
 ): Promise<Verification> {
+  if (
+    typeof input === 'object' &&
+    input !== null &&
+    'version' in input &&
+    input.version === 4
+  )
+    return verifyOwnerReceipt(
+      input,
+      reader,
+      options.agentStore,
+      options.txHash,
+    );
   if (
     typeof input === 'object' &&
     input !== null &&

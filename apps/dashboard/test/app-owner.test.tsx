@@ -91,7 +91,7 @@ it.each(['cancel', 'navigation'])(
   async (mode) => {
     render(<App enableOwner />);
     await screen.findByRole('button', { name: 'Revoke' }, { timeout: 15000 });
-    fireEvent.click(screen.getByRole('button', { name: 'AI desk' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Nalvis Copilot' }));
     fireEvent.click(await screen.findByText('Load desk cap proposal'));
     await screen.findByText('Build exact desk proposal review');
     expect(screen.queryByText('Build revoke review')).toBeNull();

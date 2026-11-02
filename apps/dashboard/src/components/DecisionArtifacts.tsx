@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { receiptV3Schema } from '../../../../packages/core/src/agent/receipt.js';
+import { executionReceiptSchema } from '../../../../packages/core/src/agent/owner-receipt.js';
 import { parseEvidenceJSON } from '../../../../packages/core/src/serialization.js';
 import {
   agentFeedBase,
@@ -27,7 +27,7 @@ export async function readDecisionArtifacts(
     live
       ? `/feed/${kind}/${hash}`
       : `${snapshotFor(chain)}/${kind}/${hash}.json`;
-  const receipt = receiptV3Schema.parse(
+  const receipt = executionReceiptSchema.parse(
     await readFeedJSON(base ?? '', path('receipts', receiptHash)),
   );
   const deployment = await loadDeployment(chain);

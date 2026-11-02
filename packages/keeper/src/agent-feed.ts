@@ -8,6 +8,7 @@ import type {
   ReceiptV3,
 } from '../../core/src/agent/index.js';
 import type { AgentFeed, AgentState, ActionView } from './agent-feed-types.js';
+import type { OwnerReceipt } from '../../core/src/agent/owner-receipt.js';
 export type { AgentFeed, AgentState } from './agent-feed-types.js';
 export const json = (value: unknown) =>
   JSON.stringify(value, (_, v: unknown) =>
@@ -32,7 +33,9 @@ export async function projectFeed(
     wake.push(e);
     if (e.type !== 'ACTION') continue;
     const r = e.data.receiptHash
-      ? await store.read<ReceiptV3>(`receipts/${e.data.receiptHash}.json`)
+      ? await store.read<ReceiptV3 | OwnerReceipt>(
+          `receipts/${e.data.receiptHash}.json`,
+        )
       : undefined;
     actions.push({
       at: e.at,

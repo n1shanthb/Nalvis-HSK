@@ -87,7 +87,7 @@ export function VerifyView({
           typeof input === 'object' &&
           input !== null &&
           'version' in input &&
-          input.version === 3;
+          (input.version === 3 || input.version === 4);
         setResult(
           await verify(
             input,

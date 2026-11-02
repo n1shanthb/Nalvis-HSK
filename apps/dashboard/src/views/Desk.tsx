@@ -11,6 +11,7 @@ import { liveDeskContext } from '../lib/desk-context.js';
 import type { DashboardChain } from '../lib/clients.js';
 import { demoContext } from '../lib/demo.js';
 import { useResource } from '../lib/useResource.js';
+import { ExitReview } from '../components/ExitReview.js';
 const creditsSchema = z
   .object({
     remaining: z.number().int().nonnegative(),
@@ -43,10 +44,12 @@ export function DeskView({
   demo = false,
   chain = 133,
   onProposal,
+  allowTrading = false,
 }: {
   demo?: boolean;
   chain?: DashboardChain;
   onProposal?: (p: OwnerProposal) => void;
+  allowTrading?: boolean;
 }) {
   const resource = useResource(
     useCallback(
@@ -161,11 +164,11 @@ export function DeskView({
   }
   return (
     <section>
-      <p className="eyebrow">05 / NATURAL LANGUAGE DESK</p>
-      <h2>Your evidence, explained.</h2>
+      <p className="eyebrow">05 / REVIEWED OWNER COMMANDS</p>
+      <h2>Nalvis Copilot</h2>
       <p>
-        Grounded answers from verified evidence. Owner actions produce a diff
-        and calldata hash for Ledger review.
+        Grounded answers from verified evidence. Sell requests produce a live
+        review card; mandate changes require Ledger review.
       </p>
       <div className="desk-toolbar">
         <label>
@@ -264,6 +267,15 @@ export function DeskView({
               </p>
             )}
             <p>{m.reply.message}</p>
+            {m.reply.intent.kind === 'exit' &&
+              (demo || chain !== 177 ? (
+                <p>
+                  Owner-directed exits require the live mainnet workspace. No
+                  swap is submitted from recorded examples.
+                </p>
+              ) : (
+                <ExitReview allowTrading={allowTrading} />
+              ))}
             {m.transcript && (
               <details className="ai-meta">
                 <summary>Interpretation transcript hashes</summary>
@@ -324,7 +336,7 @@ export function DeskView({
           />
         </label>
         <button disabled={!input.trim() || resource.loading || pending}>
-          Ask desk
+          Ask Copilot
         </button>
       </form>
     </section>

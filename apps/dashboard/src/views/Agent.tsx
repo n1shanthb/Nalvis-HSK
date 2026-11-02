@@ -70,8 +70,11 @@ export function AgentView({
       <OperationView feed={feed} />
       <div className="agent-workspace">
         <section className="agent-chat">
-          <p className="eyebrow">EXPLANATION DESK</p>
+          <p className="eyebrow">NALVIS COPILOT</p>
           <DeskView
+            allowTrading={
+              enableOwner && chain === 177 && state?.mode !== 'demo'
+            }
             demo={state?.mode === 'demo'}
             chain={chain}
             onProposal={

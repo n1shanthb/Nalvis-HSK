@@ -18,6 +18,8 @@ import { feedServer, projectFeed, type AgentState } from './agent-feed.js';
 import { storageReady, agentLock, exportSnapshot } from './agent-storage.js';
 import { connectAgentRpc, PreflightError } from './agent-rpc.js';
 import { repositoryRoot } from './config.js';
+import { copilotQueue } from '../../core/src/copilot-queue.js';
+import { processCopilotOrder } from './copilot-orders.js';
 type Env = Record<string, string | undefined>;
 export function stateRoot(env: Env = process.env) {
   return resolve(
@@ -40,6 +42,8 @@ export async function startAgentService(options: {
   const env = options.env ?? process.env,
     root = stateRoot(env),
     store = jsonFileStore(root);
+  const ownerOrders =
+    env.COPILOT_TRADES_ENABLED === 'true' ? copilotQueue(env) : undefined;
   const chain =
     options.exec === 'mainnet' ? 177 : options.exec === 'testnet' ? 133 : 31337;
   let reason = 'Starting preflight',
@@ -321,6 +325,19 @@ export async function startAgentService(options: {
         );
       forced = undefined;
       reason = '';
+      if (ownerOrders) {
+        let status: string | undefined;
+        try {
+          status = await processCopilotOrder(ownerOrders, agent, store);
+        } catch {
+          /* Redis availability never changes the autonomous strategy or verdict. */
+        }
+        if (status === 'needs_review')
+          throw new PreflightError(
+            'needs_owner',
+            'Uncertain owner order settlement; reconcile before continuing',
+          );
+      }
       // T12 tick evaluates watches and internally invokes wake for the merged fired set.
       await agent.tick(Math.floor(Date.now() / 1000));
       await store.write(

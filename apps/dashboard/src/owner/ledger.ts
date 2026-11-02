@@ -20,6 +20,7 @@ import {
   recoverTransactionAddress,
   hexToBytes,
   getAddress,
+  serializeSignature,
   type Address,
   type Hex,
 } from 'viem';
@@ -43,6 +44,7 @@ export function derivationPath(index = 0) {
 }
 export interface OwnerSigner {
   address(): Promise<Address>;
+  signMessage?(message: string): Promise<Hex>;
   signTransaction(
     unsigned: Hex,
     chainId: number,
@@ -137,6 +139,18 @@ export async function connectLedger(
         return deviceResult<{ r: Hex; s: Hex; v: number }, unknown, unknown>(
           signer.signTransaction(path, hexToBytes(unsigned)),
         );
+      },
+      async signMessage(message) {
+        assertOwnerChain(chainId);
+        const out = await deviceResult<
+          { r: Hex; s: Hex; v: number },
+          unknown,
+          unknown
+        >(signer.signMessage(path, message));
+        const v = out.v === 0 || out.v === 1 ? out.v + 27 : out.v;
+        if (v !== 27 && v !== 28)
+          throw Error('Unexpected Ledger message signature');
+        return serializeSignature({ r: out.r, s: out.s, v: BigInt(v) });
       },
       async disconnect() {
         try {

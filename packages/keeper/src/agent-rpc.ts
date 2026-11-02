@@ -27,7 +27,8 @@ import {
   amountFor,
   calldata,
   simulate,
-  receiptV3Schema,
+  executionReceiptSchema,
+  ownerReceiptHash,
   mandateStateSchema,
   type AgentClients,
   type Store,
@@ -40,6 +41,8 @@ import {
   loadDeployment,
   repositoryRoot,
 } from './config.js';
+import { assertSellAuthorization } from '../../core/src/copilot.js';
+import { matchesConfirmedSell } from '../../core/src/agent/owner-preview.js';
 export class PreflightError extends Error {
   constructor(
     readonly state: 'offline' | 'needs_owner',
@@ -250,6 +253,14 @@ export async function connectAgentRpc(
   };
   const clients: AgentClients = {
     readState,
+    durableBroadcastMarker: true,
+    readOwner: (blockNumber) =>
+      client.readContract({
+        address: vault,
+        abi: vaultAbi,
+        functionName: 'owner',
+        ...(blockNumber === undefined ? {} : { blockNumber }),
+      }),
     async evidenceLite() {
       const [e, events] = await Promise.all([collect([]), ownerEvents()]);
       const cex = e.cex.length
@@ -321,6 +332,31 @@ export async function connectAgentRpc(
     async send(receipt) {
       await guard();
       const s = await readState();
+      if (receipt.version === 4) {
+        if (
+          ownerReceiptHash(receipt) !== receipt.receiptHash ||
+          receipt.intent.type !== 'SELL' ||
+          receipt.intent.notionalB !== receipt.authorization.order.notionalB ||
+          !matchesConfirmedSell(
+            receipt.authorization.order,
+            receipt.final,
+            receipt.seq,
+          )
+        )
+          throw Error('Receipt differs from the exact owner confirmation');
+        await assertSellAuthorization(receipt.authorization, {
+          owner: await client.readContract({
+            address: vault,
+            abi: vaultAbi,
+            functionName: 'owner',
+            blockNumber: s.block,
+          }),
+          vault,
+          chainId: expected,
+          policyHash: s.mandate.policyHash,
+          now: s.blockTime,
+        });
+      }
       if (s.chainId !== expected || receipt.executionChainId !== expected)
         throw Error('Receipt execution chain mismatch');
       const committed = mandateStateSchema.parse(
@@ -386,7 +422,7 @@ export async function connectAgentRpc(
       await store.write('.pending.json', null);
       return;
     }
-    const r = receiptV3Schema.parse(
+    const r = executionReceiptSchema.parse(
       await store.read(`receipts/${pending.receiptHash}.json`),
     );
     const marker = await store.read<{ transactionHash: Hex }>('.pending.json');

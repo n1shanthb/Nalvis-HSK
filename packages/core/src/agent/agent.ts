@@ -30,6 +30,9 @@ import {
 } from './mandate-check.js';
 import { fitToMandate, needsOwner, retryAt, type FitResult } from './fitter.js';
 import { buildReceiptV3, type ReceiptV3 } from './receipt.js';
+import { executeOwnerSell, type OwnerReader } from './owner-execution.js';
+import type { OwnerReceipt } from './owner-receipt.js';
+import type { SignedSellOrder } from '../copilot.js';
 export type AgentClients = {
   evidenceLite(): Promise<EvidenceLite>;
   /** Service wrapper supplies collectEvidence(), always refreshed for each wake. */
@@ -42,7 +45,10 @@ export type AgentClients = {
     receiptHash?: Hex,
   ): Promise<{ ok: boolean; block: bigint; error?: string }>;
   /** send must enforce RPC chain, wallet pending nonce, latest head/nonce and eth_call immediately before signing. No retries. */
-  send(receipt: ReceiptV3): Promise<{ transactionHash: Hex }>;
+  send(receipt: ReceiptV3 | OwnerReceipt): Promise<{ transactionHash: Hex }>;
+  readOwner?: OwnerReader;
+  /** Production transport fsyncs .pending.json before every broadcast attempt. */
+  durableBroadcastMarker?: boolean;
   /** Explicit demo callback invokes legacy decide() with its existing evidence/policy/mandate/state. */
   rulesDemo?(): Promise<Parameters<typeof decide>>;
 };
@@ -308,7 +314,9 @@ export async function createAgent({
             input: {
               firedWatches: fired,
               evidence,
-              ...(config.marketContext ? { marketSourceStatus: marketSourceStatus(evidence) } : {}),
+              ...(config.marketContext
+                ? { marketSourceStatus: marketSourceStatus(evidence) }
+                : {}),
               vaultState: {
                 ...s,
                 valueB,
@@ -691,6 +699,21 @@ export async function createAgent({
   };
   return {
     journal,
+    executeOwnerSell: (signed: SignedSellOrder) =>
+      locked(() =>
+        executeOwnerSell({
+          signed,
+          clients,
+          store,
+          journal,
+          config,
+          async settled(receipt) {
+            runtime.journalFrom = receipt.journalHead as Hex;
+            runtime.lastAnchor = receipt.state.blockTime;
+            await save();
+          },
+        }),
+      ),
     get mode() {
       return config.mode === 'rules-demo'
         ? 'rules-demo'
