@@ -1,4 +1,59 @@
 /* Nalvis foundations: shared geometry, distinct marketing and workspace surfaces. */
+.mainnet-mandate-form {
+  padding: 24px;
+  margin-block: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.mainnet-mandate-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 24px 0;
+  min-width: 0;
+}
+.mainnet-mandate-form legend {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.mandate-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.mandate-form-grid label {
+  min-width: 0;
+  margin: 0;
+}
+.mandate-form-grid input {
+  min-height: 44px;
+  width: 100%;
+  min-width: 0;
+}
+.mainnet-mandate-form .action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.mainnet-mandate-form button {
+  min-height: 44px;
+}
+.mainnet-mandate-form code,
+.mainnet-owner-review > p {
+  overflow-wrap: anywhere;
+}
+.mainnet-owner-review .table-scroll table {
+  table-layout: fixed;
+}
+@media (max-width: 767px) {
+  .mainnet-mandate-form {
+    padding: 16px;
+  }
+  .mandate-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .agent-card.exit-review {
   margin-block: 20px;
   padding: 24px;

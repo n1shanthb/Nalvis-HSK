@@ -39,6 +39,11 @@ The ownership key stays on hardware. **Trading funds live in a smart-contract
 vault, not offline cold storage.** A separate hot agent key cannot act as the
 owner. This bounds authority; it does not eliminate contract or market risk.
 
+There is intentionally no hot-wallet owner path. Mandate changes, pause, revoke
+and withdrawal remain Ledger-controlled so serious holders can automate within
+explicit boundaries without handing a browser wallet unrestricted treasury
+authority. The agent is scoped to execution; it cannot become the owner.
+
 ## Key features
 
 - Hardware-governed mandate and owner kill switches.
