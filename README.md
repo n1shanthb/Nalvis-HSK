@@ -1,63 +1,186 @@
-# Nalvis-HSK — bounded, verifiable testnet execution
+# Nalvis — hardware-governed DeFi automation
 
-Nalvis is a Ledger-governed trading-agent prototype for HSK Chain Horizon Track 1.
-It combines a deterministic, cost-aware rebalancing engine with on-chain
-mandate checks and hash-chained receipts. The research backtest shows **no
-proven edge**; the product demonstrates bounded, inspectable execution, not
-profit.
+**Cold-key control. On-chain boundaries. Always-on agents. Verifiable decisions.**
 
-## Current HSK Testnet status
+Nalvis connects Ledger-held ownership to automated DeFi on **HashKey Chain**.
+An owner signs a bounded mandate with their hardware wallet; a separate agent
+monitors markets and can execute inside that mandate without requiring a new
+hardware signature on every autonomous trade. The owner can pause or revoke
+authority. Decisions leave inspectable evidence and hash-chained receipts.
 
-The deployed EdgewiseVault and ProofTradeRouter are on HSK Testnet (chain 133).
-The vault mandate and router policy are configured and read back from chain;
-both use policy hash
-`0xabeadf083e801ceaed5a290b5800095cd7243a791fe72419172017b32b048027`.
-The vault currently holds zero WHSK and zero test-USDT, so no funded trade can
-be demonstrated. No testnet trade receipt is claimed. Testnet pool prices are
-not real.
+Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 
-| Contract | Address |
-|---|---|
-| EdgewiseVault | [`0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc`](https://testnet-explorer.hskchain.net/address/0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc) |
-| ProofTradeRouter | [`0xC5Fa869C8423B41696886A7761ec31b3846f4e4B`](https://testnet-explorer.hskchain.net/address/0xC5Fa869C8423B41696886A7761ec31b3846f4e4B) |
+[Live app](https://nalvis-hsk-delta.vercel.app/) ·
+[Mainnet agent](https://nalvis-hsk-delta.vercel.app/#/agent) ·
+[Vault explorer](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521) ·
+[DoraHacks copy](docs/submission/DORAHACKS.md) ·
+[Video script](docs/submission/VIDEO-SCRIPT.md)
 
-The temporary owner remains in place. Ledger handover is pending a separately
-verified Ledger address and explicit authorization. See
-[docs/OWNERSHIP-HANDOVER.md](docs/OWNERSHIP-HANDOVER.md).
+![Real mainnet agent, recorded rationale and operating status](docs/images/agent-mainnet.png)
 
-## Components and runbooks
+## Why Nalvis
 
-- [Architecture](docs/ARCHITECTURE.md) — components, trust boundaries, and
-  current integration limitations.
-- [Deployment state](docs/DEPLOYMENT.md) — confirmed deployment and
-  configuration transactions.
-- [Testing](docs/TESTING.md) — reproducible checks and verified test results.
-- [Demo guide](docs/DEMO-GUIDE.md) — local scenarios and presentation steps.
-- [Ownership handover](docs/OWNERSHIP-HANDOVER.md) — two-step transfer for
-  both contracts.
-- [Verified address book](docs/ADDRESSES.md) — only approved protocol
-  addresses.
+Treasury owners and long-term holders should not have to give an unrestricted
+key to a trading bot to participate in DeFi. Requiring a hardware confirmation
+for every market response also prevents unattended operation.
 
-## Local development
+Nalvis separates **ownership, strategy and execution authority**. It targets
+the control and auditability needs of institutional-style treasury workflows:
+keep the ownership key on hardware, allocate only an intended trading balance,
+set explicit boundaries, and inspect what the agent actually did. Helping
+holders manage risk and pursue asset-growth opportunities is the objective;
+capital protection and returns are not guaranteed.
 
-Requirements: Node 22, pnpm 9, Foundry, and initialized Git submodules.
+**Custody distinction:** the owner's key remains on the Ledger. Funds allocated
+for trading reside in the smart-contract vault, not offline cold storage.
+A separate hot agent key has bounded trading authority, not owner withdrawal
+authority. This is an unaudited prototype, not a claim of institutional
+production readiness or institutional adoption.
 
-```powershell
-nvm use
+## Features
+
+- **Ledger-governed mandate:** agent identity, expiry, per-token trade caps,
+  rolling daily turnover, exposure, slippage, drawdown and minimum interval.
+  Owner controls include pause, unpause, revoke and withdrawal.
+- **Strategist + Fitter:** the strategist proposes actions and market watches;
+  the fitter negotiates a compliant proposal. Deterministic checks, simulation
+  and the vault govern execution. The LLM never signs transactions or creates
+  prices, recipients, calldata or minimum-output values.
+- **Real market monitoring:** HSKSwap WHSK/USDT quotes and pool data, with fresh
+  MEXC/Gate context. The active `fresh-dex-cex` policy excludes stale APRO from
+  decisions instead of inventing fresh oracle data.
+- **Bounded execution:** a successful vault trade swaps through HSKSwap and
+  records a receipt atomically. Exact-amount approvals reset after use; TWAP,
+  output-floor, nonce and receipt-head checks remain authoritative.
+- **Evidence and verification:** journals/artifacts persist on OCI. Selected
+  WAIT/REJECT decisions are anchored without a swap; not every wake is a new
+  on-chain transaction. The verifier checks commitments and transaction
+  bindings, with independent replay for supported receipts and artifacts.
+- **Nalvis Copilot:** natural-language interpretation and a fresh WHSK-to-USDT
+  sell review showing balances, quoted/minimum output and estimated costs.
+  One Ledger authorization creates a 15-minute SELL-only session; each order
+  still needs explicit Confirm but no new Ledger prompt. Public viewers cannot
+  trade. Owner-directed receipts are distinct from autonomous decisions.
+- **Always-on workspace:** persistent OCI keeper, read-only live feed, Vercel
+  dashboard, charts, timestamps, provenance and decision history. Redis provides
+  shared Copilot request limits and a signed-order queue.
+
+## How it works
+
+```mermaid
+flowchart LR
+  O[Ledger owner] -->|Signs mandate / can pause or revoke| V[EdgewiseVault]
+  M[HSKSwap and CEX evidence] --> S[Strategist]
+  S --> F[Fitter]
+  F --> C[Deterministic checks and simulation]
+  C --> K[Separate agent signer]
+  K -->|Within live mandate| V
+  V -->|Atomic swap| D[HSKSwap]
+  V --> R[On-chain receipt commitment]
+  R --> Q[Verifier and dashboard]
+```
+
+The Ledger controls the authorization envelope. The agent proposes within it.
+A model cannot grant itself owner rights or bypass the contract. This bounds
+authority; it does not eliminate smart-contract, key, liquidity or market risk.
+
+## Deployments and public proof
+
+### HashKey Chain mainnet · chain 177
+
+- **EdgewiseVault:** [`0x8E5043edCD2710503C351b77f27958F531E0C521`](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521).
+- **ProofTradeRouter:** [`0x73934f4E2f51bD6191e32B1BbC2E59cA6527b88a`](https://hsk.blockscout.com/address/0x73934f4E2f51bD6191e32B1BbC2E59cA6527b88a).
+- **Ledger owner:** [`0xE0B9226b1488E6293D4A8FD4E1720d35eaf80419`](https://hsk.blockscout.com/address/0xE0B9226b1488E6293D4A8FD4E1720d35eaf80419).
+- **Separate agent:** [`0x746cd4270a14eb55BB8A6A4C39204C7108b0e49d`](https://hsk.blockscout.com/address/0x746cd4270a14eb55BB8A6A4C39204C7108b0e49d).
+- [Vault deployment transaction](https://hsk.blockscout.com/tx/0x6de18ac3fd8c23b5af438510007a72d0ea2490d76699ab2f5086cbb55aee7e00).
+- [ProofTradeRouter deployment transaction](https://hsk.blockscout.com/tx/0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9).
+- [Ledger-authorized mandate update](https://hsk.blockscout.com/tx/0x906f856f7af4fe56a53fbc5d352e3274daf963593e0f3102d4628faf3367f59c).
+- [Mainnet WAIT anchor · receipt sequence 3](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
+- [Inspect that receipt in Verify](https://nalvis-hsk-delta.vercel.app/#/verify?tx=0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
+
+Both mainnet sources have Sourcify exact-match verification recorded in the
+[manifest](contracts/deployments/177.json). **Receipts are events emitted by the
+vault, not a separate receipt-token address.** ProofTradeRouter is a separate
+fallback receipt/swap product; the live Ledger-governed path uses EdgewiseVault.
+The vault's immutable swap router is HSKSwap's router, not ProofTradeRouter.
+
+### HSK testnet · chain 133
+
+- **EdgewiseVault:** [`0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc`](https://testnet-explorer.hskchain.net/address/0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc).
+- **ProofTradeRouter:** [`0xC5Fa869C8423B41696886A7761ec31b3846f4e4B`](https://testnet-explorer.hskchain.net/address/0xC5Fa869C8423B41696886A7761ec31b3846f4e4B).
+- [Testnet record](docs/DEPLOYMENT.md) and [manifest](contracts/deployments/133.json).
+
+Testnet retains its temporary owner; the verified Ledger-owned deployment is
+mainnet. Testnet prices are not real. No testnet trade receipt is claimed.
+
+## What the live demonstration proves
+
+Read-only checks on **2 November 2026, 16:33 IST**, mainnet block **29635128**,
+confirmed the Ledger owner, configured agent, live mandate and four vault
+receipt commitments. The keeper was online with a matching policy hash.
+The sampled anchor above is a successful **`commitHold`**, not a swap. At that
+snapshot, the agent had recorded 40 wakes; the vault held **5 USDT and 0 WHSK**.
+These are dated observations, not permanently live counters.
+
+The demonstration establishes mainnet deployment, hardware-governed
+authorization, running decision automation and hold-receipt anchoring. **It does
+not yet establish a real mainnet swap or profitability.** Local Anvil tests
+exercise swaps, confirmation signatures, independent verification and recovery;
+they are not mainnet trade evidence. The current mandate expires **3 November
+2026, 10:29:23 IST** unless replaced by the owner.
+
+Full verification needs the matching receipt JSON and required artifacts; an
+explorer's transaction success alone is not a complete verifier PASS. P&L is
+unavailable without verified cost basis. Research shows **no proven edge**.
+Ledger signing on this chain currently uses **blind signing**.
+
+![Mainnet mandate and owner-defined execution limits](docs/images/mandate-mainnet.png)
+
+![Copilot real position review, with no invented P&L or public trading authority](docs/images/copilot-mainnet.png)
+
+## Try it without a Ledger
+
+1. Open the [Agent page](https://nalvis-hsk-delta.vercel.app/#/agent).
+2. Choose **View Nishanth's mainnet agent** to inspect the published workspace.
+3. Read decisions, timestamps, thesis, watches and receipt links.
+4. Inspect Mandate or follow a receipt to Verify and Blockscout.
+5. Ask Copilot **sell now** to inspect its read-only review. No WHSK means no
+   sell; public viewing never grants execution authority.
+
+A different connected Ledger checks that wallet's supported workspace; it
+does not gain control of Nishanth's agent. The prototype operates one configured
+live vault/keeper, not automatic multi-tenant provisioning.
+
+## Stack and development
+
+Solidity / Foundry · TypeScript / viem / zod / Vitest · React 19 / Vite · Ledger
+WebHID · OpenRouter · OCI Docker keeper · Vercel · Upstash Redis.
+
+Requirements: Node 22, pnpm 9, Foundry and initialized submodules.
+
+```sh
 corepack enable
-pnpm install
+pnpm install --frozen-lockfile
 git submodule update --init --recursive
 pnpm -r build
 pnpm test
 pnpm lint
-Set-Location contracts
-forge build
-forge test
-Set-Location ..
+cd contracts && forge build && forge test
+cd ..
 pnpm dev
 ```
 
-Never point a signing or write workflow at chain 177. Mainnet is read-only;
-testnet prices are simulated-market context and not real-world prices. Do not
-fund, approve, sign, transfer ownership, or execute a testnet trade without
-separate human authorization.
+Hosted lifecycle tests need Linux (`flock` and `/proc`). Optional RPC fork tests
+explicitly skip if prerequisites are absent. Tests do not call paid LLMs.
+Mainnet execution is a separate, explicitly approved activation path; ordinary
+development should use local/testnet workflows.
+
+- [Agent architecture](packages/core/src/agent/README.md)
+- [Verified address book](docs/ADDRESSES.md)
+- [Copilot protocol and receipt v4](docs/COPILOT.md)
+- [Verifier](packages/verifier/README.md)
+- [Submission image checklist](docs/submission/IMAGES.md)
+
+Limits: unaudited contracts, thin liquidity, no proven edge, no demonstrated
+mainnet swap yet, and no institutional customer or compliance-readiness claim.
+HSP payments are not integrated; this submission is for the trading track.

@@ -1,5 +1,11 @@
 # HSK Testnet deployment and configuration
 
+This preserves the chain-133 deployment record. The current Ledger-owned
+**mainnet 177** deployment, mandate and receipt proof links are in the
+[README](../README.md#deployments-and-public-proof) and
+[`contracts/deployments/177.json`](../contracts/deployments/177.json). Temporary
+ownership below concerns testnet, not the mainnet Ledger owner.
+
 This is a read-only record of the existing deployment. Do not redeploy these
 contracts. No write operation was performed for this documentation update.
 
@@ -11,10 +17,10 @@ contracts. No write operation was performed for this documentation update.
 - Source commit used for deployment: `00f79c4ea5fcced27b3e33940a62ba56928f1b7e`.
 - Current manifest: [`contracts/deployments/133.json`](../contracts/deployments/133.json).
 
-| Contract | Address | Deployment transaction | Block | Gas |
-|---|---|---|---:|---:|
-| EdgewiseVault | `0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc` | `0xcb7480c81476eb9eb76f4ef7eab8e872e3d5c94cde4b23173b1ca9ad247c6941` | 35175424 | 3531069 |
-| ProofTradeRouter | `0xC5Fa869C8423B41696886A7761ec31b3846f4e4B` | `0x24519a67fa5a3f4e050ce73249b0099503fcad08424b106ad8a9fed70cae031f` | 35175424 | 901698 |
+| Contract         | Address                                      | Deployment transaction                                               |    Block |     Gas |
+| ---------------- | -------------------------------------------- | -------------------------------------------------------------------- | -------: | ------: |
+| EdgewiseVault    | `0x74E181cd60C6880D5835b06A3EAEd1727F65c4cc` | `0xcb7480c81476eb9eb76f4ef7eab8e872e3d5c94cde4b23173b1ca9ad247c6941` | 35175424 | 3531069 |
+| ProofTradeRouter | `0xC5Fa869C8423B41696886A7761ec31b3846f4e4B` | `0x24519a67fa5a3f4e050ce73249b0099503fcad08424b106ad8a9fed70cae031f` | 35175424 |  901698 |
 
 The deployer was `0xee9A370e88385E7f366E1e7c88D73F3a1691fEe1`; the current
 temporary owner of both contracts is
