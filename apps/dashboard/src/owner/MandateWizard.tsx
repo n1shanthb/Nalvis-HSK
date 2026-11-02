@@ -173,7 +173,7 @@ export function MandateWizard({
         vault,
         owner: snapshot.owner,
         data: review.data,
-        signer: await connectLedger(chain),
+        signer: await connectLedger(chain, shared?.accountIndex ?? 0),
       });
       setHash(tx);
       setMessage('Submitted. Waiting for confirmation…');

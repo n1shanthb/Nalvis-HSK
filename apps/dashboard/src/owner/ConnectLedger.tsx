@@ -2,7 +2,7 @@ import { humanError } from '../lib/errors.js';
 import { LedgerContext } from './LedgerContext.js';
 import { useContext, useState } from 'react';
 import type { Address } from 'viem';
-import { connectLedger } from './ledger.js';
+import { connectLedger, derivationPath } from './ledger.js';
 import { clientFor, loadDeployment } from '../lib/clients.js';
 import { vaultAbi } from '../../../../packages/core/src/abi/index.js';
 export function ConnectLedger({
@@ -29,11 +29,13 @@ export function ConnectLedger({
   const setAddress = shared ? shared.setAddress : setLocalAddress;
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [localIndex, setLocalIndex] = useState(0);
+  const accountIndex = shared?.accountIndex ?? localIndex;
   async function connect() {
     setBusy(true);
     setMessage('');
     try {
-      const signer = await signerFactory(chain);
+      const signer = await signerFactory(chain, accountIndex);
       let account: Address;
       try {
         account = await signer.address();
@@ -63,6 +65,15 @@ export function ConnectLedger({
   }
   return (
     <div className="ledger-connect">
+      <label>Ledger account
+        <select aria-label="Ledger account" value={accountIndex} disabled={busy} onChange={event => {
+          const index = Number(event.target.value);
+          setAddress(undefined); setMessage(''); onAddress?.(undefined);
+          if (shared) shared.setAccountIndex(index); else setLocalIndex(index);
+        }}>
+          {[0, 1, 2].map(index => <option key={index} value={index}>Account {index + 1} · {derivationPath(index)}</option>)}
+        </select>
+      </label>
       {address ? (
         <>
           <span title={address}>

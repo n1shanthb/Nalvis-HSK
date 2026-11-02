@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { LedgerContext } from './LedgerContext.js';
 import {
   decodeFunctionData,
   encodeFunctionData,
@@ -23,6 +24,7 @@ export function MainnetOwner({
   snapshot: VaultSnapshot;
   reload(): unknown;
 }) {
+  const ledger = useContext(LedgerContext);
   const [data, setData] = useState(''),
     [review, setReview] = useState<Hex>(),
     [summary, setSummary] = useState(''),
@@ -65,7 +67,7 @@ export function MainnetOwner({
     setBusy(true);
     setResult('');
     try {
-      const signer = await connectLedger(177);
+      const signer = await connectLedger(177, ledger?.accountIndex ?? 0);
       const hash = await sendOwnerAction({
         chainId: 177,
         vault: deployment.vault,
