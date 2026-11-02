@@ -22,7 +22,7 @@ import {
   sellSessionSchema,
   type SellSession,
 } from '../../../packages/core/src/copilot.js';
-import manifest from '../../../contracts/deployments/177.json';
+import manifest from '../../../contracts/deployments/177.json' with { type: 'json' };
 import type { Address } from 'viem';
 
 const client = createPublicClient({
