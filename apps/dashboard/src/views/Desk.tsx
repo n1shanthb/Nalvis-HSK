@@ -61,6 +61,8 @@ export function DeskView({
   );
   const observation = useAgentFeed(chain, !demo);
   const [input, setInput] = useState('');
+  const [buyAmount, setBuyAmount] = useState('1');
+  const [reviewedBuyAmount, setReviewedBuyAmount] = useState<string | null>(null);
   const [provider, setProvider] = useState('openrouter');
   const [providers, setProviders] = useState<
     z.infer<typeof providerSchema>['providers']
@@ -150,7 +152,7 @@ export function DeskView({
       }
     } catch {
       warning ??=
-        'AI unavailable or unable to interpret this request. Answered using the original text and built-in commands.';
+        'OpenRouter could not interpret this request. No trade was prepared. Retry, or use the BUY amount form below for a direct review.';
     }
     const latest = observation.feed?.actions.reduce(
       (best, action) => !best || action.at > best.at ? action : best,
@@ -252,6 +254,28 @@ export function DeskView({
           Uses verified locally served receipts on the selected network. Enable
           Demo mode for offline recorded evidence.
         </p>
+      )}
+      {!demo && chain === 177 && (
+        <section className="agent-card" aria-label="Direct BUY review">
+          <h3>Review a WHSK buy</h3>
+          <p>Enter an exact USDT amount. This reads a fresh quote; it does not send a trade.</p>
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            if (/^\d+(?:\.\d{1,6})?$/.test(buyAmount) && Number(buyAmount) > 0)
+              setReviewedBuyAmount(buyAmount);
+          }}>
+            <label htmlFor="copilot-buy-amount">Spend USDT</label>
+            <input id="copilot-buy-amount" inputMode="decimal" value={buyAmount}
+              onChange={(event) => { setBuyAmount(event.target.value); setReviewedBuyAmount(null); }}
+              aria-describedby="copilot-buy-help" />
+            <small id="copilot-buy-help">Up to six decimal places; the mandate and vault balance are checked in the review.</small>
+            <button type="submit" disabled={!/^\d+(?:\.\d{1,6})?$/.test(buyAmount) || Number(buyAmount) <= 0}>
+              Get fresh BUY review
+            </button>
+          </form>
+          {reviewedBuyAmount && <ExitReview key={reviewedBuyAmount} allowTrading={allowTrading}
+            direction="BUY" notionalB={reviewedBuyAmount} />}
+        </section>
       )}
       {resource.error && (
         <p role="alert">Recorded evidence unavailable: {resource.error}</p>

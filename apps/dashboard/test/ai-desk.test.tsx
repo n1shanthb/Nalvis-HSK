@@ -84,7 +84,7 @@ it('uses original text with a visible fallback when the provider fails', async (
     target: { value: 'show P&L' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
-  await screen.findByText(/AI unavailable or unable/);
+  await screen.findByText(/OpenRouter could not interpret/);
   await screen.findByText(/P&L vs hold after gas:/);
 });
 
@@ -138,4 +138,21 @@ it('shows exhausted credits and uses built-in commands without another provider 
   });
   fireEvent.click(screen.getByRole('button', { name: 'Ask Copilot' }));
   await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+});
+
+it('offers a direct BUY review when language interpretation is unavailable', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+  render(<DeskView chain={177} allowTrading />);
+  const button = screen.getByRole('button', { name: 'Get fresh BUY review' });
+  expect(button).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Spend USDT'), {
+    target: { value: '0' },
+  });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Spend USDT'), {
+    target: { value: '1' },
+  });
+  expect((button as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(button);
+  await screen.findByRole('region', { name: 'Review owner-directed buy' });
 });
