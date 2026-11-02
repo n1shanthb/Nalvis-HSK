@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { LedgerContext } from './LedgerContext.js';
 import {
   decodeFunctionData,
   encodeFunctionData,
@@ -23,6 +24,7 @@ export function MainnetOwner({
   snapshot: VaultSnapshot;
   reload(): unknown;
 }) {
+  const ledger = useContext(LedgerContext);
   const [data, setData] = useState(''),
     [review, setReview] = useState<Hex>(),
     [summary, setSummary] = useState(''),
@@ -30,6 +32,7 @@ export function MainnetOwner({
     [busy, setBusy] = useState(false),
     [result, setResult] = useState('');
   function prepare(next: string) {
+    next = next.replace(/\s/g, '');
     setReview(undefined);
     setAck(false);
     setResult('');
@@ -40,7 +43,7 @@ export function MainnetOwner({
       )
         throw Error('Vault configuration mismatch');
       if (!/^0x(?:[\da-fA-F]{2})+$/.test(next))
-        throw Error('Valid calldata required');
+        throw Error('Paste the complete 0x hex value, or load the calldata text file below.');
       const decoded = decodeFunctionData({ abi: vaultAbi, data: next as Hex });
       if (
         !['setMandate', 'pause', 'unpause', 'revoke', 'withdraw'].includes(
@@ -56,8 +59,8 @@ export function MainnetOwner({
         ),
       );
       setReview(next as Hex);
-    } catch {
-      setResult('Cannot review this calldata');
+    } catch (error) {
+      setResult(`Cannot review this calldata: ${error instanceof Error ? error.message : 'Invalid data'}`);
     }
   }
   async function sign() {
@@ -65,7 +68,7 @@ export function MainnetOwner({
     setBusy(true);
     setResult('');
     try {
-      const signer = await connectLedger(177);
+      const signer = await connectLedger(177, ledger?.accountIndex ?? 0);
       const hash = await sendOwnerAction({
         chainId: 177,
         vault: deployment.vault,
@@ -119,6 +122,16 @@ export function MainnetOwner({
             setAck(false);
           }}
         />
+      </label>
+      <label>
+        Load generated calldata file
+        <input type="file" accept=".txt" disabled={busy} onChange={async event => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const text = await file.text();
+          setData(text.trim());
+          prepare(text);
+        }} />
       </label>
       <button disabled={busy} onClick={() => prepare(data)}>
         Review calldata

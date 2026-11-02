@@ -16,7 +16,7 @@ import {
   type Deployment,
 } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
-import { readChartRisk } from '../lib/chart-data.js';
+import { readChartRisk, sources } from '../lib/chart-data.js';
 export function ContractLink({
   chain,
   value,
@@ -293,6 +293,7 @@ export function MandateView({
         </>
       )}
       <LimitChart
+        source={chain === 177 ? sources.market : chain === 31337 ? sources.demo : sources.execution}
         mandate={
           resource.data
             ? {

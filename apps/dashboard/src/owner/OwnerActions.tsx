@@ -1,5 +1,6 @@
 import { humanError } from '../lib/errors.js';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { LedgerContext } from './LedgerContext.js';
 import {
   encodeFunctionData,
   getAddress,
@@ -56,6 +57,7 @@ export function OwnerActions({
   snapshot: VaultSnapshot;
   onConfirmed?: () => void | Promise<void>;
 }) {
+  const ledger = useContext(LedgerContext);
   const [token, setToken] = useState<'whsk' | 'usdt'>('usdt'),
     [amount, setAmount] = useState(''),
     [to, setTo] = useState(snapshot.owner);
@@ -158,7 +160,7 @@ export function OwnerActions({
         vault,
         owner: snapshot.owner,
         data: review.data,
-        signer: await connectLedger(chain),
+        signer: await connectLedger(chain, ledger?.accountIndex ?? 0),
       });
       setHash(tx);
       setReview(undefined);
