@@ -9,6 +9,9 @@ export const sources = {
   execution: 'LIVE · testnet 133',
   recorded: 'RECORDED · mainnet 177 (27/10/2026)',
   demo: 'DEMO · recorded local anvil',
+  agentSnapshot: 'RECORDED · agent snapshot',
+  agentObservation: 'LAST OBSERVATION · agent feed',
+  agentUnavailable: 'UNAVAILABLE · agent feed',
 } as const;
 export type ChartSource = (typeof sources)[keyof typeof sources];
 export type Point = { time: number; value: number };

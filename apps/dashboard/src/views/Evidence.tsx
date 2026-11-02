@@ -1,4 +1,4 @@
-import { readChartRisk } from '../lib/chart-data.js';
+import { readChartRisk, sources } from '../lib/chart-data.js';
 import { LimitChart } from '../components/charts/LimitChart.js';
 import { VaultValue } from '../components/VaultValue.js';
 import { CoinGeckoReference } from '../components/CoinGeckoReference.js';
@@ -227,6 +227,13 @@ export function EvidenceView({
         </p>
       )}
       <LimitChart
+        source={
+          chain === 177
+            ? sources.market
+            : chain === 31337
+              ? sources.demo
+              : sources.execution
+        }
         mandate={resource.data?.vault?.mandate}
         evidence={resource.data}
         at={resource.data?.chartRisk?.at ?? resource.data?.now}

@@ -8,24 +8,22 @@ import {
 import { useResource } from '../lib/useResource.js';
 const kinds = ['TRADE', 'RESIZE', 'WAIT', 'REJECT'];
 export function ReceiptsView({ chain }: { chain: DashboardChain }) {
-  const resource = useResource(
+  const files = useResource(useCallback(() => localReceiptFiles(), []));
+  const network = useResource(
     useCallback(async () => {
-      const [local, network] = await Promise.allSettled([
-        localReceiptFiles(),
-        loadDeployment(chain).then((d) => receiptLogs(chain, d)),
-      ]);
-      return {
-        local: local.status === 'fulfilled' ? local.value.receipts : [],
-        warnings: local.status === 'fulfilled' ? local.value.warnings : [],
-        logs: network.status === 'fulfilled' ? network.value : [],
-        localError:
-          local.status === 'rejected' ? String(local.reason) : undefined,
-        networkError:
-          network.status === 'rejected' ? String(network.reason) : undefined,
-      };
+      return receiptLogs(chain, await loadDeployment(chain));
     }, [chain]),
   );
-  const data = resource.data;
+  const data =
+    files.data || network.data
+      ? {
+          local: files.data?.receipts ?? [],
+          warnings: files.data?.warnings ?? [],
+          logs: network.data ?? [],
+          localError: files.error,
+          networkError: network.error,
+        }
+      : undefined;
   const [selected, setSelected] = useState('');
   const [verdict, setVerdict] = useState('All');
   return (
@@ -52,14 +50,22 @@ export function ReceiptsView({ chain }: { chain: DashboardChain }) {
         On-chain Receipt events joined by contract, transaction and receipt hash
         to locally served keeper records.
       </p>
-      {resource.loading && (
+      {(files.loading || network.loading) && (
         <p className="skeleton" role="status">
           Reading receipts…
         </p>
       )}
-      {resource.error && <p role="status">{resource.error}</p>}
+      {!data && network.error && (
+        <p role="status">On-chain events unavailable — {network.error}</p>
+      )}
+      {!data && files.error && (
+        <p>Local receipts unavailable — {files.error}</p>
+      )}
       {data?.networkError && (
-        <p role="status">On-chain events unavailable — {data.networkError}</p>
+        <p role="status">
+          On-chain events refresh unavailable — {data.networkError}.{' '}
+          {data.logs.length > 0 && 'Showing last successful observation.'}
+        </p>
       )}
       {data?.localError && (
         <p>Local receipts unavailable — {data.localError}</p>

@@ -44,15 +44,18 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
     return () => clearInterval(timer);
   }, []);
   const remaining = Math.max(0, Number(m.expiry) - now);
+  const configured = Number(m.expiry) !== 0;
   return (
     <>
       <div className="metrics">
         <article>
           <span>Mandate countdown</span>
           <strong>
-            {remaining
-              ? `${Math.floor(remaining / 3600)}h ${Math.floor((remaining % 3600) / 60)}m ${remaining % 60}s`
-              : 'Expired'}
+            {!configured
+              ? 'Not configured'
+              : remaining
+                ? `${Math.floor(remaining / 3600)}h ${Math.floor((remaining % 3600) / 60)}m ${remaining % 60}s`
+                : 'Expired'}
           </strong>
         </article>
         <article>
@@ -77,7 +80,7 @@ export function MandateDetails({ snapshot }: { snapshot: VaultSnapshot }) {
               'Router owner': snapshot.routerOwner,
               'Router pending owner': snapshot.routerPendingOwner,
               Agent: m.agent,
-              Expiry: displayTime(m.expiry),
+              Expiry: configured ? displayTime(m.expiry) : 'Not configured',
             },
           },
           {
@@ -293,7 +296,13 @@ export function MandateView({
         </>
       )}
       <LimitChart
-        source={chain === 177 ? sources.market : chain === 31337 ? sources.demo : sources.execution}
+        source={
+          chain === 177
+            ? sources.market
+            : chain === 31337
+              ? sources.demo
+              : sources.execution
+        }
         mandate={
           resource.data
             ? {

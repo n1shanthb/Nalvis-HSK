@@ -25,6 +25,7 @@ const live = {
   state: {
     ...fixture.state,
     mode: 'live' as const,
+    executionChainId: 133 as const,
     provider: 'live-provider',
     models: { strategist: 'live/strategist', fitter: 'live/fitter' },
   },

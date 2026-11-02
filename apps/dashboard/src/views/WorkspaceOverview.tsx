@@ -3,6 +3,8 @@ import { useCallback } from 'react';
 import { formatUnits } from 'viem';
 import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
+import { FeedStatus } from '../components/FeedStatus.js';
+import { MandateDetails } from './Mandate.js';
 import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import { useResource } from '../lib/useResource.js';
 import {
@@ -20,13 +22,14 @@ export default function WorkspaceOverview({
   chain: DashboardChain;
   demo: boolean;
 }) {
-  const { feed } = useAgentFeed();
+  const observation = useAgentFeed(chain);
+  const { feed } = observation;
   const events = useReceiptEvents(chain, !demo);
   const vault = useResource(
     useCallback(async () => {
       if (demo) return null;
       const deployment = await loadDeployment(chain);
-      return readVault(chain, deployment.vault);
+      return readVault(chain, deployment.vault, deployment.router);
     }, [chain, demo]),
   );
   const recorded = useResource(
@@ -47,6 +50,7 @@ export default function WorkspaceOverview({
         </p>
       </div>
       <Readiness feed={feed} demo={demo} chain={chain} />
+      <FeedStatus observation={observation} />
       <section className="next-action">
         <p className="eyebrow">NEXT ACTION</p>
         <h2>
@@ -83,12 +87,23 @@ export default function WorkspaceOverview({
             <h2>Current mandate</h2>
             <a href="#/mandate">DETAILS →</a>
           </div>
-          {mandate ? (
+          {!demo && vault.error && (
+            <p role="status">
+              Mandate refresh failed.{' '}
+              {vault.data
+                ? 'Showing last successful read; current state unavailable.'
+                : 'RPC unavailable.'}
+            </p>
+          )}
+          {!demo && vault.data && <MandateDetails snapshot={vault.data} />}
+          {!demo && vault.data ? null : mandate ? (
             <dl>
               <div>
                 <dt>Expiry</dt>
                 <dd>
-                  {displayTime(mandate.expiry)}
+                  {Number(mandate.expiry) === 0
+                    ? 'Not configured'
+                    : displayTime(mandate.expiry)}
                   {demo && ' · historical'}
                 </dd>
               </div>

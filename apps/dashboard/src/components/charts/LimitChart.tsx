@@ -98,7 +98,7 @@ export function LimitChart({
                   `${r.label}: ${r.used === undefined ? 'unavailable' : r.used.toFixed(2)} of ${r.cap.toFixed(2)}, ${r.tone}`,
               )
               .join('. ')
-          : 'Mandate not deployed on 133'
+          : 'Mandate unavailable on the selected chain'
       }
       headers={['Limit', 'Used', 'Cap', 'Remaining']}
       rows={rows.map((r) => [
@@ -110,7 +110,7 @@ export function LimitChart({
         r.remaining?.toFixed(2) ?? 'Unavailable',
       ])}
     >
-      {!mandate && <p>Mandate not deployed on 133</p>}
+      {!mandate && <p>Mandate unavailable on the selected chain</p>}
       {rows.map((r) => (
         <div className={`limit-row ${r.tone}`} key={r.label}>
           <span>{r.label}</span>
