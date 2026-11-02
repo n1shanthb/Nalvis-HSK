@@ -25,7 +25,7 @@ it.skipIf(!hasAnvil).each([31337, 177] as const)(
         heartbeatSec: 300,
         anchorSec: 600,
         dailyLlmBudgetUsd: 10,
-        ...(chainId === 177 ? { executionChainId: 177 } : {}),
+        ...(chainId === 177 ? { executionChainId: 177, marketContext: 'fresh-dex-cex' } : {}),
       });
       config = { ...config, policyFile: createAgentPolicy(config) };
       await h.write(h.vault, 'setMandate', [

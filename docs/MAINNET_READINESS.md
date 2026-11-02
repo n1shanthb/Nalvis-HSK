@@ -61,6 +61,15 @@ misconfigured testnet feed from being presented as mainnet activity.
 
 ## Human deployment after approval
 
+Optional market source policy: set AGENT_MARKET_CONTEXT=fresh-dex-cex before
+generating the policy and use the same value in the keeper runtime. This binds
+the new prompt text in the strategy hash and requires a new Ledger mandate.
+APRO remains raw evidence but is only usable corroboration within 3600 seconds;
+stale APRO alone is not a HOLD gate. MEXC/Gate context is usable within 60 seconds
+of HTTP observation (not venue price-update time). HSKSwap executable quotes and
+the contract's TWAP checks remain authoritative. Existing policies without this
+field and their receipt verification are unchanged. No trade is guaranteed.
+
 1. Select OWNER_ADDRESS (Ledger), AGENT_ADDRESS and a separate CLI-selected deployer.
    Never share keys with Codex. Set DEPLOY_COMMIT to the reviewed full commit SHA.
    Fund native HSK for gas separately from the proposed 2–3 USDT pilot inventory.

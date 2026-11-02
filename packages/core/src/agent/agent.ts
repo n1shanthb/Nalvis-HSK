@@ -19,7 +19,7 @@ import {
   type EvidenceLite,
   type FiredWatch,
 } from './monitor.js';
-import { runStrategist } from './strategist.js';
+import { runStrategist, marketSourceStatus } from './strategist.js';
 import { type Action, type Watch, type StrategistOutput } from './schema.js';
 import {
   check,
@@ -249,6 +249,7 @@ export async function createAgent({
       return;
     }
     const common = {
+      marketContext: config.marketContext,
       executionChainId: s.chainId,
       provider,
       journal,
@@ -307,6 +308,7 @@ export async function createAgent({
             input: {
               firedWatches: fired,
               evidence,
+              ...(config.marketContext ? { marketSourceStatus: marketSourceStatus(evidence) } : {}),
               vaultState: {
                 ...s,
                 valueB,
