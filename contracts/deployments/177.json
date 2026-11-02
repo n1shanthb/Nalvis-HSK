@@ -1,0 +1,24 @@
+{
+  "chainId": 177,
+  "vault": "0x8E5043edCD2710503C351b77f27958F531E0C521",
+  "router": "0x73934f4E2f51bD6191e32B1BbC2E59cA6527b88a",
+  "owner": "0xE0B9226b1488E6293D4A8FD4E1720d35eaf80419",
+  "agent": "0x746cd4270a14eb55BB8A6A4C39204C7108b0e49d",
+  "deployer": "0xDeC2B0E211a4a70D7d8863a57359A503bC77df4b",
+  "block": 29605718,
+  "commit": "7b48c95467d7be8c160e67fd0fd24481c1970aab",
+  "contracts": {
+    "EdgewiseVault": {
+      "transactionHash": "0x6de18ac3fd8c23b5af438510007a72d0ea2490d76699ab2f5086cbb55aee7e00",
+      "block": 29605718,
+      "status": "0x1"
+    },
+    "ProofTradeRouter": {
+      "transactionHash": "0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9",
+      "block": 29605724,
+      "status": "0x1"
+    }
+  },
+  "sourceVerification": "Sourcify exact_match for both contracts",
+  "executionStatus": "Mandate and funded agent execution pending"
+}
