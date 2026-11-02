@@ -41,6 +41,12 @@ A separate hot agent key has bounded trading authority, not owner withdrawal
 authority. This is an unaudited prototype, not a claim of institutional
 production readiness or institutional adoption.
 
+**Why there is no hot-wallet owner path:** this is a deliberate safety choice,
+not an omitted browser-wallet feature. Nalvis keeps mandate changes, pause,
+revoke and withdrawal authority on the Ledger for serious holders and
+institutional-style treasury workflows. A scoped agent can automate execution
+inside the signed envelope without unrestricted custody of the owner's key.
+
 ## Features
 
 - **Ledger-governed mandate:** agent identity, expiry, per-token trade caps,
