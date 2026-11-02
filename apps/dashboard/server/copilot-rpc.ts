@@ -54,7 +54,10 @@ export async function copilotState() {
   return { state, owner };
 }
 export async function copilotPreview(sessionInput: unknown, request: { direction?: 'BUY' | 'SELL'; notionalB?: string } = {}) {
+  let stage = 'session validation';
+  try {
   const session = sellSessionSchema.parse(sessionInput);
+  stage = 'vault state';
   const { state, owner } = await copilotState();
   if (
     session.owner.toLowerCase() !== owner.toLowerCase() ||
@@ -95,12 +98,14 @@ export async function copilotPreview(sessionInput: unknown, request: { direction
     amountIn = amountFor(action, state);
   if (buy && (amountIn === 0n || amountIn > state.balanceB))
     return { ...status, executable: false, reason: 'The exact USDT amount is unavailable in the vault.' };
+  stage = 'pool fee';
   const fee = await client.readContract({
     address: vault,
     abi: vaultAbi,
     functionName: 'fee',
     blockNumber: state.block,
   });
+  stage = 'DEX quote';
   const q = await client.simulateContract({
     address: addresses[177].quoterV2.address,
     abi: quoterAbi,
@@ -122,14 +127,17 @@ export async function copilotPreview(sessionInput: unknown, request: { direction
     amountIn,
     amountOut: q.result[0],
   };
+  stage = 'mandate limits';
   const preview = buy
     ? buyPreview(state, quote, session as SellSession, request.notionalB!)
     : sellPreview(state, quote, session as SellSession);
+  stage = 'swap simulation';
   const simulation = preview.checked.ok
     ? await simulate(client, state, preview.checked.prepared)
     : { ok: false };
   let gasHSK: string | null = null;
   if (simulation.ok) {
+    stage = 'gas estimate';
     const [gas, price] = await Promise.all([
       client.estimateGas({
         account: state.agent,
@@ -140,6 +148,7 @@ export async function copilotPreview(sessionInput: unknown, request: { direction
     ]);
     gasHSK = formatEther(gas * price);
   }
+  stage = 'preview response';
   return {
     ...status,
     executable: preview.checked.ok && simulation.ok,
@@ -165,4 +174,7 @@ export async function copilotPreview(sessionInput: unknown, request: { direction
     poolFeeUSDT: buy ? formatUnits((amountIn * BigInt(fee)) / 1_000_000n, state.decimalsB) : undefined,
     estimatedGasHSK: gasHSK,
   };
+  } catch {
+    throw Error(`Preview failed at ${stage}. No order was submitted.`);
+  }
 }

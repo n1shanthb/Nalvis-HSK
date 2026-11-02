@@ -55,10 +55,12 @@ async function request(body?: unknown) {
         }
       : { signal: AbortSignal.timeout(30000) },
   );
-  if (!response.ok)
-    throw Error(
-      'Could not validate the live position and review. Refresh before confirming.',
-    );
+  if (!response.ok) {
+    const error = z.object({ error: z.string() }).safeParse(await response.json().catch(() => null));
+    throw Error(error.success && error.data.error.startsWith('Preview failed at ')
+      ? error.data.error
+      : 'Could not validate the live position and review. Refresh before confirming.');
+  }
   return response.json();
 }
 export function ExitReview({

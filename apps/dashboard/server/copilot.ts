@@ -109,7 +109,7 @@ export function createCopilotHandler(
         {
           error:
             error instanceof Error &&
-            /already submitted|in progress/.test(error.message)
+            /^(Preview failed at (?:session validation|vault state|pool fee|DEX quote|mandate limits|swap simulation|gas estimate|preview response)\. No order was submitted\.|already submitted|in progress)/.test(error.message)
               ? error.message
               : 'Request failed validation, authorization, freshness or current mandate checks. Refresh the review.',
         },
