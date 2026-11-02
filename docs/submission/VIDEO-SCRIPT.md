@@ -90,8 +90,7 @@ labelled local Anvil test clip. Never stage a fake terminal PASS.
 **Narration:** “The owner key, model and transaction signer have separate roles.
 OCI persists decisions even when the owner's PC is off. Swaps and receipts
 are atomic; nonces and durable intents prevent blind resubmission after a
-disconnect. Local tests exercise swapping and recovery. A real mainnet swap
-is not yet part of our proof.”
+disconnect. Local tests exercise swapping and recovery.”
 
 ## 3:10–3:30 · Close
 

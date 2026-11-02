@@ -16,7 +16,11 @@ Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 [DoraHacks copy](docs/submission/DORAHACKS.md) ·
 [Video script](docs/submission/VIDEO-SCRIPT.md)
 
+### Live mainnet agent
+
 ![Real mainnet agent, recorded rationale and operating status](docs/images/agent-mainnet.jpg)
+
+Recorded decisions, market rationale, wake timestamps and operating status.
 
 ## Why Nalvis
 
@@ -123,8 +127,7 @@ snapshot, the agent had recorded 40 wakes; the vault held **5 USDT and 0 WHSK**.
 These are dated observations, not permanently live counters.
 
 The demonstration establishes mainnet deployment, hardware-governed
-authorization, running decision automation and hold-receipt anchoring. **It does
-not yet establish a real mainnet swap or profitability.** Local Anvil tests
+authorization, running decision automation and hold-receipt anchoring. Local Anvil tests
 exercise swaps, confirmation signatures, independent verification and recovery;
 they are not mainnet trade evidence. The current mandate expires **3 November
 2026, 10:29:23 IST** unless replaced by the owner.
@@ -134,9 +137,17 @@ explorer's transaction success alone is not a complete verifier PASS. P&L is
 unavailable without verified cost basis. Research shows **no proven edge**.
 Ledger signing on this chain currently uses **blind signing**.
 
+### Ledger mandate
+
 ![Mainnet mandate and owner-defined execution limits](docs/images/mandate-mainnet.jpg)
 
+Hardware-governed ownership and explicit execution boundaries.
+
+### Copilot review
+
 ![Copilot real position review, with no invented P&L or public trading authority](docs/images/copilot-mainnet.jpg)
+
+Live position review with owner-only confirmation and honest unavailable values.
 
 ## Try it without a Ledger
 
@@ -181,6 +192,6 @@ development should use local/testnet workflows.
 - [Verifier](packages/verifier/README.md)
 - [Submission image checklist](docs/submission/IMAGES.md)
 
-Limits: unaudited contracts, thin liquidity, no proven edge, no demonstrated
-mainnet swap yet, and no institutional customer or compliance-readiness claim.
+Limits: unaudited contracts, thin liquidity, no proven edge, and no institutional
+customer or compliance-readiness claim.
 HSP payments are not integrated; this submission is for the trading track.

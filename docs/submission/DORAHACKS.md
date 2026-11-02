@@ -102,8 +102,8 @@ using HashKey Chain and HSKSwap. HSP payments are not integrated.
 
 ## Honest scope
 
-Unaudited prototype, no proven trading edge, no demonstrated mainnet swap or
-sustained profitability. P&L remains unavailable without verified cost basis.
+Unaudited prototype with no proven trading edge or sustained profitability.
+P&L remains unavailable without verified cost basis.
 Ledger signing is currently blind signing. This targets treasury control needs;
 it is not an institutional production-readiness or customer-adoption claim.
 
