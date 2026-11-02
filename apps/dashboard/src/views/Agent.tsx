@@ -5,24 +5,17 @@ import { Readiness } from '../components/Readiness.js';
 import { useAgentFeed } from '../agent/useAgentFeed.js';
 import { fallbackMessage } from '../agent/feed-client.js';
 import { FeedStatus } from '../components/FeedStatus.js';
-import { DecisionHistory } from '../components/DecisionHistory.js';
 import { CurrentMandate } from '../components/CurrentMandate.js';
 import { AgentPulse } from '../components/AgentPulse.js';
-import { useReceiptEvents } from '../agent/useReceiptEvents.js';
 import {
   displayTime,
-  explorerLink,
   type DashboardChain,
 } from '../lib/clients.js';
-import { DeskView } from './Desk.js';
 import type { OwnerProposal } from '../../../../packages/core/src/desk/proposal.js';
-import { OperationView } from '../components/operations/OperationView.js';
 const at = (time: number | null | undefined) =>
   time ? displayTime(time) : 'Not scheduled';
 export function AgentView({
   chain = 133,
-  enableOwner = true,
-  onProposal,
 }: {
   chain?: DashboardChain;
   enableOwner?: boolean;
@@ -30,10 +23,6 @@ export function AgentView({
 }) {
   const observation = useAgentFeed(chain);
   const { feed, unreachable } = observation;
-  const receipts = useReceiptEvents(
-    chain,
-    !feed || unreachable || feed.state.mode === 'live',
-  );
   const [history, setHistory] = useState(false);
   const state = feed?.state;
   const mode = !state
@@ -58,77 +47,11 @@ export function AgentView({
       <FeedStatus observation={observation} />
       <AgentPulse observation={observation} />
       {state?.mode !== 'demo' && <CurrentMandate chain={chain} />}
-      <details className="secondary-section">
-        <summary>Full decision history & negotiation</summary>
-        <DecisionHistory
-          actions={feed?.actions ?? []}
-          chain={chain}
-          provenance={observation.provenance}
-        />
-      </details>
+      <p><a href="#/activity">View decisions and receipts →</a></p>
       {unreachable && <p role="status">{fallbackMessage}</p>}
-      <OperationView feed={feed} />
+      <p><a href="#/operations">Open 3D operations view →</a></p>
       <div className="agent-workspace">
-        <section className="agent-chat">
-          <p className="eyebrow">NALVIS COPILOT</p>
-          <DeskView
-            allowTrading={
-              enableOwner && chain === 177 && state?.mode !== 'demo'
-            }
-            demo={state?.mode === 'demo'}
-            chain={chain}
-            onProposal={
-              enableOwner && state?.mode !== 'demo' && chain === 133
-                ? onProposal
-                : undefined
-            }
-          />
-        </section>
-        <aside className="agent-events">
-          <p className="eyebrow">LATEST DECISIONS</p>
-          <p>
-            Intent, fitted proposal and final verdict remain separate.{' '}
-            <a href="#/activity">Open Activity →</a>
-          </p>
-          <article className="agent-card">
-            <h3>On-chain decisions timeline</h3>
-            {receipts.range && !feed && (
-              <p>Showing receipts from block {receipts.range}</p>
-            )}
-            {receipts.hasOlder && (
-              <button onClick={() => void receipts.loadOlder()}>
-                Load older receipts
-              </button>
-            )}
-            <p>Refreshes every 30 seconds.</p>
-            {receipts.error && (
-              <p>
-                Receipts unavailable. Check the selected deployment and RPC
-                connection.
-              </p>
-            )}
-            {receipts.data?.map((l) => (
-              <p key={l.transactionHash + l.logIndex}>
-                {displayTime(l.at)} ·{' '}
-                {['TRADE', 'RESIZE', 'WAIT', 'REJECT'][l.args.kind ?? 3]} ·{' '}
-                <a href={explorerLink(chain, 'tx', l.transactionHash)}>
-                  Transaction ↗
-                </a>{' '}
-                ·{' '}
-                <a href={`#/verify?tx=${l.transactionHash}`}>
-                  Verify receipt {String(l.args.seq)}
-                </a>
-              </p>
-            ))}
-            {!receipts.data?.length && (
-              <p>
-                {feed
-                  ? 'No on-chain receipts loaded for this observation.'
-                  : 'Waiting for agent receipts.'}
-              </p>
-            )}
-          </article>
-        </aside>
+        <p><a href="#/desk">Open Nalvis Copilot →</a></p>
       </div>
       <details className="secondary-section">
         <summary>Agent status & scheduling</summary>

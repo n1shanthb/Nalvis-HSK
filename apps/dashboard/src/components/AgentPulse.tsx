@@ -15,6 +15,16 @@ const policySummary = z.object({
   }),
 });
 const outcomes = ['TRADE', 'RESIZE', 'WAIT', 'REJECT'];
+function signalLabel(raw: string) {
+  const quote = /dex_buy_quote(?:_([\d.]+)B)?_([\d.]+)_vs_(gate|mexc)_ask_([\d.]+)/i.exec(raw);
+  if (quote) return `DEX BUY ${quote[2]} vs ${quote[3].toUpperCase()} ask ${quote[4]}`;
+  const converge = /dex_mid_([\d.]+)_above_convergence_([\d.]+)/i.exec(raw);
+  if (converge) return `DEX ${converge[1]} · watch ${converge[2]}`;
+  if (/vault_balanceA_zero_sell_infeasible/i.test(raw)) return 'SELL unavailable · no WHSK in vault';
+  if (/apro_stale_excluded/i.test(raw)) return 'APRO stale · excluded';
+  if (/heartbeat_time_only/i.test(raw)) return 'Time check only · no market trigger';
+  return raw.replaceAll('_', ' ').replace(/\bbalanceA\b/gi, 'WHSK balance');
+}
 /** Summarizes recorded outputs; the feed does not expose an in-flight model phase. */
 export function AgentPulse({
   observation,
@@ -101,11 +111,11 @@ export function AgentPulse({
           </strong>
         </div>
       </div>
-      <article className="pulse-rationale">
-        <p className="micro-label">
-          LATEST RECORDED RATIONALE{' '}
+      <details className="pulse-rationale">
+        <summary>
+          {latest?.final.kind ?? 'Decision'} · recorded rationale{' '}
           {latest ? `· ${displayTime(latest.at)}` : ''}
-        </p>
+        </summary>
         <p>
           {latest?.trail ||
             'No explanation supplied in the current observation.'}
@@ -114,24 +124,40 @@ export function AgentPulse({
           Recorded output from the last decision. In-progress model thinking is
           not exposed by the feed.
         </small>
-      </article>
+      </details>
       <div className="pulse-grid">
         <div>
           <h3>Strategy & execution</h3>
           {strategyNotes.data && (
             <article className="recorded-thesis">
-              <p className="micro-label">LATEST RECORDED STRATEGY THESIS</p>
-              <p>{strategyNotes.data.thesis}</p>
-              <p>
-                Model-reported confidence:{' '}
-                {Math.round(strategyNotes.data.confidence * 100)}% (not a win
-                probability).
-              </p>
-              <ul>
+              <div className="thesis-heading">
+                <span className="micro-label">LATEST RECORDED DECISION</span>
+                <strong className={`badge ${latest?.final.kind ?? ''}`}>
+                  {latest?.final.kind ?? 'UNKNOWN'}
+                </strong>
+              </div>
+              <div className="thesis-signals" aria-label="Decision signals">
                 {strategyNotes.data.signals.map((signal, i) => (
-                  <li key={i}>{signal}</li>
+                  <div className="thesis-signal" key={i}>
+                    <span className="micro-label">SIGNAL {i + 1}</span>
+                    <strong>{signalLabel(signal)}</strong>
+                  </div>
                 ))}
-              </ul>
+              </div>
+              <details>
+                <summary>Decision details and model rationale</summary>
+                <p>{strategyNotes.data.thesis}</p>
+                <p>
+                  Model-reported confidence:{' '}
+                  {Math.round(strategyNotes.data.confidence * 100)}% (not a win
+                  probability).
+                </p>
+                <ul>
+                  {strategyNotes.data.signals.map((signal, i) => (
+                    <li key={i}><code>{signal}</code></li>
+                  ))}
+                </ul>
+              </details>
             </article>
           )}
           {strategyNotes.error && (

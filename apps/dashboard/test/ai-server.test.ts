@@ -15,8 +15,6 @@ const env = {
   DESK_AI_ENABLED: 'true',
   VERCEL: '1',
   DESK_IP_HASH_SECRET: 'x'.repeat(32),
-  GROQ_API_KEY: 'test-only-placeholder',
-  GROQ_MODEL: 'configured-model',
   OPENROUTER_API_KEY: 'test-only-placeholder',
   OPENROUTER_MODEL: 'configured-router-model',
 };
@@ -42,19 +40,16 @@ describe('server-only language translation', () => {
         await handle(new Request('https://nalvis.example/api/desk'))
       ).json(),
     ).toEqual({
-      providers: [
-        { id: 'groq', available: false },
-        { id: 'openrouter', available: false },
-      ],
+      providers: [{ id: 'openrouter', available: false }],
       credits: null,
       status: 'disabled',
     });
     expect(
-      (await handle(request({ provider: 'groq', text: 'hello' }))).status,
+      (await handle(request({ provider: 'openrouter', text: 'hello' }))).status,
     ).toBe(503);
     expect(send).not.toHaveBeenCalled();
   });
-  for (const provider of ['groq', 'openrouter'])
+  for (const provider of ['openrouter'])
     it(`uses the fixed ${provider} endpoint and returns only a validated command with hashes`, async () => {
       const send = vi
         .fn()
@@ -69,18 +64,12 @@ describe('server-only language translation', () => {
       expect(result.command).toBe('show positions');
       expect(result.promptHash).toMatch(/^[a-f0-9]{64}$/);
       expect(result.outputHash).toMatch(/^[a-f0-9]{64}$/);
-      expect(send.mock.calls[0][0]).toBe(
-        provider === 'groq'
-          ? 'https://api.groq.com/openai/v1/chat/completions'
-          : 'https://openrouter.ai/api/v1/chat/completions',
-      );
+      expect(send.mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
       const options = send.mock.calls[0][1];
       expect(options.headers.Authorization).toBe(
         'Bearer test-only-placeholder',
       );
-      expect(JSON.parse(options.body).model).toBe(
-        provider === 'groq' ? env.GROQ_MODEL : env.OPENROUTER_MODEL,
-      );
+      expect(JSON.parse(options.body).model).toBe(env.OPENROUTER_MODEL);
       expect(JSON.stringify(result)).not.toContain('test-only-placeholder');
     });
   for (const content of [
@@ -94,7 +83,7 @@ describe('server-only language translation', () => {
         env,
         vi.fn().mockResolvedValue(completion(content)),
         budget(),
-      )(request({ provider: 'groq', text: 'hello' }));
+      )(request({ provider: 'openrouter', text: 'hello' }));
       expect(response.status).toBeGreaterThanOrEqual(400);
     });
   it('rejects tools, foreign origins, excessive bodies and client model overrides', async () => {
@@ -107,26 +96,26 @@ describe('server-only language translation', () => {
     );
     const handle = createDeskHandler(env, send, budget());
     expect(
-      (await handle(request({ provider: 'groq', text: 'pause' }))).status,
+      (await handle(request({ provider: 'openrouter', text: 'pause' }))).status,
     ).toBe(502);
     expect(
       (
         await handle(
           request(
-            { provider: 'groq', text: 'pause' },
+            { provider: 'openrouter', text: 'pause' },
             { origin: 'https://evil.example' },
           ),
         )
       ).status,
     ).toBe(403);
     expect(
-      (await handle(request({ provider: 'groq', text: 'x'.repeat(5000) })))
+      (await handle(request({ provider: 'openrouter', text: 'x'.repeat(5000) })))
         .status,
     ).toBe(413);
     expect(
       (
         await handle(
-          request({ provider: 'groq', text: 'pause', model: 'override' }),
+          request({ provider: 'openrouter', text: 'pause', model: 'override' }),
         )
       ).status,
     ).toBe(400);
@@ -144,7 +133,7 @@ describe('server-only language translation', () => {
       env,
       send,
       store,
-    )(request({ provider: 'groq', text: 'pause' }));
+    )(request({ provider: 'openrouter', text: 'pause' }));
     expect(r.status).toBe(429);
     expect((await r.json()).credits.remaining).toBe(0);
     expect(send).not.toHaveBeenCalled();
@@ -160,7 +149,7 @@ describe('server-only language translation', () => {
       env,
       send,
       store,
-    )(request({ provider: 'groq', text: 'pause' }));
+    )(request({ provider: 'openrouter', text: 'pause' }));
     expect(r.status).toBe(502);
     const body = await r.json();
     expect(body.credits).toEqual(credits);
@@ -174,7 +163,7 @@ describe('server-only language translation', () => {
         await createDeskHandler(
           env,
           send,
-        )(request({ provider: 'groq', text: 'pause' }))
+        )(request({ provider: 'openrouter', text: 'pause' }))
       ).status,
     ).toBe(503);
     expect(
@@ -183,7 +172,7 @@ describe('server-only language translation', () => {
           { ...env, DESK_AI_ENABLED: undefined },
           send,
           budget(),
-        )(request({ provider: 'groq', text: 'pause' }))
+        )(request({ provider: 'openrouter', text: 'pause' }))
       ).status,
     ).toBe(503);
     expect(
@@ -194,7 +183,7 @@ describe('server-only language translation', () => {
           budget(),
         )(
           request(
-            { provider: 'groq', text: 'pause' },
+            { provider: 'openrouter', text: 'pause' },
             { 'x-forwarded-for': '192.0.2.1' },
           ),
         )
@@ -206,7 +195,7 @@ describe('server-only language translation', () => {
           env,
           send,
           budget(),
-        )(request({ provider: 'groq', text: 'pause' }, { origin: '' }))
+        )(request({ provider: 'openrouter', text: 'pause' }, { origin: '' }))
       ).status,
     ).toBe(403);
     expect(send).not.toHaveBeenCalled();
@@ -218,7 +207,7 @@ describe('server-only language translation', () => {
       };
     const handle = createDeskHandler(env, send, store);
     expect(
-      (await handle(request({ provider: 'groq', text: 'pause' }))).status,
+      (await handle(request({ provider: 'openrouter', text: 'pause' }))).status,
     ).toBe(503);
     const r = await createDeskHandler(
       env,
@@ -235,7 +224,7 @@ describe('server-only language translation', () => {
     expect(JSON.stringify(body)).not.toContain('model');
     expect(send).not.toHaveBeenCalled();
   });
-  it('disables both providers with the server kill switch', async () => {
+  it('disables the provider with the server kill switch', async () => {
     const send = vi.fn();
     expect(
       (
@@ -243,7 +232,7 @@ describe('server-only language translation', () => {
           { ...env, DESK_AI_ENABLED: 'false' },
           send,
           budget(),
-        )(request({ provider: 'groq', text: 'pause' }))
+        )(request({ provider: 'openrouter', text: 'pause' }))
       ).status,
     ).toBe(503);
     expect(send).not.toHaveBeenCalled();
@@ -257,7 +246,7 @@ it('does not let AI reinterpret mat karo as an owner action', async () => {
     env,
     send,
     store,
-  )(request({ provider: 'groq', text: 'mat karo' }));
+  )(request({ provider: 'openrouter', text: 'mat karo' }));
   expect(result.status).toBe(422);
   expect(send).not.toHaveBeenCalled();
   expect(store.check).not.toHaveBeenCalled();

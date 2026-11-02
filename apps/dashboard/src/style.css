@@ -1875,3 +1875,8 @@ progress {
     flex-wrap: wrap;
   }
 }
+.thesis-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.thesis-signals { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.75rem; margin:1rem 0; }
+.thesis-signal { display:grid; align-content:start; gap:.35rem; min-width:0; padding:1rem; border:1px solid var(--border, #364353); border-radius:12px; background:var(--surface-raised, #222d3a); }
+.thesis-signal strong { overflow-wrap:anywhere; font-size:.95rem; line-height:1.35; font-weight:600; }
+.recorded-thesis details { margin-top:.75rem; }

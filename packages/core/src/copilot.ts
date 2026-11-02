@@ -19,7 +19,7 @@ const second = z.number().int().nonnegative();
 export const sellSessionSchema = z
   .object({
     version: z.literal(1),
-    scope: z.literal('SELL_WITHIN_MANDATE'),
+    scope: z.enum(['SELL_WITHIN_MANDATE', 'TRADE_WITHIN_MANDATE']),
     chainId: z.union([z.literal(177), z.literal(133), z.literal(31337)]),
     owner: address,
     vault: address,
@@ -38,6 +38,7 @@ export const sellOrderSchema = z
     vault: address,
     policyHash: commitment,
     tokenIn: address,
+    direction: z.enum(['BUY', 'SELL']).optional(),
     notionalB: z
       .string()
       .regex(/^\d+(\.\d+)?$/)
@@ -66,8 +67,10 @@ export type SellOrder = z.infer<typeof sellOrderSchema>;
 export type SignedSellOrder = z.infer<typeof signedSellOrderSchema>;
 export const sellSessionMessage = (s: SellSession) =>
   [
-    'Nalvis Copilot: authorize a temporary sell session',
-    'Scope: SELL only, within the existing mandate. No withdrawals or mandate changes.',
+    `Nalvis Copilot: authorize a temporary ${s.scope === 'TRADE_WITHIN_MANDATE' ? 'trade' : 'sell'} session`,
+    s.scope === 'TRADE_WITHIN_MANDATE'
+      ? 'Scope: BUY or SELL within the existing mandate. No withdrawals or mandate changes.'
+      : 'Scope: SELL only, within the existing mandate. No withdrawals or mandate changes.',
     `Owner: ${s.owner}`,
     `Vault: ${s.vault}`,
     `Chain: ${s.chainId}`,
@@ -118,6 +121,8 @@ export async function assertSellAuthorization(
     o.delegationHash !== hash(d)
   )
     throw Error('Expired or invalid sell authorization');
+  if (o.direction === 'BUY' && d.scope !== 'TRADE_WITHIN_MANDATE')
+    throw Error('BUY requires an owner-authorized trade session');
   if (
     !(await verifyMessage({
       address: d.owner,

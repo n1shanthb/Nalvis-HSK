@@ -13,6 +13,7 @@ import {
 import {
   sellActionFor,
   sellPreview,
+  buyPreview,
 } from '../../core/src/agent/owner-preview.js';
 import { ownerReceiptHash } from '../../core/src/agent/owner-receipt.js';
 import {
@@ -68,7 +69,7 @@ it.skipIf(!hasAnvil).each([31337, 177] as const)(
       const first = await h.state();
       const delegation: SellSession = {
         version: 1,
-        scope: 'SELL_WITHIN_MANDATE',
+        scope: 'TRADE_WITHIN_MANDATE',
         owner: owner.address,
         vault: h.vault.address,
         chainId,
@@ -116,6 +117,22 @@ it.skipIf(!hasAnvil).each([31337, 177] as const)(
       }
       expect((await h.state()).balanceA).toBeLessThan(first.balanceA);
       expect((await h.state()).balanceB).toBeGreaterThan(first.balanceB);
+      const afterSells = await h.state();
+      await h.advance(301);
+      const buyState = await h.state();
+      const buyAction = { type: 'BUY' as const, notionalB: '1', urgency: 'now' as const, reason: 'Owner-confirmed Copilot buy' };
+      const buy = buyPreview(buyState, await h.quote(buyAction, buyState), delegation, '1');
+      const buySigned = {
+        delegation,
+        ownerSignature,
+        order: buy.order,
+        orderSignature: await browser.signMessage({ message: { raw: hash(buy.order) } }),
+      };
+      const buyReceipt = await agent.executeOwnerSell(buySigned);
+      expect(buyReceipt.final.direction).toBe('BUY');
+      expect((await verify(buyReceipt, rpcReader(h.url), { agentStore: store })).status).toBe('PASS');
+      await expect(agent.executeOwnerSell(buySigned)).rejects.toThrow();
+      expect((await h.state()).balanceA).toBeGreaterThan(afterSells.balanceA);
     } finally {
       await h.stop();
     }

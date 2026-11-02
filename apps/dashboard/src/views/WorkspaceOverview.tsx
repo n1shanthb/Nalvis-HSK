@@ -12,6 +12,7 @@ import {
   loadDeployment,
   readVault,
   displayTime,
+  explorerLink,
   type DashboardChain,
 } from '../lib/clients.js';
 import { demoContext, demoReceipts } from '../lib/demo.js';
@@ -178,7 +179,7 @@ export default function WorkspaceOverview({
               <a
                 className="activity-preview"
                 key={r.transactionHash + r.logIndex}
-                href={`#/verify?tx=${r.transactionHash}`}
+                href={explorerLink(chain, 'tx', r.transactionHash)}
               >
                 <span className="badge">
                   {['TRADE', 'RESIZE', 'WAIT', 'REJECT'][r.args.kind ?? 3]}

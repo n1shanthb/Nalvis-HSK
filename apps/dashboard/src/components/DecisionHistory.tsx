@@ -186,15 +186,8 @@ export function DecisionHistory({
                   )}
                   {action.txHash && (
                     <>
-                      {explorerLink(chain, 'tx', action.txHash) && (
-                        <a href={explorerLink(chain, 'tx', action.txHash)}>
-                          Transaction ↗
-                        </a>
-                      )}{' '}
-                      <a
-                        href={`#/verify?tx=${encodeURIComponent(action.txHash)}`}
-                      >
-                        Verify receipt
+                      <a href={explorerLink(chain, 'tx', action.txHash)} target="_blank" rel="noreferrer">
+                        View transaction on Blockscout ↗
                       </a>
                       {provenance === 'live' && opened[actionKey(action)] ? (
                         <TransactionState hash={action.txHash} chain={chain} />

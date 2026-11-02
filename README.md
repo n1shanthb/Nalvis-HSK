@@ -74,9 +74,9 @@ inside the signed envelope without unrestricted custody of the owner's key.
   WAIT/REJECT decisions are anchored without a swap; not every wake is a new
   on-chain transaction. The verifier checks commitments and transaction
   bindings, with independent replay for supported receipts and artifacts.
-- **Nalvis Copilot:** natural-language interpretation and a fresh WHSK-to-USDT
+- **Nalvis Copilot:** natural-language interpretation and fresh USDT-to-WHSK or WHSK-to-USDT
   sell review showing balances, quoted/minimum output and estimated costs.
-  One Ledger authorization creates a 15-minute SELL-only session; each order
+  One Ledger authorization creates a 15-minute mandate-scoped trading session; each order
   still needs explicit Confirm but no new Ledger prompt. Public viewers cannot
   trade. Owner-directed receipts are distinct from autonomous decisions.
 - **Always-on workspace:** persistent OCI keeper, read-only live feed, Vercel

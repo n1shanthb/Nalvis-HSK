@@ -6,19 +6,14 @@ import { MandateWizard } from '../src/owner/MandateWizard.js';
 import { LedgerProvider } from '../src/owner/LedgerContext.js';
 import { ConnectLedger } from '../src/owner/ConnectLedger.js';
 import { snapshot, vault, owner } from './ux-fixtures.js';
-test('drawer makes background inert, closes with document Escape, and restores focus', async () => {
+test('Copilot opens as its own page with a navigable route', async () => {
   window.history.replaceState(null, '', '?demo=1#/agent');
   render(<App initialRoute="agent" />);
-  const trigger = screen.getByRole('button', { name: 'Nalvis Copilot' });
-  trigger.focus();
-  fireEvent.click(trigger);
-  await screen.findByRole('dialog');
-  expect(trigger.closest('[inert]')).toBeTruthy();
-  fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(document.activeElement).toBe(trigger);
+  fireEvent.click(screen.getByRole('link', { name: 'Nalvis Copilot' }));
+  await screen.findByRole('heading', { name: 'Nalvis Copilot' });
+  expect(window.location.hash).toBe('#/desk');
   expect(
-    screen.getByRole('link', { name: 'Agent' }).getAttribute('aria-current'),
+    screen.getByRole('link', { name: 'Copilot' }).getAttribute('aria-current'),
   ).toBe('page');
 });
 test('watch tabs respond to arrows and label their panel', () => {

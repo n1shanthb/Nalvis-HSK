@@ -81,10 +81,49 @@ export function sellPreview(
   };
   return { action, checked, order, state, quote };
 }
+/** Exact owner-selected USDT size; deterministic checks may reject but never resize it. */
+export function buyPreview(
+  state: MandateState,
+  quote: ExecQuote,
+  session: SellSession,
+  notionalB: string,
+) {
+  if (session.scope !== 'TRADE_WITHIN_MANDATE')
+    throw Error('BUY requires an owner-authorized trade session');
+  const action: Action = {
+    type: 'BUY',
+    notionalB,
+    urgency: 'now',
+    reason: 'Owner-confirmed Copilot buy',
+  };
+  const validUntil = Math.min(state.blockTime + 90, session.expiresAt);
+  const checked = check(action, state, quote, { deadline: validUntil, validUntil });
+  const p = checked.prepared;
+  const order: SellOrder = {
+    version: 1,
+    delegationHash: hash(session),
+    chainId: state.chainId,
+    vault: state.vault,
+    policyHash: state.mandate.policyHash,
+    tokenIn: p.tokenIn,
+    direction: 'BUY',
+    notionalB,
+    amountIn: String(p.amountIn),
+    minOut: String(p.minOut),
+    expectedOut: String(quote.amountOut),
+    nonce: String(p.nonce),
+    seq: String(state.seq),
+    prevHead: state.head,
+    stateHash: hash(state),
+    createdAt: state.blockTime,
+    validUntil,
+  };
+  return { action, checked, order, state, quote };
+}
 export function preparedSellOrder(order: SellOrder) {
   return {
     kind: 'TRADE' as const,
-    direction: 'SELL' as const,
+    direction: order.direction ?? 'SELL',
     tokenIn: order.tokenIn,
     amountIn: BigInt(order.amountIn),
     minOut: BigInt(order.minOut),
@@ -102,7 +141,7 @@ export function matchesConfirmedSell(
   return (
     seq === BigInt(order.seq) &&
     prepared.kind === 'TRADE' &&
-    prepared.direction === 'SELL' &&
+    prepared.direction === (order.direction ?? 'SELL') &&
     prepared.tokenIn.toLowerCase() === order.tokenIn.toLowerCase() &&
     prepared.amountIn === BigInt(order.amountIn) &&
     prepared.minOut === BigInt(order.minOut) &&
