@@ -5,13 +5,13 @@ profit charts, fabricated returns, customer logos, audit seals or endorsement ba
 
 ## Included images
 
-1. **`../images/agent-mainnet.png` — lead/cover.** Real chain-177 agent, wake
+1. **`../images/agent-mainnet.jpg` — lead/cover.** Real chain-177 agent, wake
    timestamp, WAIT rationale and counters. Caption: “Live mainnet decisions;
    recorded rationale, not in-progress model thinking.”
-2. **`../images/mandate-mainnet.png` — owner boundaries.** Owner, agent, expiry
+2. **`../images/mandate-mainnet.jpg` — owner boundaries.** Owner, agent, expiry
    and limits. Caption: “Hardware-governed authority; allocated trading funds
    live in the vault.”
-3. **`../images/copilot-mainnet.png` — reviewed action.** Actual zero-WHSK state.
+3. **`../images/copilot-mainnet.jpg` — reviewed action.** Actual zero-WHSK state.
    Caption: “No position means no sell; public viewing grants no trading authority.”
 
 README embeds these images and contains an editable Mermaid architecture

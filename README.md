@@ -16,7 +16,7 @@ Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 [DoraHacks copy](docs/submission/DORAHACKS.md) ·
 [Video script](docs/submission/VIDEO-SCRIPT.md)
 
-![Real mainnet agent, recorded rationale and operating status](docs/images/agent-mainnet.png)
+![Real mainnet agent, recorded rationale and operating status](docs/images/agent-mainnet.jpg)
 
 ## Why Nalvis
 
@@ -134,9 +134,9 @@ explorer's transaction success alone is not a complete verifier PASS. P&L is
 unavailable without verified cost basis. Research shows **no proven edge**.
 Ledger signing on this chain currently uses **blind signing**.
 
-![Mainnet mandate and owner-defined execution limits](docs/images/mandate-mainnet.png)
+![Mainnet mandate and owner-defined execution limits](docs/images/mandate-mainnet.jpg)
 
-![Copilot real position review, with no invented P&L or public trading authority](docs/images/copilot-mainnet.png)
+![Copilot real position review, with no invented P&L or public trading authority](docs/images/copilot-mainnet.jpg)
 
 ## Try it without a Ledger
 
