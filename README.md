@@ -22,7 +22,7 @@ Built for **HSK Chain Horizon · Track 1: AI Agent Trading**.
 
 **Verify in three steps:** [watch the mainnet agent](https://nalvis-hsk-delta.vercel.app/#/agent),
 [inspect the Ledger-owned vault](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521),
-then [inspect a WAIT receipt](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
+then [inspect the verified mainnet BUY](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b).
 
 ### Live mainnet agent
 
@@ -116,6 +116,7 @@ authority; it does not eliminate smart-contract, key, liquidity or market risk.
 - [ProofTradeRouter deployment transaction](https://hsk.blockscout.com/tx/0xa1bda1f55e674d1ed07e6e97949b4b0fae2e4d7f405b1935960c6f0d79a81eb9).
 - [Ledger-authorized mandate update](https://hsk.blockscout.com/tx/0x906f856f7af4fe56a53fbc5d352e3274daf963593e0f3102d4628faf3367f59c).
 - [Mainnet WAIT anchor · receipt sequence 3](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
+- [Mainnet owner-confirmed BUY · receipt sequence 6](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b).
 - [Inspect that receipt in Verify](https://nalvis-hsk-delta.vercel.app/#/verify?tx=0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
 
 Both mainnet sources have Sourcify exact-match verification recorded in the
@@ -135,6 +136,33 @@ mainnet. Testnet prices are not real. No testnet trade receipt is claimed.
 
 ## What the live demonstration proves
 
+### Verified mainnet swap · 2 November 2026, 21:51:55 IST
+
+The Ledger owner authorized a scoped Copilot session and separately confirmed
+a **1 USDT → 11.391399167725834581 WHSK** BUY. The agent submitted the swap
+through EdgewiseVault on HashKey Chain 177 in [transaction
+`0x7a3020…d5722b`](https://hsk.blockscout.com/tx/0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b),
+mined successfully in block **29644690**. The on-chain vault Receipt event is
+sequence **6**, receipt hash
+`0x7866962effe9baba1758c81832dc14d8dd9654a8ee73a23b48b63fbe97501200`.
+The USDT transfer, HSKSwap pool Swap event and WHSK transfer to the vault are
+visible in the transaction logs. This was an **owner-directed BUY**, not an
+autonomous Strategist/Fitter decision or a claim of profit.
+
+The independent verifier returned **PASS** for all 18 v4 checks: owner
+signature, mandate replay, historical owner/state, evidence and journal hashes,
+exact calldata, transaction sender/destination, vault Receipt event, expiry and
+chain head. The [receipt and verification artifacts](receipts/177/agent/receipts/0x7866962effe9baba1758c81832dc14d8dd9654a8ee73a23b48b63fbe97501200.json)
+are frozen in this repository. Reproduce against the mainnet RPC with:
+
+```sh
+pnpm verify 0x7a3020fb769d4181f235dc40483b74fe4c7408a02a311d5e30b3c16390d5722b \
+  --receipt receipts/177/agent/receipts/0x7866962effe9baba1758c81832dc14d8dd9654a8ee73a23b48b63fbe97501200.json \
+  --agent-root receipts/177/agent --rpc https://mainnet.hsk.xyz --chain 177
+```
+
+The earlier snapshot below predates this BUY and remains a dated record.
+
 Read-only checks on **2 November 2026, 16:33 IST**, mainnet block **29635128**,
 confirmed the Ledger owner, configured agent, live mandate and four vault
 receipt commitments. The keeper was online with a matching policy hash.
@@ -142,7 +170,7 @@ The sampled anchor above is a successful **`commitHold`**, not a swap. At that
 snapshot, the agent had recorded 40 wakes; the vault held **5 USDT and 0 WHSK**.
 These are dated observations, not permanently live counters.
 
-The demonstration establishes mainnet deployment, hardware-governed
+That earlier observation established mainnet deployment, hardware-governed
 authorization, running decision automation and hold-receipt anchoring. Local Anvil tests
 exercise swaps, confirmation signatures, independent verification and recovery;
 they are not mainnet trade evidence. The current mandate expires **3 November
