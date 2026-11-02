@@ -2,7 +2,16 @@
 
 **Keep ownership on a Ledger. Give an agent boundaries, not an unrestricted wallet.**
 
+Nalvis combines a Ledger-owned vault on HashKey mainnet, a running LLM
+Strategist and Fitter, and on-chain mandate limits. Its public agent feed shows
+what the agent considered, when it acted or waited, and the evidence behind its
+decision.
+
 [Live app](https://nalvis-hsk-delta.vercel.app/) · [GitHub](https://github.com/n1shanthb/Nalvis-HSK) · [Live mainnet agent](https://nalvis-hsk-delta.vercel.app/#/agent)
+
+**Verify it:** [open the agent](https://nalvis-hsk-delta.vercel.app/#/agent) →
+[inspect the vault](https://hsk.blockscout.com/address/0x8E5043edCD2710503C351b77f27958F531E0C521) →
+[inspect a WAIT receipt](https://hsk.blockscout.com/tx/0xad4ede6b975f9178cdbfa5e6a5501603c625238094d76ac894c8bacc0f36c592).
 
 ## The problem
 
