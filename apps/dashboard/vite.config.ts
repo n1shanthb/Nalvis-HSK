@@ -59,8 +59,14 @@ export default defineConfig({
     {
       name: 'desk-server',
       configureServer(server) {
+        const feedEnvironment = {
+          ...loadEnv(server.config.mode, root, ''),
+          ...process.env,
+        };
         const agentFeed = createAgentFeedHandler(
-          process.env.AGENT_FEED_UPSTREAM ?? demoFeedUpstream,
+          feedEnvironment.AGENT_FEED_UPSTREAM ?? demoFeedUpstream,
+          fetch,
+          feedEnvironment.AGENT_FEED_PROXY_TOKEN,
         );
         server.middlewares.use('/api/agent', async (req, res) => {
           const response = await agentFeed(

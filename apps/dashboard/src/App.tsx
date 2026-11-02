@@ -22,6 +22,7 @@ const VerifyView = lazy(() =>
 import { type DashboardChain } from './lib/clients.js';
 import { invalidateReads } from './lib/useResource.js';
 import { AgentFeedProvider } from './agent/useAgentFeed.js';
+import { WorkspaceAccess } from './components/WorkspaceAccess.js';
 import './style.css';
 const OwnerPanel = lazy(() => import('./owner/MandateForm.js'));
 const DemoConsole = lazy(() =>
@@ -95,187 +96,194 @@ function AppContent({
   }, []);
   if (route === 'home') return <Landing />;
   return (
-    <AgentFeedProvider chain={chain}>
-      <div className="shell ux-shell">
-        <div inert={deskOpen || undefined}>
-          <Header
-            activeRoute={route}
-            demo={demo}
-            onDesk={() => {
-              setProposal(undefined);
-              setDeskOpen(true);
-            }}
-          />
-          {demo && (
-            <div className="banner" role="note">
-              DEMO · local anvil — prices not real · offline recorded receipts
-            </div>
-          )}
-          {!demo && chain === 133 && (
-            <div className="banner" role="note">
-              Testnet — pool prices are not real
-            </div>
-          )}
-          {!demo && chain === 31337 && (
-            <div className="banner" role="note">
-              local anvil — prices not real
-            </div>
-          )}
-          {!demo && chain === 177 && (
-            <div className="banner" role="note">
-              Mainnet 177 — real funds; owner actions require explicit build
-              activation
-            </div>
-          )}
-          <main
-            id="workspace-main"
-            tabIndex={-1}
-            key={`${chain}-${route}-${demo}`}
-          >
-            <Suspense
-              fallback={
-                <div className="skeleton" role="status">
-                  Loading console…
-                </div>
-              }
-            >
-              {route === 'overview' ? (
-                <WorkspaceOverview chain={chain} demo={demo} />
-              ) : route === 'activity' ? (
-                <ActivityView chain={chain} demo={demo} />
-              ) : route === 'agent' ? (
-                <AgentView
-                  chain={chain}
-                  enableOwner={enableOwner}
-                  onProposal={(p) => {
-                    setProposal(p);
-                    window.location.hash = '#/mandate';
-                    setRoute('mandate');
-                  }}
-                />
-              ) : route === 'desk' ? (
-                <DeskView
-                  demo={demo}
-                  chain={chain}
-                  onProposal={
-                    enableOwner && !demo && chain === 133
-                      ? (p) => {
-                          setProposal(p);
-                          window.location.hash = '#/mandate';
-                          setRoute('mandate');
-                        }
-                      : undefined
-                  }
-                />
-              ) : route === 'verify' ? (
-                <VerifyView chain={demo ? 31337 : chain} demo={demo} />
-              ) : demo && (route === 'mandate' || route === 'setup') ? (
-                <DemoMandate setup={route === 'setup'} />
-              ) : demo ? (
-                <DemoConsole route={route} />
-              ) : (
-                <>
-                  {(route === 'mandate' || route === 'setup') && (
-                    <MandateView
-                      chain={chain}
-                      setup={route === 'setup'}
-                      onOwner={
-                        enableOwner
-                          ? (d, s, reload) =>
-                              chain === 177 ? (
-                                <MainnetOwner
-                                  deployment={d}
-                                  snapshot={s}
-                                  reload={reload}
-                                />
-                              ) : (
-                                <Suspense
-                                  fallback={<p>Loading owner panel…</p>}
-                                >
-                                  <MandateWizard
-                                    chain={chain}
-                                    vault={d.vault}
-                                    snapshot={s}
-                                    onConfirmed={() => {
-                                      setProposal(undefined);
-                                      invalidateReads();
-                                      return reload();
-                                    }}
-                                  />
-                                  <OwnerActions
-                                    chain={chain}
-                                    vault={d.vault}
-                                    snapshot={s}
-                                    onConfirmed={() => {
-                                      setProposal(undefined);
-                                      invalidateReads();
-                                      return reload();
-                                    }}
-                                  />
-                                  {proposal && (
-                                    <OwnerPanel
-                                      chain={chain}
-                                      vault={d.vault}
-                                      snapshot={s}
-                                      proposal={proposal}
-                                      proposalOnly
-                                      onProposalClear={() =>
-                                        setProposal(undefined)
-                                      }
-                                    />
-                                  )}
-                                </Suspense>
-                              )
-                          : undefined
-                      }
-                    />
-                  )}{' '}
-                  {route === 'evidence' && <EvidenceView chain={chain} />}
-                  {route === 'receipts' && <ReceiptsView chain={chain} />}{' '}
-                </>
-              )}
-            </Suspense>
-          </main>
-        </div>
-        {deskOpen && (
-          <DeskDrawer
-            onClose={() => {
-              setDeskOpen(false);
-              setProposal(undefined);
-            }}
-          >
-            <button
-              onClick={() => {
-                setDeskOpen(false);
-                setProposal(undefined);
-              }}
-            >
-              Close desk
-            </button>
-            <Suspense fallback={<p>Loading desk…</p>}>
-              <DeskView
+    <WorkspaceAccess chain={chain} demo={demo}>
+      {(publicView) => (
+        <AgentFeedProvider chain={chain}>
+          <div className="shell ux-shell">
+            <div inert={deskOpen || undefined}>
+              <Header
+                activeRoute={route}
                 demo={demo}
-                chain={chain}
-                onProposal={
-                  enableOwner && !demo && chain === 133
-                    ? (p) => {
+                onDesk={() => {
+                  setProposal(undefined);
+                  setDeskOpen(true);
+                }}
+              />
+              {demo && (
+                <div className="banner" role="note">
+                  DEMO · local anvil — prices not real · offline recorded
+                  receipts
+                </div>
+              )}
+              {!demo && chain === 133 && (
+                <div className="banner" role="note">
+                  Testnet — pool prices are not real
+                </div>
+              )}
+              {!demo && chain === 31337 && (
+                <div className="banner" role="note">
+                  local anvil — prices not real
+                </div>
+              )}
+              {!demo && chain === 177 && (
+                <div className="banner" role="note">
+                  Mainnet 177 — real funds; owner actions require explicit build
+                  activation
+                </div>
+              )}
+              <main
+                id="workspace-main"
+                tabIndex={-1}
+                key={`${chain}-${route}-${demo}`}
+              >
+                <Suspense
+                  fallback={
+                    <div className="skeleton" role="status">
+                      Loading console…
+                    </div>
+                  }
+                >
+                  {route === 'overview' ? (
+                    <WorkspaceOverview chain={chain} demo={demo} />
+                  ) : route === 'activity' ? (
+                    <ActivityView chain={chain} demo={demo} />
+                  ) : route === 'agent' ? (
+                    <AgentView
+                      chain={chain}
+                      enableOwner={enableOwner && !publicView}
+                      onProposal={(p) => {
                         setProposal(p);
                         window.location.hash = '#/mandate';
                         setRoute('mandate');
-                        setDeskOpen(false);
+                      }}
+                    />
+                  ) : route === 'desk' ? (
+                    <DeskView
+                      demo={demo}
+                      chain={chain}
+                      onProposal={
+                        enableOwner && !publicView && !demo && chain === 133
+                          ? (p) => {
+                              setProposal(p);
+                              window.location.hash = '#/mandate';
+                              setRoute('mandate');
+                            }
+                          : undefined
                       }
-                    : undefined
-                }
-              />
-            </Suspense>
-          </DeskDrawer>
-        )}
-        <footer inert={deskOpen || undefined}>
-          <span>Market evidence · mainnet 177 · read-only</span>
-          <span>No proven edge. Bounded, provable execution.</span>
-        </footer>
-      </div>
-    </AgentFeedProvider>
+                    />
+                  ) : route === 'verify' ? (
+                    <VerifyView chain={demo ? 31337 : chain} demo={demo} />
+                  ) : demo && (route === 'mandate' || route === 'setup') ? (
+                    <DemoMandate setup={route === 'setup'} />
+                  ) : demo ? (
+                    <DemoConsole route={route} />
+                  ) : (
+                    <>
+                      {(route === 'mandate' || route === 'setup') && (
+                        <MandateView
+                          chain={chain}
+                          setup={route === 'setup'}
+                          onOwner={
+                            enableOwner && !publicView
+                              ? (d, s, reload) =>
+                                  chain === 177 ? (
+                                    <MainnetOwner
+                                      deployment={d}
+                                      snapshot={s}
+                                      reload={reload}
+                                    />
+                                  ) : (
+                                    <Suspense
+                                      fallback={<p>Loading owner panel…</p>}
+                                    >
+                                      <MandateWizard
+                                        chain={chain}
+                                        vault={d.vault}
+                                        snapshot={s}
+                                        onConfirmed={() => {
+                                          setProposal(undefined);
+                                          invalidateReads();
+                                          return reload();
+                                        }}
+                                      />
+                                      <OwnerActions
+                                        chain={chain}
+                                        vault={d.vault}
+                                        snapshot={s}
+                                        onConfirmed={() => {
+                                          setProposal(undefined);
+                                          invalidateReads();
+                                          return reload();
+                                        }}
+                                      />
+                                      {proposal && (
+                                        <OwnerPanel
+                                          chain={chain}
+                                          vault={d.vault}
+                                          snapshot={s}
+                                          proposal={proposal}
+                                          proposalOnly
+                                          onProposalClear={() =>
+                                            setProposal(undefined)
+                                          }
+                                        />
+                                      )}
+                                    </Suspense>
+                                  )
+                              : undefined
+                          }
+                        />
+                      )}{' '}
+                      {route === 'evidence' && <EvidenceView chain={chain} />}
+                      {route === 'receipts' && (
+                        <ReceiptsView chain={chain} />
+                      )}{' '}
+                    </>
+                  )}
+                </Suspense>
+              </main>
+            </div>
+            {deskOpen && (
+              <DeskDrawer
+                onClose={() => {
+                  setDeskOpen(false);
+                  setProposal(undefined);
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setDeskOpen(false);
+                    setProposal(undefined);
+                  }}
+                >
+                  Close desk
+                </button>
+                <Suspense fallback={<p>Loading desk…</p>}>
+                  <DeskView
+                    demo={demo}
+                    chain={chain}
+                    onProposal={
+                      enableOwner && !publicView && !demo && chain === 133
+                        ? (p) => {
+                            setProposal(p);
+                            window.location.hash = '#/mandate';
+                            setRoute('mandate');
+                            setDeskOpen(false);
+                          }
+                        : undefined
+                    }
+                  />
+                </Suspense>
+              </DeskDrawer>
+            )}
+            <footer inert={deskOpen || undefined}>
+              <span>Market evidence · mainnet 177 · read-only</span>
+              <span>No proven edge. Bounded, provable execution.</span>
+            </footer>
+          </div>
+        </AgentFeedProvider>
+      )}
+    </WorkspaceAccess>
   );
 }
 

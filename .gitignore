@@ -21,3 +21,5 @@ mainnet-*.log
 policy/agent-mainnet-v3.json
 contracts/deployments/177.simulation.json
 .vercel
+__pycache__/
+*.pyc

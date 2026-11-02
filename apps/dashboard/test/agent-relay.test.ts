@@ -47,3 +47,19 @@ it('reports unavailable upstreams instead of substituting fixtures', async () =>
     ).status,
   ).toBe(502);
 });
+it('uses only the operator token for the VM edge and never the browser credentials', async () => {
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+  const handler = createAgentFeedHandler(
+    'http://vm.example:8788',
+    fetcher,
+    'test-relay-token',
+  );
+  await handler(
+    new Request('https://app.example/api/agent?path=/feed/state', {
+      headers: { Authorization: 'Bearer browser-value' },
+    }),
+  );
+  expect(fetcher.mock.calls[0][1].headers).toEqual({
+    Authorization: 'Bearer test-relay-token',
+  });
+});

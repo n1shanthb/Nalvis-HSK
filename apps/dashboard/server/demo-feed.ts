@@ -1,6 +1,5 @@
-/** Owner-approved temporary demo endpoint. Override with AGENT_FEED_UPSTREAM for a stable hostname.
- * Quick Tunnel hostnames change on tunnel process restart; never use this as a permanent deployment.
- * This URL exposes only the keeper's existing read-only public projection and artifacts.
+/** Owner-approved demo HTTP endpoint. Use AGENT_FEED_UPSTREAM to override.
+ * Vercel-to-VM traffic is unencrypted; never send wallet keys through this relay.
+ * The dedicated proxy token belongs only in the server environment.
  */
-export const demoFeedUpstream =
-  'https://comp-paperback-fcc-shopping.trycloudflare.com';
+export const demoFeedUpstream = 'http://129.159.17.90:8788';

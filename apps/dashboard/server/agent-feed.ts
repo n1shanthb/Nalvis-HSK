@@ -2,6 +2,7 @@
 export function createAgentFeedHandler(
   upstream: string | undefined,
   fetcher: typeof fetch = fetch,
+  proxyToken?: string,
 ) {
   const cache = new Map<
     string,
@@ -53,6 +54,9 @@ export function createAgentFeedHandler(
             const response = await fetcher(upstream.replace(/\/$/, '') + key, {
               signal: AbortSignal.timeout(7000),
               redirect: 'error',
+              ...(proxyToken
+                ? { headers: { Authorization: `Bearer ${proxyToken}` } }
+                : {}),
             });
             const body = await response.text();
             if (body.length > 4_000_000) throw Error('Feed response too large');

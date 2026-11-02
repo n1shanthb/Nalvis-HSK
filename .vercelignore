@@ -23,3 +23,5 @@ receipts/*
 !receipts/demo
 !receipts/demo/**
 apps/dashboard/review/*.png
+**/__pycache__
+**/*.pyc
