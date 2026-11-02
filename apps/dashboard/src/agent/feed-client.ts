@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { AgentFeed } from './feed-types.js';
 import type { DashboardChain } from '../lib/clients.js';
+export const agentFeedBase = () =>
+  import.meta.env.VITE_AGENT_FEED_URL ?? '/api/agent';
 export const selectedChain = (): DashboardChain =>
   import.meta.env.VITE_EXECUTION_CHAIN === '177' ? 177 : 133;
 export const snapshotFor = (chain: DashboardChain) =>
@@ -102,7 +104,13 @@ export async function readFeedJSON(
   path: string,
   signal?: AbortSignal,
 ): Promise<unknown> {
-  const r = await fetch(base.replace(/\/$/, '') + path, {
+  const url =
+    base === '/api/agent'
+      ? '/api/agent?path=' +
+        encodeURIComponent(path.split('?')[0]) +
+        (path.includes('?') ? '&' + path.split('?')[1] : '')
+      : base.replace(/\/$/, '') + path;
+  const r = await fetch(url, {
     signal: signal ?? AbortSignal.timeout(8000),
   });
   if (!r.ok) throw Error('Feed unreachable');

@@ -176,7 +176,9 @@ test('Agent uses demo fixtures only under explicit query flag', async () => {
   const view = render(<AgentView />);
   expect(screen.getByText('Demo: rule engine, not the AI agent')).toBeTruthy();
   expect(screen.getByRole('tab', { name: 'Active watches' })).toBeTruthy();
-  expect(screen.getByText(/Agent wanted 200 USDT BUY/)).toBeTruthy();
+  expect(
+    screen.getAllByText(/Agent wanted 200 USDT BUY/).length,
+  ).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('tab', { name: 'Watch history' }));
   expect(screen.getByText(/Wait for an observable price change/)).toBeTruthy();
   view.unmount();

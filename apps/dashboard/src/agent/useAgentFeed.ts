@@ -10,6 +10,7 @@ import { fixture } from './fixture.js';
 import type { AgentFeed } from './feed-types.js';
 import {
   fetchFeed,
+  agentFeedBase,
   feedSchema,
   readFeedJSON,
   selectedChain,
@@ -83,7 +84,7 @@ function useAgentFeedSource(
       }
       clearTimeout(timer);
       inFlight = true;
-      const base = import.meta.env.VITE_AGENT_FEED_URL;
+      const base = agentFeedBase();
       const signal = () =>
         AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
       try {

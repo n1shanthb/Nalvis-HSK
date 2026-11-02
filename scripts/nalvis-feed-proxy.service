@@ -1,0 +1,21 @@
+[Unit]
+Description=Nalvis authenticated read-only demo HTTP feed proxy
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=nobody
+Group=nogroup
+EnvironmentFile=/srv/nalvis/feed-proxy.env
+ExecStart=/usr/bin/python3 /srv/nalvis/feed-proxy.py
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=128M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

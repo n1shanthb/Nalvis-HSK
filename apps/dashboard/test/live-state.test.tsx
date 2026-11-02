@@ -278,7 +278,7 @@ it('successful refresh and failed refresh preserve mainnet review calldata, ackn
   const { vaultAbi } = await import('../../../packages/core/src/abi/index.js');
   const calldata = encodeFunctionData({ abi: vaultAbi, functionName: 'pause' });
   function View() {
-    const r = useResource(load);
+    const r = useResource<clients.VaultSnapshot>(load);
     return (
       <LedgerContext.Provider
         value={{

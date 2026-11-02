@@ -86,7 +86,10 @@ it('renders panels and T13A spend chart data from validated live feed', async ()
     send.mock.calls.filter(([url]) =>
       String(url).startsWith('https://agent.example'),
     ),
-  ).toHaveLength(4);
+  ).toHaveLength(5);
+  expect(
+    send.mock.calls.some(([url]) => String(url).endsWith('/feed/policy')),
+  ).toBe(true);
 });
 it('unreachable feed shows the exported snapshot and fallback banner', async () => {
   window.history.replaceState(null, '', '/#/agent');
