@@ -192,197 +192,211 @@ export function DeskView({
     setPending(false);
   }
   return (
-    <section>
-      <p className="eyebrow">05 / REVIEWED OWNER COMMANDS</p>
-      <h2>Nalvis Copilot</h2>
-      <p>
-        Answers use current market reads and the observed agent feed. Buy and
-        sell requests produce a fresh review card; mandate changes require
-        Ledger review.
-      </p>
-      <div className="desk-toolbar">
-        <label>
-          Language engine{' '}
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            disabled={pending}
-          >
-            <option value="rules">Built-in commands</option>
-            {(['openrouter'] as const).map((id) => (
-              <option
-                key={id}
-                value={id}
-                disabled={
-                  !providers.find((p) => p.id === id)?.available ||
-                  credits?.remaining === 0 ||
-                  credits?.globalRemaining === 0
-                }
+    <section className="copilot-page">
+      <header className="copilot-page-header">
+        <p className="eyebrow">05 / REVIEWED OWNER COMMANDS</p>
+        <h2>Nalvis Copilot</h2>
+        <p>
+          Ask about the agent, inspect live evidence, or prepare a reviewed
+          trade. Verified rules remain authoritative.
+        </p>
+      </header>
+      <div className="copilot-layout">
+        <section className="copilot-chat-panel" aria-label="Nalvis conversation">
+          <header className="copilot-chat-header">
+            <div>
+              <strong><span className="copilot-online-dot" /> Nalvis</strong>
+              <small>Grounded in the selected workspace</small>
+            </div>
+            <label className="copilot-engine">
+              <span>Language engine</span>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                disabled={pending}
               >
-                OpenRouter
-                {providers.find((p) => p.id === id)?.available
-                  ? ''
-                  : ' · not configured'}
-              </option>
+                <option value="rules">Built-in commands</option>
+                {(['openrouter'] as const).map((id) => (
+                  <option
+                    key={id}
+                    value={id}
+                    disabled={
+                      !providers.find((p) => p.id === id)?.available ||
+                      credits?.remaining === 0 ||
+                      credits?.globalRemaining === 0
+                    }
+                  >
+                    OpenRouter
+                    {providers.find((p) => p.id === id)?.available
+                      ? ''
+                      : ' · not configured'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </header>
+          <div className="copilot-context-strip" aria-live="polite">
+            <span>{provider === 'rules' ? 'Deterministic commands' : 'OpenRouter interpretation'}</span>
+            <span>
+              {credits
+                ? `${credits.remaining} personal · ${credits.globalRemaining} shared calls left`
+                : 'Provider credits unavailable'}
+            </span>
+            {credits && (
+              <span className="sr-only">AI credits: {credits.remaining} remaining today</span>
+            )}
+            <span>{demo ? 'Recorded evidence' : `Chain ${chain} · live workspace`}</span>
+          </div>
+          <div className="conversation" role="log" aria-live="polite">
+            {!messages.length && (
+              <div className="chat-empty">
+                <span className="chat-avatar" aria-hidden="true">N</span>
+                <div>
+                  <h3>What do you want to inspect?</h3>
+                  <p>
+                    Ask why the agent waited, check positions or spread, or
+                    describe a trade you want reviewed.
+                  </p>
+                </div>
+              </div>
+            )}
+            {resource.error && (
+              <p className="chat-alert" role="alert">
+                Recorded evidence unavailable: {resource.error}
+              </p>
+            )}
+            {messages.map((m, i) => (
+              <article className="chat-turn" key={i}>
+                <div className="chat-message user-chat-message">
+                  <div className="chat-bubble"><p>{m.input}</p></div>
+                  <span className="chat-avatar user-avatar" aria-hidden="true">You</span>
+                </div>
+                <div className="chat-message assistant-chat-message">
+                  <span className="chat-avatar" aria-hidden="true">N</span>
+                  <div className="chat-bubble">
+                    {m.source && (
+                      <p className="ai-meta">
+                        {m.source}
+                        {m.interpretation && <> · Interpreted as <code>{m.interpretation}</code></>}
+                      </p>
+                    )}
+                    {m.warning && <p className="ai-fallback" role="status">{m.warning}</p>}
+                    <p>{m.reply.message}</p>
+                    {(m.reply.intent.kind === 'exit' || m.reply.intent.kind === 'buy') &&
+                      (demo || chain !== 177 ? (
+                        <p>Owner-directed trades require the live mainnet workspace.</p>
+                      ) : (
+                        <ExitReview
+                          allowTrading={allowTrading}
+                          direction={m.reply.intent.kind === 'buy' ? 'BUY' : 'SELL'}
+                          notionalB={m.reply.intent.kind === 'buy' ? m.reply.intent.notionalB : undefined}
+                        />
+                      ))}
+                    {m.transcript && (
+                      <details className="ai-meta">
+                        <summary>Interpretation audit</summary>
+                        <code>Prompt: {m.transcript.promptHash}<br />Output: {m.transcript.outputHash}</code>
+                      </details>
+                    )}
+                    {m.reply.diff && <pre>{JSON.stringify({ diff: m.reply.diff, calldataHash: m.reply.calldataHash }, null, 2)}</pre>}
+                    {m.reply.proposal && onProposal && (
+                      <button className="secondary" onClick={() => onProposal(m.reply.proposal!)}>
+                        Review exact proposal with Ledger
+                      </button>
+                    )}
+                    {m.reply.ruleTrace?.map((trace, index) => (
+                      <p className="ai-meta" key={index}>
+                        {trace.pass ? 'PASS' : 'FAIL'} · {trace.rule}: {trace.detail}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </article>
             ))}
-          </select>
-        </label>
-        <p>
-          {provider === 'rules'
-            ? providers.some((p) => p.available)
-              ? 'Choose OpenRouter, or use built-in commands without a key.'
-              : 'OpenRouter not configured. Built-in commands are available.'
-            : 'AI interprets language only. Verified rules decide.'}
-        </p>
-      </div>
-      <p className="ai-meta" aria-live="polite">
-        {credits
-          ? `AI credits: ${credits.remaining} remaining today · shared daily budget: ${credits.globalRemaining} calls remaining. Resets ${new Date(credits.resetAt * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.${credits.retryAfter ? ` Rate limit: retry in ${credits.retryAfter}s.` : ''}`
-          : 'AI credits unavailable · providers are disabled until shared budgets and credentials are configured.'}
-      </p>
-      <details className="desk-supported">
-        <summary>What can I ask?</summary>
-        <p className="muted">{supportedCommands}</p>
-        <p>
-          AI requests send your text to the selected provider. Never include
-          keys or sensitive information. Proposals always require separate owner
-          review; this conversation does not execute trades.
-        </p>
-      </details>
-      {!demo && (
-        <p>
-          Uses verified locally served receipts on the selected network. Enable
-          Demo mode for offline recorded evidence.
-        </p>
-      )}
-      {!demo && chain === 177 && (
-        <section className="agent-card" aria-label="Direct BUY review">
-          <h3>Review a WHSK buy</h3>
-          <p>Enter an exact USDT amount. This reads a fresh quote; it does not send a trade.</p>
-          <form onSubmit={(event) => {
-            event.preventDefault();
-            if (/^\d+(?:\.\d{1,6})?$/.test(buyAmount) && Number(buyAmount) > 0)
-              setReviewedBuyAmount(buyAmount);
-          }}>
-            <label htmlFor="copilot-buy-amount">Spend USDT</label>
-            <input id="copilot-buy-amount" inputMode="decimal" value={buyAmount}
-              onChange={(event) => { setBuyAmount(event.target.value); setReviewedBuyAmount(null); }}
-              aria-describedby="copilot-buy-help" />
-            <small id="copilot-buy-help">Up to six decimal places; the mandate and vault balance are checked in the review.</small>
-            <button type="submit" disabled={!/^\d+(?:\.\d{1,6})?$/.test(buyAmount) || Number(buyAmount) <= 0}>
-              Get fresh BUY review
+            {pending && <p className="desk-pending" role="status">Nalvis is interpreting your request…</p>}
+          </div>
+          <form
+            className="copilot-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit(input);
+            }}
+          >
+            <label className="sr-only" htmlFor="copilot-message">Ask Nalvis</label>
+            <input
+              id="copilot-message"
+              value={input}
+              maxLength={500}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="Ask about a decision, position, or trade…"
+            />
+            <button aria-label="Ask Copilot" disabled={!input.trim() || resource.loading || pending}>
+              Send
             </button>
           </form>
-          {reviewedBuyAmount && <ExitReview key={reviewedBuyAmount} allowTrading={allowTrading}
-            direction="BUY" notionalB={reviewedBuyAmount} />}
         </section>
-      )}
-      {resource.error && (
-        <p role="alert">Recorded evidence unavailable: {resource.error}</p>
-      )}
-      <div className="conversation" role="log" aria-live="polite">
-        {!messages.length && (
-          <p>
-            Ask about a decision, inspect positions, or prepare an owner
-            proposal.
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <article key={i}>
-            <p className="user-message">{m.input}</p>
-            {m.source && (
-              <p className="ai-meta">
-                {m.source}
-                {m.interpretation && (
-                  <>
-                    {' '}
-                    · Interpreted as <code>{m.interpretation}</code>
-                  </>
-                )}
-              </p>
-            )}
-            {m.warning && (
-              <p className="ai-fallback" role="status">
-                {m.warning}
-              </p>
-            )}
-            <p>{m.reply.message}</p>
-            {(m.reply.intent.kind === 'exit' || m.reply.intent.kind === 'buy') &&
-              (demo || chain !== 177 ? (
-                <p>
-                  Owner-directed exits require the live mainnet workspace. No
-                  swap is submitted from recorded examples.
-                </p>
-              ) : (
-                <ExitReview
-                  allowTrading={allowTrading}
-                  direction={m.reply.intent.kind === 'buy' ? 'BUY' : 'SELL'}
-                  notionalB={m.reply.intent.kind === 'buy' ? m.reply.intent.notionalB : undefined}
-                />
-              ))}
-            {m.transcript && (
-              <details className="ai-meta">
-                <summary>Interpretation transcript hashes</summary>
-                <p>
-                  SHA-256 · audit metadata for this conversation, not an
-                  on-chain receipt.
-                </p>
-                <code>
-                  Prompt: {m.transcript.promptHash}
-                  <br />
-                  Output: {m.transcript.outputHash}
-                </code>
-              </details>
-            )}
-            {m.reply.diff && (
-              <pre>
-                {JSON.stringify(
-                  { diff: m.reply.diff, calldataHash: m.reply.calldataHash },
-                  null,
-                  2,
-                )}
-              </pre>
-            )}
-            {m.reply.proposal && onProposal && (
-              <button
-                className="secondary"
-                onClick={() => onProposal(m.reply.proposal!)}
+        <aside className="copilot-action-rail" aria-label="Reviewed actions">
+          {!demo && chain === 177 && (
+            <section className="copilot-trade-card" aria-label="Direct BUY review">
+              <div className="trade-card-heading">
+                <span className="watch-kind">BUY</span>
+                <span>USDT → WHSK</span>
+              </div>
+              <h3>Prepare a reviewed buy</h3>
+              <p>Enter the exact amount to receive a fresh quote and mandate check.</p>
+              <form
+                className="copilot-buy-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (/^\d+(?:\.\d{1,6})?$/.test(buyAmount) && Number(buyAmount) > 0)
+                    setReviewedBuyAmount(buyAmount);
+                }}
               >
-                Review exact proposal with Ledger
-              </button>
-            )}
-            {m.reply.ruleTrace?.map((t, i) => (
-              <p key={i}>
-                {t.pass ? 'PASS' : 'FAIL'} · {t.rule}: {t.detail}
-              </p>
-            ))}
-          </article>
-        ))}
-        {pending && (
-          <p className="desk-pending" role="status">
-            Interpreting your request…
-          </p>
-        )}
+                <label htmlFor="copilot-buy-amount">Spend</label>
+                <div className="amount-input">
+                  <input
+                    aria-label="Spend USDT"
+                    id="copilot-buy-amount"
+                    inputMode="decimal"
+                    value={buyAmount}
+                    onChange={(event) => {
+                      setBuyAmount(event.target.value);
+                      setReviewedBuyAmount(null);
+                    }}
+                    aria-describedby="copilot-buy-help"
+                  />
+                  <span>USDT</span>
+                </div>
+                <small id="copilot-buy-help">Current vault balance and mandate are checked.</small>
+                <button
+                  aria-label="Get fresh BUY review"
+                  type="submit"
+                  disabled={!/^\d+(?:\.\d{1,6})?$/.test(buyAmount) || Number(buyAmount) <= 0}
+                >
+                  Review buy
+                </button>
+              </form>
+              {reviewedBuyAmount && (
+                <ExitReview
+                  key={reviewedBuyAmount}
+                  allowTrading={allowTrading}
+                  direction="BUY"
+                  notionalB={reviewedBuyAmount}
+                />
+              )}
+            </section>
+          )}
+          <details className="copilot-help-card">
+            <summary>Capabilities and limits</summary>
+            <p>{supportedCommands}</p>
+            <p>
+              Language interpretation cannot bypass the mandate. Never include
+              keys or sensitive information.
+            </p>
+            {!demo && <p>Evidence comes from the selected live workspace.</p>}
+          </details>
+        </aside>
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit(input);
-        }}
-      >
-        <label>
-          Ask Nalvis
-          <input
-            value={input}
-            maxLength={500}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Why did you WAIT last?"
-          />
-        </label>
-        <button disabled={!input.trim() || resource.loading || pending}>
-          Ask Copilot
-        </button>
-      </form>
     </section>
   );
 }

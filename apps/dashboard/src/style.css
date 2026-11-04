@@ -1113,6 +1113,422 @@ th {
 .ai-fallback {
   color: var(--warning);
 }
+
+/* Shared watch cards replace duplicated sentence lists in Agent surfaces. */
+.watch-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.watch-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #080c10;
+}
+.watch-card > header,
+.trade-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.watch-kind,
+.watch-armed,
+.watch-fired {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.watch-kind {
+  color: var(--muted);
+}
+.watch-armed {
+  color: var(--accent);
+}
+.watch-fired {
+  color: var(--warning);
+}
+.watch-card h4 {
+  min-height: 2.4em;
+  margin-bottom: 10px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+.watch-card > p {
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.watch-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
+}
+.watch-meta > div {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+.watch-meta dt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.watch-meta dd {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 12px;
+}
+.watch-card-grid.compact .watch-card h4 {
+  min-height: 0;
+}
+.pulse-watches .watch-card-grid {
+  margin-bottom: 18px;
+}
+
+/* Copilot is a focused conversation with reviewed actions in a side rail. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.copilot-page-header {
+  max-width: 760px;
+  margin-bottom: 32px;
+}
+.copilot-page-header > p:last-child {
+  font-size: 17px;
+}
+.copilot-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr);
+  align-items: start;
+  gap: 22px;
+}
+.copilot-chat-panel,
+.copilot-trade-card,
+.copilot-help-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #080c10;
+}
+.copilot-chat-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+.copilot-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.copilot-chat-header strong,
+.copilot-chat-header small {
+  display: block;
+}
+.copilot-chat-header small {
+  margin-top: 3px;
+}
+.copilot-online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px #a3e63517;
+}
+.copilot-engine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.copilot-engine select {
+  min-height: 36px;
+  padding: 6px 30px 6px 10px;
+  font-size: 12px;
+}
+.copilot-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.copilot-context-strip span + span::before {
+  content: '•';
+  margin-right: 18px;
+  color: #475149;
+}
+.copilot-chat-panel .conversation {
+  min-height: 470px;
+  margin: 0;
+  padding: 28px 20px 18px;
+}
+.chat-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 500px;
+  padding-top: 28px;
+}
+.chat-empty h3 {
+  margin: 3px 0 8px;
+}
+.chat-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #3c543e;
+  border-radius: 10px;
+  background: #142016;
+  color: var(--accent);
+  font-family: Syne, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+.user-avatar {
+  width: 36px;
+  color: var(--text);
+  background: var(--raised);
+  border-color: var(--line);
+  font-size: 9px;
+}
+.chat-turn {
+  border: 0 !important;
+  padding: 0 0 26px !important;
+}
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.user-chat-message {
+  justify-content: flex-end;
+}
+.chat-bubble {
+  min-width: 0;
+  max-width: min(82%, 640px);
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px 14px 14px;
+  background: var(--surface);
+}
+.user-chat-message .chat-bubble {
+  border-radius: 14px 4px 14px 14px;
+  background: #182218;
+  border-color: #2f422f;
+}
+.chat-bubble > :last-child {
+  margin-bottom: 0;
+}
+.chat-bubble p {
+  color: var(--text);
+  font-size: 14px;
+}
+.chat-bubble .ai-meta {
+  color: var(--muted);
+  font-size: 10px;
+}
+.chat-alert,
+.desk-pending {
+  margin: 16px 46px;
+  padding: 12px 14px;
+  border: 1px solid #e8b84a55;
+  border-radius: 8px;
+  background: #e8b84a0b;
+  color: var(--warning);
+  font-size: 13px;
+}
+.copilot-composer {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+  background: #080c10f2;
+  backdrop-filter: blur(10px);
+}
+.copilot-composer input {
+  min-height: 48px;
+  margin: 0 !important;
+  padding-inline: 16px;
+  background: var(--surface);
+}
+.copilot-composer button {
+  min-width: 78px;
+  border-radius: 9px;
+}
+.copilot-action-rail {
+  position: sticky;
+  top: 100px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.copilot-trade-card {
+  padding: 20px;
+}
+.trade-card-heading {
+  justify-content: flex-start;
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.trade-card-heading .watch-kind {
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: var(--accent);
+  background: #a3e63510;
+}
+.copilot-trade-card h3 {
+  margin-bottom: 8px;
+  font-size: 20px;
+}
+.copilot-trade-card > p {
+  font-size: 13px;
+}
+.copilot-buy-form label {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.amount-input {
+  position: relative;
+}
+.amount-input input {
+  margin: 0 !important;
+  padding-right: 62px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.amount-input span {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.copilot-buy-form small {
+  display: block;
+  margin: 8px 0 14px;
+}
+.copilot-buy-form button {
+  width: 100%;
+  border-radius: 8px;
+}
+.copilot-help-card {
+  padding: 10px 18px 16px;
+}
+.copilot-help-card summary {
+  margin: 0 !important;
+  color: var(--text);
+  font-size: 13px;
+}
+.copilot-help-card p {
+  font-size: 12px;
+}
+.copilot-action-rail .exit-review {
+  margin: 18px -8px -8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.copilot-action-rail .exit-review dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.copilot-action-rail .exit-review dl > div {
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #080c10;
+}
+.copilot-action-rail .exit-review dd {
+  margin-top: 4px;
+  text-align: left;
+  color: var(--text);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .copilot-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .copilot-action-rail {
+    position: static;
+  }
+}
+@media (max-width: 680px) {
+  .watch-card-grid,
+  .watch-meta,
+  .copilot-action-rail .exit-review dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .watch-card h4 {
+    min-height: 0;
+  }
+  .copilot-chat-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .copilot-engine {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .copilot-engine select {
+    flex: 1;
+  }
+  .copilot-context-strip span + span::before {
+    display: none;
+  }
+  .copilot-chat-panel .conversation {
+    min-height: 390px;
+    padding-inline: 14px;
+  }
+  .chat-bubble {
+    max-width: calc(100% - 48px);
+  }
+  .copilot-composer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .copilot-composer button {
+    width: 100%;
+  }
+}
 /* Chart geometry and accessible alternative data. */
 .time-series-host {
   position: relative;
