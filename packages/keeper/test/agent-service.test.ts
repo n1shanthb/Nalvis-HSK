@@ -12,7 +12,10 @@ import {
   createJournal,
 } from '../../core/src/agent/index.js';
 import { feedServer } from '../src/agent-feed.js';
-import { startAgentService } from '../src/agent-service.js';
+import {
+  serviceLoopDelaySec,
+  startAgentService,
+} from '../src/agent-service.js';
 import {
   agentLock,
   exportSnapshot,
@@ -115,6 +118,13 @@ describe('read-only agent feed', () => {
   });
 });
 describe('durable service lifecycle', () => {
+  it('polls owner orders inside the signed quote lifetime without increasing strategy wake cadence', () => {
+    expect(serviceLoopDelaySec({}, 600, false)).toBe(600);
+    expect(serviceLoopDelaySec({}, 600, true)).toBe(5);
+    expect(serviceLoopDelaySec({ COPILOT_POLL_SEC: '10' }, 600, true)).toBe(10);
+    expect(serviceLoopDelaySec({ COPILOT_POLL_SEC: 'bad' }, 600, true)).toBe(5);
+    expect(serviceLoopDelaySec({ COPILOT_POLL_SEC: '10' }, 3, true)).toBe(3);
+  });
   it('uses exactly the dashboard source-of-truth feed types', async () => {
     expect(
       await readFile(

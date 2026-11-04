@@ -211,6 +211,14 @@ export function ExitReview({
         session.expiresAt <= Date.now() / 1000
       )
         throw Error('Session changed or expired.');
+      // Ledger approval can consume most of a short quote lifetime. Refresh the
+      // exact state/quote after signing, while retaining the same signed session.
+      await load();
+      if (
+        delegation.current !== session ||
+        session.expiresAt <= Date.now() / 1000
+      )
+        throw Error('Session changed or expired while refreshing the review.');
       setOwnerSignature(signature);
     } catch {
       setError(

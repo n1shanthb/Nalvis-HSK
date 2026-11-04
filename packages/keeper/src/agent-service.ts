@@ -29,6 +29,21 @@ export function stateRoot(env: Env = process.env) {
         : './.agent-state'),
   );
 }
+/** Owner confirmations must be claimed well inside their 90-second quote lifetime.
+ * Strategy evaluation still obeys AgentConfig.pollSec inside agent.tick(). */
+export function serviceLoopDelaySec(
+  env: Env,
+  strategyPollSec: number,
+  ownerOrdersEnabled: boolean,
+) {
+  if (!ownerOrdersEnabled) return strategyPollSec;
+  const requested = Number(env.COPILOT_POLL_SEC ?? 5);
+  const ownerPollSec =
+    Number.isInteger(requested) && requested >= 2 && requested <= 30
+      ? requested
+      : 5;
+  return Math.min(strategyPollSec, ownerPollSec);
+}
 export async function startAgentService(options: {
   exec: 'testnet' | 'anvil' | 'mainnet';
   once?: boolean;
@@ -377,9 +392,17 @@ export async function startAgentService(options: {
       await active;
       if (stopped || options.once) break;
       try {
-        await delay((config?.pollSec ?? 20) * 1000, undefined, {
-          signal: abort.signal,
-        });
+        await delay(
+          serviceLoopDelaySec(
+            env,
+            config?.pollSec ?? 20,
+            ownerOrders !== undefined,
+          ) * 1000,
+          undefined,
+          {
+            signal: abort.signal,
+          },
+        );
       } catch {
         /* stop interrupts poll delay */
       }
