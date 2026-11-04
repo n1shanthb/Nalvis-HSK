@@ -12,6 +12,7 @@ import {
   type DashboardChain,
 } from '../lib/clients.js';
 import type { OwnerProposal } from '../../../../packages/core/src/desk/proposal.js';
+import { WatchCards } from '../components/WatchCards.js';
 const at = (time: number | null | undefined) =>
   time ? displayTime(time) : 'Not scheduled';
 export function AgentView({
@@ -169,19 +170,7 @@ export function AgentView({
                   </div>
                 ))
             ) : (
-              feed.watches.map((w) => (
-                <div key={w.id}>
-                  <h4>{w.label}</h4>
-                  <p>
-                    Set by {w.createdBy} · {w.note}
-                  </p>
-                  <p>
-                    Created {at(w.createdAt)} · Last fired{' '}
-                    {w.lastFiredAt ? at(w.lastFiredAt) : 'Never'} ·{' '}
-                    {w.fireCount} fires · Expires {at(w.expiresAt)}
-                  </p>
-                </div>
-              ))
+              <WatchCards watches={feed.watches} />
             )}
           </div>
         </article>

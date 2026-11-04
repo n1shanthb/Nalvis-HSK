@@ -5,6 +5,7 @@ import { agentFeedBase, readFeedJSON } from '../agent/feed-client.js';
 import { displayTime } from '../lib/clients.js';
 import { useResource } from '../lib/useResource.js';
 import { readStrategyNotes } from '../agent/strategy-notes.js';
+import { WatchCards } from './WatchCards.js';
 
 const policySummary = z.object({
   executionChainId: z.number(),
@@ -275,24 +276,7 @@ export function AgentPulse({
       {!compact && (
         <div className="pulse-watches">
           <h3>What can wake the agent?</h3>
-          {feed.watches.length ? (
-            <ul>
-              {feed.watches.map((watch) => (
-                <li key={watch.id}>
-                  <strong>{watch.label}</strong>
-                  <span>{watch.note}</span>
-                  <small>
-                    {watch.createdBy} · fired {watch.fireCount} times
-                    {watch.expiresAt
-                      ? ` · expires ${displayTime(watch.expiresAt)}`
-                      : ''}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No active watches supplied in the feed.</p>
-          )}
+          <WatchCards watches={feed.watches} compact />
         </div>
       )}
       <a href={compact ? '#/agent' : '#/activity'}>
