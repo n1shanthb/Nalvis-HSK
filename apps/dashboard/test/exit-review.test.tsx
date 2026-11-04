@@ -124,6 +124,12 @@ it('requires the owner session and a separate explicit Confirm, and binds the di
     ).toBe(false),
   );
   expect(
+    fetcher.mock.calls.filter(([, options]) => {
+      const body = options?.body ? JSON.parse(String(options.body)) : undefined;
+      return body?.op === 'preview';
+    }),
+  ).toHaveLength(2);
+  expect(
     fetcher.mock.calls.some(([, options]) =>
       String(options?.body).includes('"confirm"'),
     ),

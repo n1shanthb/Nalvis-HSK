@@ -39,6 +39,10 @@ Vercel server variables (never `VITE_` secrets):
 OCI requires the same Redis REST URL/token and opt-in flag, in a supplemental
 mode-600 env file, alongside its existing agent env. No agent signing key goes to
 Vercel. `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` aliases also work.
+Set `COPILOT_POLL_SEC=5` (valid range 2–30 seconds) so reviewed orders are
+claimed well inside their 90-second quote lifetime. This only changes owner-order
+queue polling; strategy evaluation and model wakes continue to obey
+`AGENT_POLL_SEC` and the configured watches.
 Missing/invalid Redis configuration disables order processing without changing
 autonomous strategy. Redis request limits also protect the Copilot AI endpoint;
 they count requests rather than guaranteeing a dollar spend ceiling.
